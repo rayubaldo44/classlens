@@ -1,6 +1,6 @@
 # Demo Guide
 
-**Implementation status:** Planned. No demo dataset, teacher material, seeded database, or ClassLens UI flow exists in the repository as of 2026-10-01.
+**Implementation status:** The complete local workflow, deterministic baseline/follow-up fixtures, teacher material, reset/start runner, and calculated results are implemented as of 2026-10-02. The service chain is live-verified. A headless Firefox rehearsal reached the real validated intake, but local driver interaction blocked the remaining automated clicks; the full manual browser rehearsal and deployment checks remain open.
 
 This document defines the reproducible hackathon demonstration. It must remain honest about synthetic, seeded, cached, or live-generated content.
 
@@ -21,7 +21,7 @@ These responses may indicate a recurring misunderstanding of sunlight as food ra
 
 ## Reproducible dataset requirements
 
-Create these fixtures during implementation; do not hand-edit production data before the demo:
+The implemented fixtures and verification contracts are:
 
 1. **Assessment definition** with stable question IDs, exact prompts, learning objectives, expected answers/rubrics, subject, grade, and topic.
 2. **Baseline response CSV** with 40–50 stable synthetic student IDs, valid quoting, several questions if time permits, correctness according to the chosen transparent scoring contract, and a deliberate mix of:
@@ -36,7 +36,33 @@ Create these fixtures during implementation; do not hand-edit production data be
 5. **Follow-up response CSV** using the same synthetic student/question IDs, with missing records represented by absence and the file clearly labeled `demo_seed` if outcomes are predetermined.
 6. **Reset/seed command or documented procedure** that restores the same clean state before each run.
 
-Fix seeds wherever the selected grouping or fixture-generation code uses randomness. Record model IDs and thresholds. Do not claim the dataset exists until these files are committed and verified.
+The baseline and follow-up fixtures, manifests, and teacher material are versioned under `data/demo/`. Grouping is deterministic for fixed inputs, model, threshold, and minimum support; no fixture-generation randomness is used at runtime.
+
+## Clean local start and reset
+
+Complete the backend environment setup in [backend/README.md](../backend/README.md), including a server-side `GEMINI_API_KEY`. From the repository root:
+
+```bash
+./scripts/demo.sh check
+./scripts/demo.sh reset
+```
+
+Open `http://127.0.0.1:5173`. The runner permits both the `127.0.0.1` and `localhost` spellings of that origin, so either address works. If that port is occupied, choose another and the runner will configure matching backend CORS automatically:
+
+```bash
+CLASSLENS_FRONTEND_PORT=4179 ./scripts/demo.sh reset
+```
+
+If a screen reports that the browser could not reach the API, the backend may be stopped or the origin may be blocked by CORS. A CORS block is invisible to `curl` and appears in the browser console as a blocked cross-origin request even while the backend is healthy. Check the origin allow-list before restarting FastAPI.
+
+Useful controls:
+
+```bash
+./scripts/demo.sh status
+./scripts/demo.sh stop
+```
+
+`reset` stops only process groups previously recorded by the runner. Starting a fresh backend clears all process-local analysis, material, remediation, and comparison state. It does not delete fixtures, model caches, environment files, or secrets. Verification on 2026-10-02 retrieved an indexed material before reset with HTTP 200 and received HTTP 404 `material_not_found` for the same ID afterward.
 
 ## Golden-path click sequence
 
@@ -99,9 +125,9 @@ Load the clearly labeled synthetic follow-up. Show transparent before/after coun
 Reliability is the priority, so prepare fallbacks before the event:
 
 1. Keep local copies of the exact synthetic assessment, CSVs, and teacher material.
-2. Keep a deterministic seeded analysis result derived from those same fixtures, including exact membership and provenance.
-3. If live AI is unavailable, switch through an explicit **Seeded demo result** control or configuration and say that the model output was precomputed from the displayed data.
-4. If document extraction is unreliable on the venue network, use a pre-extracted chunk fixture from the same visible document and label it as preprocessed.
+2. Keep the deterministic fixture manifests available to verify counts, group membership, and follow-up transitions.
+3. An explicit seeded Gemini remediation fallback is not implemented. If live generation fails, show the readable provider error and move to a clearly labeled screenshot or recording; do not imply the draft was generated live.
+4. The demo teaching material is already plain text, so no network document extraction is required.
 5. Keep screenshots or a short recording only as the final presentation fallback, labeled as a recorded run.
 
 Never present seeded groups, retrieval, remediation, or follow-up results as live provider output. Never silently replace a failure with fabricated content.
@@ -110,27 +136,27 @@ Never present seeded groups, retrieval, remediation, or follow-up results as liv
 
 ### Data and expected outputs
 
-- [ ] Synthetic assessment, baseline CSV, material, manifest, and follow-up CSV exist and are versioned.
-- [ ] Row counts, blank counts, scoring, group membership, and result arithmetic match the manifest.
-- [ ] No real student data appears in files, logs, screenshots, or browser storage.
-- [ ] Seeded/precomputed items are labeled in fixtures and UI.
+- [x] Synthetic assessment, baseline CSV, material, manifest, and follow-up CSV exist and are versioned.
+- [x] Row counts, blank counts, scoring, group membership, and result arithmetic match the manifest.
+- [x] No real student data appears in the versioned fixtures; stable synthetic identifiers are used.
+- [x] Synthetic/precomputed fixture inputs are labeled in fixtures and UI.
 
 ### Services and configuration
 
-- [ ] Frontend, backend, and database URLs are correct for the demo environment.
-- [ ] Required secrets are present server-side and absent from the frontend bundle.
+- [x] Local frontend and backend URLs are configured by the demo runner; no database connection is used.
+- [x] Required Gemini configuration is present server-side and absent from the frontend bundle.
 - [ ] CORS and HTTPS work from the presentation machine/network.
 - [ ] Provider quotas, model availability, and timeouts were checked.
-- [ ] Health checks and logs are accessible without exposing sensitive data.
+- [x] Health checks and runner-owned log paths are accessible without printing secrets.
 
 ### Golden path
 
 - [ ] Run the full click sequence from a clean reset twice.
-- [ ] Confirm CSV validation and preview counts.
-- [ ] Confirm the target group and exact evidence.
-- [ ] Confirm the expected source passage and locator.
-- [ ] Confirm remediation references only available passages.
-- [ ] Confirm edit, approve, and reject states persist correctly.
+- [x] Confirm CSV validation and preview counts.
+- [x] Confirm the target group and exact evidence through the live service path.
+- [x] Confirm the expected source passage and locator through the live service path.
+- [x] Confirm remediation references only available passages through the live service path.
+- [x] Confirm edit, approve, and reject states persist correctly within one backend process.
 - [ ] Confirm follow-up missing values and percentages render correctly.
 
 ### Presentation

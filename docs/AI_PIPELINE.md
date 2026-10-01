@@ -1,6 +1,6 @@
 # AI Pipeline
 
-**Implementation status:** Proposed. No analysis, embedding, grouping, LLM, document extraction, retrieval, or remediation code exists in the repository as of 2026-10-01.
+**Implementation status:** The working AI pipeline is unchanged. Its assessment evidence, material chunks, teacher review, and follow-up comparison now have PostgreSQL adapters; live Supabase restart verification awaits a direct database URL. Standalone LLM misconception-label interpretation remains unimplemented.
 
 This document is the authority for the proposed AI workflow and its failure behavior. Product requirements and safeguards are in [PRODUCT.md](PRODUCT.md); selected and pending technologies are in [TECH_STACK.md](TECH_STACK.md).
 
@@ -25,12 +25,12 @@ Embeddings find potentially related answer patterns. They do not diagnose a misc
 
 ## 1. CSV validation and preprocessing
 
-The exact import schema is a pending decision. The initial proposed minimum is one row per student/question response with:
+The implemented import schema is documented in [API.md](API.md). Each row includes:
 
 - `student_id`: stable synthetic or privacy-safe identifier
 - `question_id`: identifier matching an assessment question
-- `response_text`: the original free-text answer
-- `is_correct`: optional explicit boolean for a deterministic demo, depending on the chosen scoring approach
+- `answer`: the original free-text answer
+- `is_correct`: required explicit `true`/`false` for deterministic MVP eligibility
 
 Assessment input must separately provide each question's prompt and expected answer or rubric. Before any AI call:
 
@@ -58,30 +58,33 @@ Never compare or group responses from different questions in the initial MVP. Si
 
 ## 3. Incorrect-response identification
 
-The scoring method is unresolved. Acceptable initial paths are:
-
-- a validated `is_correct` field supplied with the deterministic demo data; or
-- a transparent rubric/answer-key scoring step whose output can be inspected and corrected.
+The MVP uses a validated `is_correct` field supplied with each row. ClassLens does not infer correctness in this milestone. This makes the grouping input deterministic and inspectable; future rubric-assisted scoring remains a separate concern.
 
 Correct and blank responses should contribute to baseline counts but should not enter misconception grouping. If correctness is uncertain, represent that uncertainty rather than treating the response as definitely wrong.
 
-## 4. Embedding generation
+## 4. Embedding generation — implemented
 
-**Proposed:** Embed only eligible incorrect responses, with question context included only if evaluation shows it improves separation. Record:
+The backend embeds only eligible incorrect answer text using local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. The model adapter is isolated under `backend/app/providers/embeddings/`; analysis code depends on its typed protocol, not the package directly. The current preprocessing version is `answer_only_v1`; original answers remain unchanged for evidence. The response records:
 
 - exact model identifier and revision when available;
 - preprocessing/template version;
 - vector dimension;
-- generation timestamp and analysis run;
+- stable analysis run identifier;
 - provider/request failure metadata without secrets.
 
 Batch calls within provider limits, apply a timeout, and validate response count and vector dimensions. A partial or malformed embedding batch must fail the affected analysis rather than inventing or zero-filling vectors.
 
-The exact Hugging Face model and hosted-versus-local execution mode remain TBD.
+Vectors are batched, normalized, and validated for count, consistent dimensions, finite values, and non-zero magnitude. Provider or malformed-vector failures return a retryable structured error and no groups. Model files are downloaded and cached locally on first use; Python 3.11 and a CPU-only PyTorch wheel are the verified development setup.
 
-## 5. Similarity and grouping
+## 5. Similarity and grouping — implemented
 
-**Proposed; algorithm TBD:** Normalize vectors if required by the chosen similarity metric, calculate within-question similarity, then use a grouping method that can leave noise unassigned. Candidate approaches may include hierarchical clustering with a distance cutoff, density-based clustering, or a small graph of similarity-connected responses.
+The service partitions eligible responses by `question_id`, calculates cosine similarity, and applies deterministic agglomerative complete-link clustering. Two clusters merge only when every cross-cluster response pair meets the configured similarity threshold. This conservative rule prevents bridge responses from chaining otherwise dissimilar ideas together. Clusters below minimum support remain outliers.
+
+Current environment-configurable defaults:
+
+- `CLASSLENS_SIMILARITY_THRESHOLD=0.70`
+- `CLASSLENS_MIN_GROUP_SIZE=3`
+- algorithm identifier `complete_link_cosine_v1`
 
 The selected strategy must be evaluated on short response text and small per-question samples. Store the algorithm name, distance metric, threshold(s), minimum group size, and software/model versions with each run.
 
@@ -94,9 +97,9 @@ The selected strategy must be evaluated on short response text and small per-que
 - Measure group coherence; low-coherence groups should be withheld or explicitly caveated.
 - Use careful labels such as “potential misconception” and “responses suggest.”
 
-Thresholds must be calibrated against the versioned demo fixture, then checked with perturbations or alternate seeds to avoid a one-off result.
+The initial threshold was evaluated against the versioned fixture without phrase rules: 29 eligible incorrect responses produced 4 groups containing 18 responses and 11 outliers. The strongest group contained 9 differently worded sunlight-as-food responses. Soil-food and two semantically distinct carbon-dioxide error groups also met support. This is hackathon calibration, not a claim of general educational validity.
 
-## 6. Representative evidence
+## 6. Representative evidence — implemented
 
 For each proposed group, return evidence before interpretation:
 
@@ -108,7 +111,7 @@ For each proposed group, return evidence before interpretation:
 - nearest outliers or contrasting responses when useful;
 - question prompt and expected answer/rubric.
 
-Representation must not become cherry-picking. Keep full group membership available to the detail view even if only a few examples appear initially.
+The implementation returns every member student identifier plus up to three exact responses nearest the group medoid, their similarity to the medoid, and mean pairwise coherence. Representation must not become cherry-picking; the UI shows the full member list alongside the representative responses.
 
 ## 7. LLM misconception interpretation
 
@@ -122,59 +125,83 @@ Provide the LLM only the question context, expected concept, aggregate evidence,
 
 Validate output against a schema. Reject evidence IDs that were not supplied and descriptions that contain invented quotes. The UI should still display deterministic group evidence if the LLM fails; the interpretation should be marked unavailable.
 
-## 8. Teacher-material extraction and chunking
+## 8. Teacher-material extraction and chunking — implemented
 
-**Proposed; formats and extractor TBD:**
+The MVP accepts UTF-8 `.txt` files up to 1 MB. It rejects unsupported extensions, decoding errors, null characters, empty content, and text that produces no chunks. PDF, DOCX, and scanned-page extraction are not implemented.
 
-1. Validate supported file type and size.
-2. Extract text and source metadata such as filename, page, heading, and character offsets when available.
-3. Normalize whitespace without changing educational content.
-4. Surface unreadable/scanned or empty extraction rather than accepting it as useful material.
-5. Split text into moderately overlapping semantic chunks, preferably respecting paragraph/section boundaries.
-6. Store each chunk's exact text, ordinal, source locator, extraction version, and content hash.
-7. Embed chunks using a model suitable for retrieval. Whether this is the same model as response grouping is an unresolved decision and must be evaluated rather than assumed.
+Text extraction decodes UTF-8 with an optional BOM. Cleaning normalizes CRLF/CR to LF, removes trailing whitespace per line, collapses runs of three or more newlines, and trims the document boundaries. Chunk text is an exact slice of this normalized source, with start/end character offsets. The original uploaded file is not modified or persisted.
 
-Chunk size and overlap are configuration values that must be recorded with the material version.
+Chunking uses configurable sliding character windows with defaults `CLASSLENS_MATERIAL_CHUNK_SIZE_CHARS=900` and `CLASSLENS_MATERIAL_CHUNK_OVERLAP_CHARS=120`. The end prefers a paragraph boundary, then a sentence boundary, then a word boundary; the overlap advances to a word boundary. Each chunk has a stable ordinal ID within its content-addressed material and offsets into the normalized text.
 
-## 9. Vector retrieval and relevance checks
+Chunks reuse the existing `EmbeddingService` and local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` model. The adapter is shared with response analysis; no second provider implementation is added. Embeddings are normalized and checked before indexing.
 
-Construct a retrieval query from the selected question, expected concept, teacher-reviewed misconception description, and representative evidence. Retrieve only chunks belonging to teacher-selected material.
+## 9. Vector retrieval and relevance checks — implemented
 
-**Proposed controls:**
+Retrieval accepts a selected group's question, correct answer, and exact representative answers. It embeds that context as one query and searches only the selected material. Generic provisional labels are excluded from the query because they do not communicate an interpreted concept.
 
-- rank by the embedding model's supported similarity metric;
-- use a small configurable `top_k`;
-- remove duplicate or heavily overlapping chunks;
-- apply a calibrated minimum relevance threshold;
-- return score and source locator with each passage;
-- allow the teacher to inspect passages before generation.
+The runtime `MaterialIndex` persists material metadata and exact chunks in PostgreSQL while retaining normalized vectors in a process-local cache. It ranks by the existing exact cosine implementation, returns the configured top-k (default `3`), and filters below the configured score (default `0.42`).
 
-If no passage clears the threshold, return `no_relevant_material`. Do not pass unrelated text to generation or generate citations from general model knowledge.
+When the cache is empty after startup, stored chunks are re-embedded with their recorded compatible model before retrieval. When no chunk clears the threshold, the API returns `insufficient_relevant_context` and blocks grounded generation.
 
-## 10. Grounded remediation generation
+Ingestion and retrieval remain synchronous and CPU-bound. Chunks are durable and shared through PostgreSQL; each worker has its own rebuildable vector cache, so first retrieval per material/worker incurs embedding work.
 
-The LLM receives the teacher-reviewed group context and an enumerated list of retrieved passages. Request structured fields such as:
+## 10. Grounded remediation generation — implemented
 
+The backend uses the isolated Gemini adapter with stable free-tier `gemini-3.1-flash-lite`. Central prompt version `grounded_remediation_v1` receives only the selected group context and an enumerated list of retrieved passages, including:
+
+- grade, subject, and topic;
+- group/question identifiers and the current provisional label;
+- exact question and correct concept;
+- affected/eligible response counts and exact representative answers;
+- exact material/document metadata, chunk IDs, chunk text, and retrieval scores.
+
+The prompt explicitly says the group is already detected, treats student/source text as untrusted data, forbids unsupported claims, and requests concise age-appropriate teacher content. Gemini structured JSON is parsed into Pydantic fields:
+
+- misconception summary;
 - learning objective;
-- short teacher-facing rationale;
-- targeted explanation or activity;
-- worked example if supported;
-- follow-up questions;
-- expected answers or rubric notes;
-- passage IDs supporting each substantive element.
+- teacher explanation and corrected concept;
+- short activity and optional analogy;
+- one to three follow-up questions with expected answers;
+- one or more supporting chunk IDs.
 
-The prompt must instruct the model to use only supplied passages for source-dependent claims and to state when the sources are insufficient. Validate every cited passage ID. Preserve the exact retrieved text used for the generation so the teacher can audit it later.
+Generation is synchronous for the demo, with temperature `0.2`, a 2,200-token output bound, and configurable `CLASSLENS_LLM_TIMEOUT_MS` (default 45 seconds). If retrieval status is not `retrieved` or has no results, the service returns `insufficient_context` without calling Gemini. Every returned chunk ID must belong to the supplied retrieval result; unknown or empty references reject the whole draft. The record preserves exact source snapshots and generated content.
 
-## 11. Teacher review
+## 11. Teacher review — implemented in process memory
 
-Generation creates a `draft`, never an approved intervention. The teacher can:
+Generation creates status `generated`, never `approved`. The teacher can:
 
 - compare the draft with the potential misconception and passages;
-- edit the activity and questions;
+- edit all pedagogical fields while source references remain locked;
+- save changes while status remains `generated`;
 - approve or reject it;
-- leave review notes if implemented.
+- leave review notes.
 
-Persist the generated draft separately from the teacher-edited content when feasible, along with the reviewer action and timestamp.
+PostgreSQL preserves immutable `generated_content` separately from teacher-edited `content`, exact source snapshots, provider/model/prompt version, status, notes, and timestamps. Approval and rejection remain terminal.
+
+## 9. Follow-up re-analysis and comparison — implemented
+
+Follow-up CSVs use the same schema, validation, normalization, correctness boundary, embedding adapter, and grouping service as baseline assessments. A comparison loads its baseline analysis and explicitly approved linked remediation from persistence.
+
+The service validates that subject, grade level, topic, question ID, prompt, and correct answer still correspond. Follow-up student IDs must be members of the baseline cohort; absent and blank answers remain missing rather than becoming incorrect or resolved.
+
+Because clustering IDs can change as answers improve, the selected follow-up misconception is matched by:
+
+1. the same question ID; and
+2. the greatest overlap with the original group members, with at least two overlapping members required.
+
+The recorded method is `same_question_member_overlap_v1`. If no recurring group reaches that evidence threshold, the result is `insufficient_data` with no calculated improvement metrics.
+
+For a completed comparison, deterministic arithmetic reports:
+
+- affected students and misconception prevalence before and after;
+- correct students and correctness rate before and after;
+- prevalence reduction and correctness change in percentage points;
+- matched answered and missing follow-up counts; and
+- original-group transitions: resolved correct, changed but still incorrect, still struggling, missing, and newly affected.
+
+Prevalence denominators are answered students on the selected question for each assessment. Transition categories use stable student IDs and the original selected group. The result describes an observed before/after change and explicitly does not claim the approved intervention caused it.
+
+The versioned photosynthesis fixtures produce 9 of 43 answered students affected before (20.9%) and 3 of 43 after (7.0%), a 13.9 percentage-point reduction. Of the 9 initially affected students, 5 answer correctly, 1 changes but remains incorrect, and 3 still show the recurring misconception. The broader question correctness count changes from 14 of 43 to 33 of 43; one follow-up answer is blank and one baseline student is absent.
 
 ## Failure handling
 
@@ -187,8 +214,10 @@ Persist the generated draft separately from the teacher-edited content when feas
 | Unstable or low-coherence grouping | Return outliers/low-confidence or withhold the proposed group. |
 | LLM interpretation failure | Keep evidence; mark description unavailable; allow retry. |
 | Extraction failure or empty text | Mark material failed with a useful cause; do not index it. |
-| No relevant passage | Return `no_relevant_material`; block claims of grounded remediation. |
-| Remediation LLM failure or invalid citations | Keep selected passages and prior drafts; reject invalid output; allow retry. |
+| No relevant passage | Return `insufficient_relevant_context` with no results; block claims of grounded remediation. |
+| Material embedding, index, or retrieval failure | Return a structured retryable material error; do not return sources as if retrieval succeeded. |
+| Remediation LLM missing configuration, timeout, high demand, or other provider failure | Return a sanitized structured error; keep source evidence; save no fabricated draft; allow retry where appropriate. |
+| Malformed structured output or invalid chunk references | Reject the complete generation and save no remediation. |
 | Network/backend failure | Use idempotency where needed and let the client safely retry or poll. |
 | Missing follow-up data | Report missing counts and omit unsupported comparisons. |
 

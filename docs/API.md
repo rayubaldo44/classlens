@@ -1,13 +1,13 @@
-# Proposed API
+# ClassLens API
 
-**Implementation status:** Proposed. No FastAPI application or endpoint exists as of 2026-10-01.
+**Implementation status:** The complete API path has PostgreSQL-backed runtime repositories. Local contracts pass; live Supabase migration/restart verification awaits `SUPABASE_DB_URL`.
 
-All paths, payloads, and status codes below are a versioned starting contract for the frontend and backend. Finalize the CSV/scoring and execution-model decisions before implementation. Base path: `/api/v1`.
+Implemented endpoints are marked and describe the current frontend/backend contract. Other sections remain proposed until implemented. Base path for implemented versioned routes: `/api/v1`.
 
 ## Conventions
 
 - JSON uses `snake_case` to align with proposed Python models; the frontend should map through typed API contracts.
-- Top-level persisted resource IDs are UUID strings. Imported `question_id`/`student_id` values and evidence display keys are validated external identifiers; implementation should name internal versus external identifiers unambiguously.
+- Resource IDs are opaque strings. Assessment, analysis, group, material, and comparison public IDs use deterministic content-derived prefixes; internal relational rows may use UUIDs. Imported `question_id`/`student_id` values remain validated external identifiers.
 - Timestamps are UTC ISO 8601 strings.
 - File endpoints use `multipart/form-data`; other endpoints use JSON.
 - Long analysis/generation operations may return `202 Accepted` and a pollable resource.
@@ -46,13 +46,13 @@ Proposed mappings:
 | `502` | Upstream embedding/LLM/extraction provider failure. |
 | `503` | Backend dependency unavailable or timed out. |
 
-Expected domain outcomes such as `insufficient_data` or `no_relevant_material` should usually be successful resource states, not fabricated successes or generic server errors.
+Expected domain outcomes such as `insufficient_data` or `insufficient_relevant_context` should usually be successful resource states, not fabricated successes or generic server errors.
 
 ## Health
 
-### `GET /health`
+### `GET /health` — implemented
 
-Proposed minimal readiness response:
+Verified minimal readiness response:
 
 ```json
 {
@@ -63,118 +63,149 @@ Proposed minimal readiness response:
 
 Do not report external AI providers healthy unless the endpoint actually checks them; keep expensive provider diagnostics separate.
 
-## Assessment upload
+## Assessment intake — implemented preview contract
 
-### `POST /assessments`
+### CSV contract
 
-Creates a validated assessment snapshot from an assessment JSON part and a CSV file part. This first contract uses an atomic import: any invalid row rejects the import.
-
-Multipart parts:
-
-- `assessment`: JSON file or JSON string
-- `responses`: CSV file
-
-Proposed assessment JSON:
-
-```json
-{
-  "title": "Photosynthesis Check",
-  "subject": "Science",
-  "grade_level": "7",
-  "topic": "Photosynthesis",
-  "questions": [
-    {
-      "question_id": "q1",
-      "prompt": "How do plants use sunlight to make food?",
-      "expected_answer": "Sunlight provides energy that plants use to make glucose from carbon dioxide and water."
-    }
-  ]
-}
-```
-
-Proposed CSV header:
+The MVP intake uses one UTF-8 CSV with these required columns:
 
 ```csv
-student_id,question_id,response_text,is_correct
-S001,q1,Plants eat sunlight.,false
+assessment_title,subject,grade_level,topic,student_id,question_id,question,answer,correct_answer,is_correct
 ```
 
-`is_correct` remains dependent on the unresolved scoring decision. It is shown here as the deterministic demo option.
+- Every field except `answer` must contain a non-whitespace value.
+- `is_correct` must be the literal `true` or `false` (case-insensitive). A blank answer cannot be marked correct.
+- Blank answers are accepted, preserved, marked `blank`, and counted separately.
+- Student identifiers are synthetic/stable for the demo; names and unnecessary personal data are excluded.
+- Each `student_id`/`question_id` pair must be unique.
+- Assessment metadata must be consistent across rows. A `question_id` must always use the same question and correct answer.
+- Source answer text is preserved; trimming is used only to determine whether it is blank.
+- Files must use a `.csv` extension, UTF-8 encoding, and be no larger than 1 MB.
+- Intake does not infer scores or persist data. The explicit correctness value is the deterministic MVP scoring boundary.
 
-`201 Created`:
+### `POST /api/v1/assessments/preview`
+
+Accepts multipart field `file` and optional `data_label` (`teacher_upload` by default or `synthetic_demo`). The import is atomic: one invalid row rejects the preview.
+
+`200 OK` returns assessment metadata, transparent counts, and up to five normalized sample responses:
 
 ```json
 {
-  "assessment_id": "9cb83ae7-8e28-4f0a-bf72-8314f838c6ac",
-  "status": "ready",
-  "summary": {
-    "question_count": 1,
-    "response_count": 45,
-    "valid_count": 43,
-    "blank_count": 2,
-    "incorrect_count": 28
+  "status": "validated",
+  "data_label": "teacher_upload",
+  "filename": "photosynthesis_responses.csv",
+  "assessment": {
+    "title": "Photosynthesis Free-Response Check",
+    "subject": "Science",
+    "grade_level": "7",
+    "topic": "Photosynthesis"
   },
-  "questions": [
+  "summary": {
+    "response_count": 45,
+    "answered_count": 43,
+    "blank_count": 2,
+    "correct_count": 14,
+    "incorrect_count": 29,
+    "student_count": 45,
+    "question_count": 1
+  },
+  "sample_responses": [
     {
-      "question_id": "q1",
-      "response_count": 45,
-      "blank_count": 2,
-      "incorrect_count": 28
+      "row_number": 2,
+      "student_id": "S001",
+      "question_id": "Q1",
+      "question": "Explain how plants make food during photosynthesis.",
+      "answer": "Plants eat sunlight and that becomes their food.",
+      "correct_answer": "Plants use light energy to convert carbon dioxide and water into glucose and oxygen.",
+      "answer_status": "answered",
+      "is_correct": false
     }
   ]
 }
 ```
 
-Common errors: `csv_parse_error`, `csv_missing_columns`, `unknown_question_id`, `duplicate_response`, `invalid_correctness_value`, `file_too_large`.
+### `GET /api/v1/assessments/demo/photosynthesis/preview`
 
-## Analysis
+Runs the versioned synthetic fixture through the same parser and returns the preview with `data_label: "synthetic_demo"`.
 
-### `POST /assessments/{assessment_id}/analyses`
+Implemented error codes include `unsupported_file_type`, `file_too_large`, `csv_empty`, `csv_encoding_error`, `csv_malformed`, `csv_duplicate_columns`, `csv_missing_columns`, `csv_blank_required_value`, `csv_invalid_correctness`, `csv_inconsistent_assessment`, `csv_inconsistent_question`, and `csv_duplicate_response`.
 
-Starts analysis for a ready assessment.
+## Analysis — implemented synchronous MVP contract
 
-```json
-{
-  "question_ids": ["q1"]
-}
-```
+### `POST /api/v1/assessments/analyze`
 
-`202 Accepted`:
+Accepts the same multipart `file` CSV as preview. The endpoint revalidates and analyzes the complete file, then atomically persists the normalized assessment, questions, responses, run, groups, and memberships before returning. Preview endpoints remain non-persistent.
 
-```json
-{
-  "analysis_id": "9cebf85e-ab22-477b-a97f-393b3c48b277",
-  "status": "queued",
-  "created_at": "2026-10-01T06:45:00Z"
-}
-```
+### `GET /api/v1/assessments/demo/photosynthesis/analysis`
 
-### `GET /analyses/{analysis_id}`
+Runs the versioned synthetic fixture through the same parser and analysis service. This is not cached output.
 
-Returns job state and group summaries. `status` is one of `queued`, `running`, `completed`, `failed`, or `insufficient_data`.
+Both endpoints return `200 OK` with a stable `assessment_id` plus the existing analysis payload:
 
 ```json
 {
-  "analysis_id": "9cebf85e-ab22-477b-a97f-393b3c48b277",
-  "assessment_id": "9cb83ae7-8e28-4f0a-bf72-8314f838c6ac",
+  "assessment_id": "assessment_1234567890abcdef",
+  "analysis_id": "analysis_1a191d0a7331cb82",
   "status": "completed",
-  "progress": {"stage": "complete", "completed_questions": 1, "total_questions": 1},
+  "data_label": "synthetic_demo",
+  "filename": "photosynthesis_responses.csv",
+  "assessment": {
+    "title": "Photosynthesis Free-Response Check",
+    "subject": "Science",
+    "grade_level": "7",
+    "topic": "Photosynthesis"
+  },
+  "summary": {
+    "response_count": 45,
+    "answered_count": 43,
+    "blank_count": 2,
+    "correct_count": 14,
+    "eligible_incorrect_count": 29,
+    "grouped_response_count": 18,
+    "outlier_count": 11,
+    "question_count": 1,
+    "group_count": 4
+  },
+  "embedding": {
+    "model_id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "dimension": 384,
+    "preprocessing": "answer_only_v1"
+  },
+  "grouping": {
+    "algorithm": "complete_link_cosine_v1",
+    "similarity_threshold": 0.7,
+    "minimum_support": 3
+  },
   "groups": [
     {
-      "group_id": "c5ccbe27-bbcd-455c-80f2-943979a12e9c",
-      "question_id": "q1",
-      "title": "Sunlight treated as plant food",
-      "support_count": 12,
-      "eligible_response_count": 28,
-      "confidence_label": "moderate",
-      "interpretation_status": "available"
+      "group_id": "grp_704762a85fd8",
+      "provisional_label": "Potential misconception pattern 1",
+      "interpretation_status": "not_requested",
+      "question_id": "Q1",
+      "question": "Explain how plants make food during photosynthesis.",
+      "correct_answer": "Plants use light energy to convert carbon dioxide and water into glucose and oxygen.",
+      "support_count": 9,
+      "eligible_response_count": 29,
+      "member_student_ids": ["S001", "S005", "S009"],
+      "representative_responses": [
+        {
+          "student_id": "S033",
+          "answer": "The leaves absorb sunlight as food for the plant.",
+          "similarity_to_medoid": 1.0
+        }
+      ],
+      "coherence": 0.8454
     }
   ],
-  "outlier_count": 6
+  "message": null
 }
 ```
 
-On provider failure, `status: "failed"` includes a sanitized `failure` object and no invented groups. An LLM-only interpretation failure may still return deterministic groups with `interpretation_status: "failed"`.
+### `GET /api/v1/assessments/analyses/{analysis_id}`
+
+Reconstructs a persisted analysis response and its evidence groups. Missing IDs return `404 initial_assessment_not_found`.
+
+The member list above is abbreviated only in this documentation example. Runtime responses contain every member identifier. When no group has at least the configured support, the endpoint returns `status: "insufficient_data"`, an empty `groups` list, and an explanatory `message`. Embedding failures return the standard error envelope with `503`, a safe `embedding_failed` or `embedding_invalid_response` code, and no fabricated group.
 
 ## Misconception details
 
@@ -206,159 +237,196 @@ On provider failure, `status: "failed"` includes a sanitized `failure` object an
 
 Pagination or explicit limits should be added before returning full membership for larger datasets.
 
-## Material upload
+## Learning-material ingestion and retrieval — implemented MVP contract
 
-### `POST /assessments/{assessment_id}/materials`
+Supported upload format is UTF-8 plain text (`.txt`), up to 1 MB. Metadata and exact chunks persist in PostgreSQL. Embeddings remain a rebuildable memory cache.
 
-Multipart parts:
+### `POST /api/v1/learning-materials/ingest`
 
-- `file`: supported teacher material
-- `display_name`: optional safe label
+Accepts multipart `file` and optional `title`. Validation, cleanup, chunking, embedding, and transactional persistence complete synchronously. Re-ingesting identical normalized content is idempotent.
 
-`202 Accepted`:
-
-```json
-{
-  "material_id": "82fa50d6-0b92-48af-9652-6e6f797b6070",
-  "status": "processing",
-  "display_name": "Photosynthesis lesson notes.pdf"
-}
-```
-
-### `GET /materials/{material_id}`
+`200 OK`:
 
 ```json
 {
-  "material_id": "82fa50d6-0b92-48af-9652-6e6f797b6070",
   "status": "ready",
-  "display_name": "Photosynthesis lesson notes.pdf",
-  "chunk_count": 14
-}
-```
-
-Common failed states/errors: `unsupported_material_type`, `material_too_large`, `extraction_failed`, `empty_extracted_text`.
-
-## Remediation generation
-
-### `POST /misconception-groups/{group_id}/remediations`
-
-```json
-{
-  "material_ids": ["82fa50d6-0b92-48af-9652-6e6f797b6070"]
-}
-```
-
-`202 Accepted`:
-
-```json
-{
-  "intervention_id": "390f6d64-e040-4481-aa42-8d84a4a41f34",
-  "status": "generating"
-}
-```
-
-### `GET /interventions/{intervention_id}`
-
-Returns `generating`, `draft`, `approved`, `rejected`, or `generation_failed` state. The client can poll this resource after a `202` response.
-
-Completed resource example:
-
-```json
-{
-  "intervention_id": "390f6d64-e040-4481-aa42-8d84a4a41f34",
-  "status": "draft",
-  "content": {
-    "learning_objective": "Distinguish sunlight as an energy source from glucose as stored chemical energy.",
-    "activity": "Use the supplied lesson diagram to trace energy from sunlight into glucose, then label what enters and what is produced.",
-    "follow_up_questions": [
-      {
-        "prompt": "Is sunlight matter that a plant eats? Explain its role.",
-        "expected_answer": "No. Sunlight supplies energy used to produce glucose."
-      }
-    ]
+  "material": {
+    "material_id": "mat_d4181909edbae023",
+    "title": "Grade 7 Photosynthesis Learning Notes",
+    "filename": "photosynthesis_grade7.txt",
+    "source_kind": "teacher_upload",
+    "content_hash": "d4181909edbae0234efd5b5cdf400659f85f700ccbfa23db7b90e6e44455fa74",
+    "chunk_count": 3,
+    "chunk_size_chars": 900,
+    "chunk_overlap_chars": 120,
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "embedding_dimension": 384
   },
-  "sources": [
-    {
-      "passage_id": "chunk-04",
-      "material_id": "82fa50d6-0b92-48af-9652-6e6f797b6070",
-      "source_locator": {"page": 2, "section": "Energy and glucose"},
-      "text": "Example placeholder for contract shape; implementation must return exact uploaded source text.",
-      "relevance_score": 0.84
-    }
+  "message": "Material is ready with 3 persisted chunks."
+}
+```
+
+### `POST /api/v1/learning-materials/demo/photosynthesis/ingest`
+
+Ingests `data/demo/learning_materials/photosynthesis_grade7.txt` through the same validation, chunking, embedding, and indexing service. Returns `source_kind: "synthetic_demo"`.
+
+### `POST /api/v1/learning-materials/{material_id}/retrieve`
+
+Accepts a detected group context:
+
+```json
+{
+  "group_id": "grp_704762a85fd8",
+  "question_id": "Q1",
+  "question": "Explain how plants make food during photosynthesis.",
+  "correct_answer": "Plants use light energy to convert carbon dioxide and water into glucose and oxygen.",
+  "representative_answers": [
+    "The leaves absorb sunlight as food for the plant.",
+    "Sunlight is the food that plants absorb through their leaves.",
+    "Leaves eat light from the sun as their source of food."
   ]
 }
 ```
 
-The example source text above is explicitly a contract placeholder, not a claim that demo material or retrieval exists. If no passage meets the relevance rule, return a successful domain state such as:
+The API embeds the question, exact representative answers, and reference answer as a semantic query. It searches only chunks belonging to the requested material ID, ranks by exact cosine similarity, returns up to `CLASSLENS_RETRIEVAL_TOP_K=3`, and filters below `CLASSLENS_RETRIEVAL_MIN_SCORE=0.42`. Both values are configurable. The chunk strategy is configurable through `CLASSLENS_MATERIAL_CHUNK_SIZE_CHARS=900` and `CLASSLENS_MATERIAL_CHUNK_OVERLAP_CHARS=120`.
+
+`200 OK` returns `status: "retrieved"` with source metadata and exact chunk text, or `status: "insufficient_relevant_context"` with an empty `results` array. The latter explicitly blocks grounded-remediation claims. Results include material/document ID, title, filename, content hash, chunk ID/index, cosine score, and offsets into the cleaned text.
+
+Implemented material errors include `unsupported_material_type` (415), `material_too_large` (413), `material_empty`, `material_encoding_error`, `material_invalid_text`, `no_chunks_generated`, `material_embedding_failed`, `material_embedding_invalid_response`, `material_index_failed`, `material_not_found` (404), `embedding_model_mismatch`, and `material_retrieval_failed`. Provider/index errors use the shared structured error envelope and never return fabricated sources.
+
+## Grounded remediation and teacher review — implemented synchronous demo contract
+
+Remediation records persist in PostgreSQL. The API preserves the original Gemini generation separately from teacher-edited current content. Nothing starts approved.
+
+### `POST /api/v1/remediations`
+
+Accepts required `analysis_id`, the selected detected group, class context, and complete typed retrieval response. The database verifies the intervention's analysis/group and material/chunk relationships.
+
+Abbreviated request shape:
 
 ```json
 {
-  "status": "no_relevant_material",
-  "intervention_id": null,
-  "message": "No passage in the selected material was relevant enough to ground remediation."
+  "analysis_id": "analysis_1a191d0a7331cb82",
+  "grade_level": "7",
+  "subject": "Science",
+  "topic": "Photosynthesis",
+  "misconception": {
+    "group_id": "grp_704762a85fd8",
+    "provisional_label": "Potential misconception pattern 1",
+    "question_id": "Q1",
+    "question": "Explain how plants make food during photosynthesis.",
+    "correct_answer": "Plants use light energy to convert carbon dioxide and water into glucose and oxygen.",
+    "support_count": 9,
+    "eligible_response_count": 29,
+    "representative_responses": [
+      {"student_id": "S033", "answer": "The leaves absorb sunlight as food for the plant.", "similarity_to_medoid": 1.0}
+    ]
+  },
+  "retrieval": {
+    "status": "retrieved",
+    "group_id": "grp_704762a85fd8",
+    "material": {"material_id": "mat_d4181909edbae023", "title": "Grade 7 Photosynthesis Learning Notes"},
+    "results": [{"chunk_id": "chunk_001", "text": "Exact retrieved text...", "similarity": 0.784}]
+  }
 }
 ```
 
-## Intervention review
+The runtime request must include every required `material`, retrieval-metadata, chunk-index, and offset field from the retrieval contract; the example is abbreviated for readability.
 
-### `PATCH /interventions/{intervention_id}`
+`200 OK` returns either `status: "generated"` with a remediation or the controlled state below without calling Gemini:
 
-Uses explicit review actions and optimistic concurrency.
+```json
+{
+  "status": "insufficient_context",
+  "remediation": null,
+  "message": "Insufficient teacher-provided material to generate grounded remediation."
+}
+```
+
+A generated remediation has lifecycle status `generated` and includes:
+
+- `generated_content`: immutable original Gemini structure;
+- `content`: current teacher-editable structure;
+- `sources`: exact retrieved source snapshots;
+- provider/model/prompt version and timestamps.
+
+Both content objects include `misconception_summary`, `learning_objective`, `teacher_explanation`, `corrected_concept`, `activity`, optional `analogy`, one to three `{prompt, expected_answer}` follow-up questions, and validated `source_references` containing only supplied chunk IDs.
+
+### `GET /api/v1/remediations/{remediation_id}`
+
+Returns the current typed remediation record. Missing IDs return `404 remediation_not_found`.
+
+### `PATCH /api/v1/remediations/{remediation_id}`
+
+Accepts `action: "save" | "approve" | "reject"`, optional teacher `review_notes`, and optional `edited_content`. Source references are not accepted from the edit form and remain locked to the validated generation.
 
 ```json
 {
   "action": "approve",
-  "expected_updated_at": "2026-10-01T07:10:00Z",
   "edited_content": {
-    "learning_objective": "Distinguish sunlight as an energy source from glucose as stored chemical energy.",
-    "activity": "Teacher-edited activity text.",
+    "misconception_summary": "Teacher-reviewed summary.",
+    "learning_objective": "Teacher-edited objective.",
+    "teacher_explanation": "Teacher-edited explanation.",
+    "corrected_concept": "Teacher-edited concept.",
+    "activity": "Teacher-edited activity.",
+    "analogy": null,
     "follow_up_questions": [
-      {
-        "prompt": "Teacher-edited question.",
-        "expected_answer": "Teacher-edited expected answer."
-      }
+      {"prompt": "Teacher-edited question.", "expected_answer": "Teacher-edited expected answer."}
     ]
   },
   "review_notes": "Approved after aligning wording with the class lesson."
 }
 ```
 
-`action` is `save_draft`, `approve`, or `reject`. `200 OK` returns the updated intervention. Invalid transitions return `409 intervention_state_conflict`.
+Saving keeps status `generated`; approval or rejection is terminal and returns status `approved` or `rejected`. A later mutation returns `409 remediation_invalid_transition`.
 
-## Follow-up results and comparison
+Generation errors include `llm_not_configured`, `llm_timeout`, `llm_provider_unavailable`, `llm_malformed_output`, `llm_ungrounded_output`, and `llm_generation_failed`. Provider/schema/citation failure saves no remediation and never returns fabricated content.
 
-### `POST /assessments/{assessment_id}/follow-up-results`
+## Follow-up results and comparison — implemented
 
-Uploads a CSV with the frozen follow-up schema. For the proposed demo contract:
+Comparison resources and normalized follow-up assessments persist in PostgreSQL. Their linkage includes baseline/follow-up assessment and analysis IDs, selected groups, and the approved remediation.
 
-```csv
-student_id,question_id,response_text,is_correct
-S001,q1,Sunlight supplies energy used to make glucose.,true
-```
+### `POST /api/v1/results`
 
-`201 Created` returns imported, missing, rejected, and matched counts. Seeded results must use `source_kind: "demo_seed"`.
+Multipart request fields:
 
-### `GET /assessments/{assessment_id}/results`
+- `file`: follow-up CSV using the existing assessment CSV contract
+- `baseline_analysis_id`: an analysis snapshot returned by an earlier analysis request
+- `group_id`: the selected baseline misconception group
+- `remediation_id`: the explicitly approved intervention for that group
+
+The service rejects missing resources, unapproved or mismatched interventions, assessment context changes, question/answer-key changes, and unknown student identifiers. It re-runs the existing misconception analysis on the follow-up answers; the route does not calculate metrics itself.
+
+### `POST /api/v1/results/demo/photosynthesis`
+
+Accepts the same three linkage IDs as JSON and analyzes the versioned synthetic fixture at `data/demo/photosynthesis_follow_up_responses.csv` through the production CSV parser. This endpoint does not return precomputed percentages.
+
+### `GET /api/v1/results/{comparison_id}`
+
+Returns the stored typed comparison. The verified demo result is:
 
 ```json
 {
-  "assessment_id": "9cb83ae7-8e28-4f0a-bf72-8314f838c6ac",
-  "source_labels": {"baseline": "demo_seed", "follow_up": "demo_seed"},
-  "overall": {
-    "baseline": {"correct": 17, "total_scored": 43, "percent": 39.5},
-    "follow_up": {"correct": 31, "total_scored": 40, "percent": 77.5},
-    "missing_follow_up": 3
-  },
-  "questions": [
-    {
-      "question_id": "q1",
-      "baseline": {"correct": 17, "total_scored": 43, "percent": 39.5},
-      "follow_up": {"correct": 31, "total_scored": 40, "percent": 77.5},
-      "missing_follow_up": 3
+  "status": "completed",
+  "metrics": {
+    "before": {"answered_students": 43, "correct_students": 14, "affected_students": 9, "misconception_prevalence_percent": 20.9},
+    "after": {"answered_students": 43, "correct_students": 33, "affected_students": 3, "misconception_prevalence_percent": 7.0},
+    "matched_answered_students": 43,
+    "missing_follow_up_students": 2,
+    "prevalence_percentage_point_reduction": 13.9,
+    "correct_percentage_point_change": 44.1,
+    "transitions": {
+      "baseline_affected": 9,
+      "resolved_correct": 5,
+      "changed_but_still_incorrect": 1,
+      "still_struggling": 3,
+      "missing_from_baseline_group": 0,
+      "new_affected": 0
     }
-  ],
-  "interpretation_note": "This before/after comparison does not by itself establish that the intervention caused the change."
+  }
 }
 ```
 
-These values illustrate response shape only and are not verified ClassLens results.
+The full response also includes comparison/follow-up analysis IDs, source kinds, the matched follow-up group and matching method, question context, timestamps, and a trace containing assessment, group, remediation, and follow-up identifiers. If recurring follow-up membership cannot be identified reliably, status is `insufficient_data` and `metrics` is null—no improvement is inferred.
+
+Domain errors include `initial_assessment_not_found`, `misconception_not_found`, `intervention_not_found`, `intervention_not_approved`, `results_context_mismatch`, `follow_up_assessment_mismatch`, `follow_up_question_missing`, `follow_up_question_mismatch`, `follow_up_student_mismatch`, and `results_not_found`. CSV and analysis/provider failures retain their existing structured contracts.

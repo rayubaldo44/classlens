@@ -1,0 +1,96 @@
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .analysis import RepresentativeResponse
+from .materials import MaterialRetrievalResponse
+
+
+class FollowUpQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(description="One concise check-for-understanding question.")
+    expected_answer: str = Field(description="A concise answer or teacher rubric note.")
+
+
+class EditableRemediationContent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    misconception_summary: str
+    learning_objective: str
+    teacher_explanation: str
+    corrected_concept: str
+    activity: str
+    analogy: str | None = None
+    follow_up_questions: list[FollowUpQuestion]
+
+
+class GeneratedRemediationDraft(EditableRemediationContent):
+    source_references: list[str] = Field(
+        description="One or more source chunk IDs that directly support the intervention."
+    )
+
+
+class RemediationContent(EditableRemediationContent):
+    source_references: list[str]
+
+
+class RemediationMisconceptionContext(BaseModel):
+    group_id: str = Field(min_length=1, max_length=100)
+    provisional_label: str = Field(min_length=1, max_length=300)
+    question_id: str = Field(min_length=1, max_length=100)
+    question: str = Field(min_length=1, max_length=2000)
+    correct_answer: str = Field(min_length=1, max_length=4000)
+    support_count: int = Field(ge=1)
+    eligible_response_count: int = Field(ge=1)
+    representative_responses: list[RepresentativeResponse] = Field(min_length=1, max_length=3)
+
+
+class RemediationGenerationRequest(BaseModel):
+    analysis_id: str = Field(min_length=1, max_length=100)
+    grade_level: str = Field(min_length=1, max_length=100)
+    subject: str = Field(min_length=1, max_length=200)
+    topic: str = Field(min_length=1, max_length=300)
+    misconception: RemediationMisconceptionContext
+    retrieval: MaterialRetrievalResponse
+
+
+class RemediationSource(BaseModel):
+    material_id: str
+    material_title: str
+    filename: str
+    chunk_id: str
+    chunk_index: int
+    text: str
+    similarity: float
+    start_char: int
+    end_char: int
+
+
+class RemediationRecord(BaseModel):
+    remediation_id: str
+    status: Literal["generated", "approved", "rejected"]
+    analysis_id: str
+    group_id: str
+    provider: str
+    model: str
+    prompt_version: Literal["grounded_remediation_v1"]
+    generated_content: RemediationContent
+    content: RemediationContent
+    sources: list[RemediationSource]
+    review_notes: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RemediationGenerationResponse(BaseModel):
+    status: Literal["generated", "insufficient_context"]
+    remediation: RemediationRecord | None = None
+    message: str | None = None
+
+
+class RemediationReviewRequest(BaseModel):
+    action: Literal["save", "approve", "reject"]
+    edited_content: EditableRemediationContent | None = None
+    review_notes: str | None = Field(default=None, max_length=2000)

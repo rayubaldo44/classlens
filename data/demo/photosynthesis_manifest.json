@@ -1,0 +1,19 @@
+{
+  "data_label": "synthetic_demo",
+  "assessment_title": "Photosynthesis Free-Response Check",
+  "response_count": 45,
+  "answered_count": 43,
+  "blank_count": 2,
+  "correct_count": 14,
+  "incorrect_count": 29,
+  "student_count": 45,
+  "question_count": 1,
+  "intended_patterns": {
+    "sunlight_as_food": ["S001", "S005", "S009", "S013", "S017", "S021", "S025", "S029", "S033", "S037", "S041", "S045"],
+    "food_from_soil": ["S002", "S006", "S010", "S014", "S018", "S022", "S026", "S030", "S034"],
+    "carbon_dioxide_confusion": ["S003", "S007", "S011", "S015", "S019", "S023", "S027", "S031"],
+    "correct_or_mostly_correct": ["S004", "S008", "S012", "S016", "S020", "S024", "S028", "S032", "S035", "S036", "S038", "S039", "S040", "S042"],
+    "blank": ["S043", "S044"]
+  },
+  "note": "Expected pattern membership is deterministic fixture metadata for later evaluation. No AI analysis is performed during intake."
+}

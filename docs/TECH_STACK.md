@@ -14,11 +14,11 @@ This document is the authority for selected technologies, proposed dependencies,
 |---|---|---|---|
 | Frontend | React + TypeScript + Vite | Confirmed; scaffold present | Fast iteration, typed UI, and an existing scaffold. |
 | Styling | CSS; Tailwind only if needed | Confirmed constraint; library choice open | Avoid adding a styling dependency without a concrete need. |
-| Backend | Python + FastAPI | Confirmed; not initialized | Fits AI/data tooling and provides typed HTTP contracts with OpenAPI. |
-| Database | Supabase PostgreSQL | Confirmed; not configured | Managed relational storage suitable for the hackathon. |
-| Vector extension | pgvector | Proposed only if persistent retrieval is needed | Keeps vectors near relational metadata but adds setup that may be unnecessary for a small deterministic demo. |
-| Response embeddings | Hugging Face embedding model | Confirmed provider family; exact model TBD | Supports semantic comparison without custom training. |
-| LLM | Provider/model TBD | TBD | Must meet availability, latency, cost, structured-output, and grounding needs. |
+| Backend | Python + FastAPI | Confirmed; health foundation implemented | Fits AI/data tooling and provides typed HTTP contracts with OpenAPI. |
+| Database | Supabase PostgreSQL via psycopg | Confirmed; migration/adapters implemented, live URL pending | Direct transactions keep golden-path writes atomic and server-side. |
+| Vector extension | None for MVP | Confirmed | Exact chunks persist; the tiny corpus is re-embedded into a process cache after restart. |
+| Response embeddings | Local Sentence Transformers using `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Confirmed and verified | Lightweight 384-dimensional multilingual embeddings, no hosted inference secret, and adequate semantic separation on the demo fixture. |
+| LLM | Google Gemini API using `gemini-3.1-flash-lite` | Confirmed; remediation adapter and live demo path verified | Stable free-tier model with structured JSON output, suitable demo latency, and an official Python SDK. |
 | Retrieval corpus | Teacher-provided materials | Confirmed requirement | Keeps intervention grounding within teacher-selected sources. |
 | Frontend deployment | Vercel | Confirmed; not configured | Direct fit for the Vite frontend. |
 | Backend deployment | TBD | TBD | Select based on FastAPI support, cold-start behavior, setup time, and secret management. |
@@ -32,9 +32,19 @@ This document is the authority for selected technologies, proposed dependencies,
 - TypeScript `~6.0.2`
 - ESLint 10 with TypeScript and React Hooks/Refresh plugins
 
+`backend/requirements.txt` and `backend/requirements-dev.txt` now declare:
+
+- FastAPI `>=0.115,<1`, Uvicorn `>=0.30,<1`, and python-multipart `>=0.0.20,<1` for CSV uploads
+- sentence-transformers `5.7.0` with the `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` model for local answer embeddings
+- Google Gen AI SDK `>=1,<2` for Gemini structured remediation output and python-dotenv `>=1,<2` for ignored local backend configuration
+- psycopg `>=3.2,<4` with binary and pool extras for direct server-side PostgreSQL access
+- HTTPX `>=0.27,<1` and pytest `>=8,<9` for backend contract tests
+
+Material ingestion and retrieval add no new runtime dependency: UTF-8 text decoding, chunking, the existing embedding service, and an in-memory `MaterialIndex` implementation use the current stack.
+
 The installed workspace was observed using Node `v22.23.1` and npm `10.9.8`. Vite's locked dependency metadata requires a compatible modern Node release; the project has not yet declared an explicit Node version policy.
 
-No backend, Supabase, AI, document-extraction, clustering, or test dependency is confirmed by repository code yet.
+The AI runtime was verified with Python 3.11 and CPU-only PyTorch 2.7.1. Install the CPU wheel first as documented in `backend/README.md`; otherwise a default Linux resolver may download unnecessary CUDA packages. No Supabase browser client, document-extraction, external clustering, or pgvector dependency is present.
 
 ## Proposed dependency categories
 
@@ -42,11 +52,9 @@ Select the smallest set after the related decisions are made:
 
 - FastAPI server and ASGI runtime
 - Request/settings validation compatible with the selected FastAPI version
-- PostgreSQL/Supabase client and migration tool, if direct persistence is used
 - CSV parsing from the Python standard library or a data library, based on schema complexity
 - Hugging Face-compatible embedding inference client or local inference package
 - Numerical/grouping library for the chosen algorithm
-- LLM SDK with structured output support
 - Extractors for only the teacher-material formats supported in the demo
 - Backend testing and HTTP contract testing
 
@@ -56,12 +64,7 @@ These are categories, not approved packages. Record an accepted selection in [DE
 
 | Decision | Needed before | Selection criteria |
 |---|---|---|
-| Exact Hugging Face embedding model and execution mode | Misconception grouping and document embeddings | Semantic quality on short Grade 7 answers, latency, dimensionality, license, offline/cache behavior, and cost. |
-| LLM provider/model | Group interpretation and remediation | Reliability, structured output, latency, cost, context size, rate limits, and key availability. |
-| Grouping algorithm and thresholds | Analysis implementation | Works on small per-question samples, supports noise/outliers, produces stable demo results, and exposes meaningful support. |
-| Scoring approach for free-text responses | Incorrect-response filtering | Deterministic enough for the demo, transparent, and compatible with answer keys/rubrics. |
-| Supported material formats and extractor | Material upload | Demo document format, source-location preservation, predictable extraction, and minimal dependencies. |
-| Persistent vectors vs in-memory demo index | Retrieval implementation | Dataset size, restart/reuse needs, Supabase readiness, and time remaining. |
+| Additional material formats and extractors | Supporting PDF/DOCX beyond `.txt` | Demo document needs, source-location preservation, predictable extraction, and minimal dependencies. |
 | Backend host | Deployment | FastAPI support, cold starts, logs, environment secrets, time to deploy, and cost. |
 | Node version policy | Shared setup/CI | Compatibility with locked Vite version and deployment environment. |
 

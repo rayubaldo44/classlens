@@ -15,20 +15,24 @@ Checkboxes represent verified repository state as of 2026-10-01. Tasks are order
 
 - [x] Establish authoritative product, architecture, AI, database, API, demo, decision, status, and backlog documentation.
 - [x] Verify that the existing frontend scaffold starts, lints, and builds.
-- [ ] Resolve the minimum blocking decisions: LLM provider, exact embedding model, initial grouping method, teacher-material formats/extractor, backend host, and whether vectors must persist for the demo.
-- [ ] Initialize a minimal FastAPI backend with configuration loading, health endpoint, structured error responses, and test setup.
+- [x] Initialize a minimal FastAPI backend with environment-configured local CORS, a typed health endpoint, and health/CORS tests.
+- [x] Connect the frontend to `GET /health` through a typed client configured by `VITE_API_URL` and show connection states.
+- [ ] Resolve the remaining backend-host decision. Relational persistence is implemented; vectors intentionally remain a rebuildable memory cache.
+- [x] Add the structured API error envelope with the first endpoint that can return domain or validation errors.
+- [x] Make the local demo reachable from both loopback spellings and stop reporting browser-blocked requests as a stopped backend. Recorded as D-016.
+- [x] Diagnose the subsequent API-unavailable report and restore the stopped backend; verify health/CORS for both local origins and the synthetic preview (2026-10-02).
 
-**Verification:** backend starts locally; health endpoint returns a stable response; missing secrets fail clearly at startup or provider-call time; automated backend checks pass.
+**Verification:** backend and frontend start locally; health endpoint and CORS return stable responses; the frontend reaches the configured backend; automated backend and frontend checks pass. Missing secrets and structured errors must be verified when the first dependent endpoint is added. On 2026-10-02 both `127.0.0.1:5173` and `localhost:5173` were confirmed to receive allow-origin headers for the demo preview GET and a POST preflight after `./scripts/demo.sh reset`.
 
 ### 1. Validated assessment intake
 
 Depends on: Foundation.
 
-- [ ] Freeze a minimal assessment and CSV contract for the photosynthesis demo.
-- [ ] Create a reproducible, versioned demo assessment and response dataset for approximately 40–50 synthetic students; label it as synthetic.
-- [ ] Implement CSV upload, size/type checks, required-column validation, encoding/parsing errors, blank-response handling, and normalized preview output.
-- [ ] Build a minimal teacher upload/preview screen with loading, success, and actionable error states.
-- [ ] Preserve stable synthetic student identifiers without collecting names or unnecessary personal data.
+- [x] Freeze a minimal assessment and CSV contract for the photosynthesis demo.
+- [x] Create a reproducible, versioned demo assessment and response dataset for approximately 40–50 synthetic students; label it as synthetic.
+- [x] Implement CSV upload, size/type checks, required-column validation, encoding/parsing errors, blank-response handling, and normalized preview output.
+- [x] Build a minimal teacher upload/preview screen with loading, success, and actionable error states.
+- [x] Preserve stable synthetic student identifiers without collecting names or unnecessary personal data.
 
 **Verification:** a valid fixture produces the expected row counts and normalized preview; malformed files, missing columns, duplicate identifiers, and empty responses produce specific errors; frontend and API agree on the contract.
 
@@ -36,10 +40,10 @@ Depends on: Foundation.
 
 Depends on: Validated assessment intake.
 
-- [ ] Store or carry forward assessment, question, answer-key/rubric, response, and correctness data.
-- [ ] Implement question-specific scoring or a deterministic demo-safe correctness input.
-- [ ] Exclude blank and correct responses from misconception grouping while preserving counts for the teacher.
-- [ ] Make reruns idempotent or explicitly version analysis runs.
+- [x] Store or carry forward assessment, question, answer-key/rubric, response, and correctness data.
+- [x] Implement question-specific scoring or a deterministic demo-safe correctness input.
+- [x] Exclude blank and correct responses from misconception grouping while preserving counts for the teacher.
+- [x] Make reruns idempotent or explicitly version analysis runs.
 
 **Verification:** known fixtures yield deterministic correct/incorrect/blank counts per question, and the exact responses sent to analysis are inspectable.
 
@@ -47,12 +51,12 @@ Depends on: Validated assessment intake.
 
 Depends on: Baseline scoring and the embedding/grouping decisions.
 
-- [ ] Generate embeddings for eligible responses with batching, timeouts, and provider/model metadata.
-- [ ] Group responses within each question using the selected proposed strategy and calibrated minimum-support rules.
-- [ ] Retain outliers and insufficient-data outcomes instead of forcing every response into a group.
-- [ ] Select representative responses and compute evidence fields without altering student text.
+- [x] Generate embeddings for eligible responses with batching and provider/model metadata; local execution has explicit malformed/provider failure handling rather than a network timeout.
+- [x] Group responses within each question using the selected proposed strategy and calibrated minimum-support rules.
+- [x] Retain outliers and insufficient-data outcomes instead of forcing every response into a group.
+- [x] Select representative responses and compute evidence fields without altering student text.
 - [ ] Use the LLM to draft concise potential-misconception labels from question context, expected answer, and supplied evidence.
-- [ ] Build an analysis overview and group-detail view with membership count, confidence/caveat language, and representative responses.
+- [x] Build an analysis overview and group-detail view with membership count, confidence/caveat language, and representative responses.
 
 **Verification:** the demo fixture reproducibly surfaces the “sunlight as food” pattern; every description is traceable to stored evidence; small or incoherent samples are labeled insufficient/low confidence; embedding or LLM failure never produces fabricated results.
 
@@ -60,11 +64,11 @@ Depends on: Baseline scoring and the embedding/grouping decisions.
 
 Depends on: Foundation provider choices; can begin after the intake contract stabilizes.
 
-- [ ] Upload supported teacher material with type/size validation.
-- [ ] Extract text, preserve source/page or section metadata where available, and show extraction failures.
-- [ ] Chunk and embed extracted material using a recorded strategy.
-- [ ] Retrieve passages for a selected misconception and apply an explicit relevance threshold.
-- [ ] Show retrieved passages and source metadata to the teacher.
+- [x] Upload UTF-8 `.txt` teacher material with extension, size, encoding, null-byte, and empty-content validation.
+- [x] Extract and normalize text while preserving chunk offsets; return actionable extraction/validation failures.
+- [x] Chunk and embed extracted material using a recorded, configurable strategy and the existing embedding adapter.
+- [x] Retrieve passages for a selected misconception using an explicit cosine relevance threshold and configurable top-k.
+- [x] Show exact retrieved passages and source metadata separately from student evidence.
 
 **Verification:** a known demo document returns the expected photosynthesis passage; unrelated material produces a “no sufficiently relevant material” state; displayed source references resolve to stored text.
 
@@ -72,11 +76,13 @@ Depends on: Foundation provider choices; can begin after the intake contract sta
 
 Depends on: Evidence-backed groups and successful retrieval.
 
-- [ ] Generate a targeted explanation/activity and follow-up questions using only the selected group evidence and retrieved passages.
-- [ ] Persist prompt/model/retrieval provenance needed to inspect the result.
-- [ ] Require teacher edit plus approve/reject controls; never auto-approve.
-- [ ] Prevent or clearly reject generation when grounding is insufficient.
-- [ ] Build clear retry/error behavior for LLM and network failures.
+- [x] Generate a targeted explanation/activity and follow-up questions using only the selected group evidence and retrieved passages.
+- [x] Preserve prompt/model/retrieval provenance needed to inspect the persisted result.
+- [x] Require teacher edit plus approve/reject controls; never auto-approve.
+- [x] Prevent or clearly reject generation when grounding is insufficient.
+- [x] Build clear retry/error behavior for LLM and network failures.
+
+The generation implementation, deterministic contract tests, and live `gemini-3.1-flash-lite` demo path are verified. The live smoke generated a source-backed intervention from the strongest detected group, preserved a teacher edit, approved one record, and rejected a separate record. Earlier `gemini-3.8-flash` and full-prompt `gemini-3.6-flash` attempts returned Google's transient high-demand response and correctly produced no draft.
 
 **Verification:** generated claims can be traced to displayed passages; unsupported citations are absent; approval state and edits persist; failure paths keep the prior valid state and never fabricate content.
 
@@ -84,15 +90,19 @@ Depends on: Evidence-backed groups and successful retrieval.
 
 Depends on: Approved intervention and stable demo identifiers.
 
-- [ ] Record or load clearly labeled synthetic follow-up results.
-- [ ] Compare baseline and follow-up by question/group using transparent counts and percentages.
-- [ ] Show missing follow-up data as unavailable, not zero or inferred.
+- [x] Record or load clearly labeled synthetic follow-up results.
+- [x] Compare baseline and follow-up by question/group using transparent counts and percentages.
+- [x] Show missing follow-up data as unavailable, not zero or inferred.
 - [ ] Complete the documented three-minute click path with loading and meaningful empty/error states.
-- [ ] Add a deterministic demo reset/seed procedure and honest fallback assets.
+- [x] Add a deterministic local demo check/start/reset/status/stop procedure that preserves persisted state.
+- [ ] Add an explicit, honestly labeled fallback for live Gemini unavailability; never switch silently.
 - [ ] Deploy the frontend to Vercel and the backend to the selected host; configure Supabase and secrets.
+- [ ] Configure `SUPABASE_DB_URL`, apply the migration, and verify the complete workflow survives FastAPI restart and React reload.
 - [ ] Run the pre-demo checklist in [docs/DEMO.md](docs/DEMO.md#pre-demo-checklist).
 
 **Verification:** a clean demo run completes upload → evidence → material retrieval → remediation review → results without manual database edits; a second run is repeatable; deployed URLs pass smoke checks.
+
+The local single-process service path is live-verified through real Gemini generation and results retrieval. The prepared follow-up fixture produces 9/43 affected before (20.9%) and 3/43 after (7.0%), while preserving one blank, one absent student, one partially improved student, and three still-struggling students. The reset runner is verified, including a 200-before/404-after process-state proof. A headless Firefox run verified dashboard navigation and the real 45/29/2 preview, but browser-driver interaction blocked the remaining automated clicks; manual full-path rehearsal, an explicit provider fallback, and deployment remain open.
 
 ## P1 — optional polish after P0
 

@@ -1,0 +1,19 @@
+{
+  "data_label": "synthetic_demo",
+  "assessment_title": "Photosynthesis Follow-up Check",
+  "linked_baseline_fixture": "photosynthesis_responses.csv",
+  "response_rows": 44,
+  "answered_count": 43,
+  "blank_count": 1,
+  "absent_student_ids": ["S044"],
+  "correct_count": 33,
+  "incorrect_count": 10,
+  "target_baseline_group": {
+    "group_id": "grp_704762a85fd8",
+    "verified_member_count": 9,
+    "resolved_correct": ["S001", "S005", "S009", "S017", "S021"],
+    "changed_but_still_incorrect": ["S037"],
+    "still_sunlight_as_food": ["S025", "S033", "S045"]
+  },
+  "note": "Deterministic synthetic follow-up data for the ClassLens demo. Outcomes are fixture labels for verification; runtime metrics must be calculated from parsed responses and follow-up analysis. No causal claim is implied."
+}
