@@ -39,7 +39,7 @@ type AnalysisSource = { kind: 'demo' } | { kind: 'upload'; file: File }
 type WorkflowPointer = { analysis_id?: string; group_id?: string; material_id?: string; remediation_id?: string; comparison_id?: string }
 const WORKFLOW_KEY = 'classlens.workflow.v1'
 const readWorkflow = (): WorkflowPointer => { try { return JSON.parse(localStorage.getItem(WORKFLOW_KEY) ?? '{}') as WorkflowPointer } catch { return {} } }
-const updateWorkflow = (next: Partial<WorkflowPointer>) => localStorage.setItem(WORKFLOW_KEY, JSON.stringify({ ...readWorkflow(), ...next }))
+const replaceWorkflow = (next: WorkflowPointer) => localStorage.setItem(WORKFLOW_KEY, JSON.stringify(next))
 
 function App() {
   const [route, setRoute] = useState<RouteKey>(routeFromPath)
@@ -50,6 +50,7 @@ function App() {
   const [retrievedSources, setRetrievedSources] = useState<MaterialRetrievalResponse | null>(null)
   const [approvedRemediation, setApprovedRemediation] = useState<RemediationRecord | null>(null)
   const [savedComparison, setSavedComparison] = useState<FollowUpComparisonRecord | null>(null)
+  const [restoreMessage, setRestoreMessage] = useState('')
   useEffect(() => {
     const pointer = readWorkflow()
     if (!pointer.analysis_id) return
@@ -59,16 +60,24 @@ function App() {
         const group = analysis.groups.find((item) => item.group_id === pointer.group_id) ?? null
         setSelectedAnalysis(analysis); setSelectedAssessment(analysis.assessment); setSelectedGroup(group)
         if (group && pointer.material_id) {
-          const retrieval = await retrieveMaterialForGroup(pointer.material_id, {
-            group_id: group.group_id, question_id: group.question_id, question: group.question,
-            correct_answer: group.correct_answer,
-            representative_answers: group.representative_responses.map((item) => item.answer),
-          })
-          setRetrievedSources(retrieval)
+          try {
+            const retrieval = await retrieveMaterialForGroup(pointer.material_id, {
+              group_id: group.group_id, question_id: group.question_id, question: group.question,
+              correct_answer: group.correct_answer,
+              representative_answers: group.representative_responses.map((item) => item.answer),
+            })
+            setRetrievedSources(retrieval)
+          } catch { setRestoreMessage('The saved teaching-material retrieval could not be restored. Reload it from the misconception detail.') }
         }
-        if (pointer.remediation_id) setApprovedRemediation(await getRemediation(pointer.remediation_id))
-        if (pointer.comparison_id) setSavedComparison(await getFollowUpComparison(pointer.comparison_id))
-      } catch { /* Keep the current screen's explicit empty/error state when a saved pointer is stale. */ }
+        if (pointer.remediation_id) {
+          try { setApprovedRemediation(await getRemediation(pointer.remediation_id)) }
+          catch { setRestoreMessage('Some saved intervention state could not be restored. The persisted evidence remains available from the start of the workflow.') }
+        }
+        if (pointer.comparison_id) {
+          try { setSavedComparison(await getFollowUpComparison(pointer.comparison_id)) }
+          catch { setRestoreMessage('The saved comparison could not be restored. You can rerun the follow-up from the approved intervention.') }
+        }
+      } catch { setRestoreMessage(`The saved workflow could not be restored. ${NETWORK_FAILURE_HINT}`) }
     })()
   }, [])
   useEffect(() => { const onPopState = () => setRoute(routeFromPath()); window.addEventListener('popstate', onPopState); return () => window.removeEventListener('popstate', onPopState) }, [])
@@ -79,7 +88,8 @@ function App() {
     <nav aria-label="Golden path"><p className="nav-heading">Demo sequence</p>{demoSteps.map((step, index) => <button key={step.key} className={route === step.key ? 'nav-item active' : 'nav-item'} onClick={() => navigate(step.key)} aria-current={route === step.key ? 'page' : undefined}><span>{String(index + 1).padStart(2, '0')}</span>{step.label}</button>)}</nav>
     <ApiStatus />
   </aside><main className="main-content">
-    {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? 'none'} source={analysisSource} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { updateWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception group={selectedGroup} onBack={() => navigate('analysis')} onRetrieved={(sources) => { if (sources) updateWorkflow({ material_id: sources.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} assessment={selectedAssessment} sources={retrievedSources} onBack={() => navigate('misconception')} onNext={(record) => { updateWorkflow({ remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { updateWorkflow({ comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
+    {restoreMessage && <StatePanel kind="error" title="Saved workflow not fully restored" description={restoreMessage} action={<button className="text-button" onClick={() => { localStorage.removeItem(WORKFLOW_KEY); setRestoreMessage(''); navigate('upload') }}>Start a new workflow →</button>} />}
+    {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? 'none'} source={analysisSource} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception group={selectedGroup} onBack={() => navigate('analysis')} onRetrieved={(sources) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: sources?.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}-${approvedRemediation?.remediation_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} assessment={selectedAssessment} sources={retrievedSources} initialRemediation={approvedRemediation} onBack={() => navigate('misconception')} onNext={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: retrievedSources?.material.material_id, remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: retrievedSources?.material.material_id, remediation_id: approvedRemediation?.remediation_id, comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
   </main></div>
 }
 
@@ -190,7 +200,7 @@ function Misconception({ group, onBack, onRetrieved, onNext }: { group: Misconce
     <section className="section-block"><div className="section-title"><div><p className="eyebrow">Student evidence · {group.support_count} affected responses</p><h2>Representative responses</h2></div><Badge>Exact input evidence</Badge></div><div className="evidence-list">{group.representative_responses.map((item) => <blockquote key={item.student_id}><p>“{item.answer}”</p><cite>{item.student_id} · similarity to medoid {item.similarity_to_medoid.toFixed(2)}</cite></blockquote>)}</div></section>
     <section className="section-block material-grounding"><div className="section-title"><div><p className="eyebrow">Teaching material</p><h2>Find supporting passages</h2></div><Badge tone="green">Separate from student evidence</Badge></div><p className="material-help">Choose the synthetic photosynthesis notes or ingest a UTF-8 plain text file. Retrieved passages come only from this selected material.</p>
       <div className="material-controls"><button className="button secondary" disabled={ingestStatus === 'loading'} onClick={() => void ingest(ingestPhotosynthesisDemoMaterial)}>{ingestStatus === 'loading' ? 'Preparing material…' : 'Load photosynthesis demo notes'}</button><label className="file-input material-file">{selectedFile?.name ?? 'Choose teaching material (.txt)'}<input type="file" accept=".txt,text/plain" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0] ?? null; setSelectedFile(file); setMaterial(null); setRetrieval(null); setIngestStatus('idle'); setIngestError(''); setRetrievalStatus('idle'); setRetrievalError(''); onRetrieved(null) }} /></label><button className="button secondary" disabled={!selectedFile || ingestStatus === 'loading'} onClick={() => selectedFile && void ingest(() => ingestLearningMaterial(selectedFile))}>Ingest selected text</button></div>
-      {ingestStatus === 'idle' && !material && <StatePanel kind="empty" title="No teaching material selected" description="Load the demo notes or choose a .txt file. Material is held in the backend memory index until it restarts." />}
+      {ingestStatus === 'idle' && !material && <StatePanel kind="empty" title="No teaching material selected" description="Load the demo notes or choose a .txt file. Material metadata and exact chunks are persisted; vectors are rebuilt after a backend restart." />}
       {ingestStatus === 'loading' && <StatePanel kind="loading" title="Preparing teaching material" description="The backend is validating, chunking, embedding, and indexing this text." />}
       {ingestStatus === 'error' && <StatePanel kind="error" title="Teaching material could not be ingested" description={ingestError} />}
       {material && <div className="material-ready"><div><strong>{material.title}</strong><span>{material.filename} · {material.chunk_count} chunks · {material.embedding_dimension}-dimension embeddings</span></div><Badge tone={material.source_kind === 'synthetic_demo' ? 'amber' : 'green'}>{material.source_kind === 'synthetic_demo' ? 'Synthetic demo material' : 'Teacher upload'}</Badge><button className="button primary" disabled={retrievalStatus === 'loading'} onClick={() => void retrieve()}>{retrievalStatus === 'loading' ? 'Finding passages…' : 'Find supporting passages'}</button></div>}
@@ -214,19 +224,20 @@ function editableFromRecord(record: RemediationRecord): EditableRemediationConte
   }
 }
 
-function Intervention({ group, analysisId, assessment, sources, onBack, onNext }: {
+function Intervention({ group, analysisId, assessment, sources, initialRemediation, onBack, onNext }: {
   group: MisconceptionGroup | null
   analysisId: string | null
   assessment: AssessmentPreview['assessment'] | null
   sources: MaterialRetrievalResponse | null
+  initialRemediation: RemediationRecord | null
   onBack: () => void
   onNext: (record: RemediationRecord) => void
 }) {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'saving' | 'insufficient' | 'error'>('idle')
-  const [record, setRecord] = useState<RemediationRecord | null>(null)
-  const [editable, setEditable] = useState<EditableRemediationContent | null>(null)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'saving' | 'insufficient' | 'error'>(initialRemediation ? 'ready' : 'idle')
+  const [record, setRecord] = useState<RemediationRecord | null>(initialRemediation)
+  const [editable, setEditable] = useState<EditableRemediationContent | null>(initialRemediation ? editableFromRecord(initialRemediation) : null)
   const [reviewed, setReviewed] = useState(false)
-  const [reviewNotes, setReviewNotes] = useState('')
+  const [reviewNotes, setReviewNotes] = useState(initialRemediation?.review_notes ?? '')
   const [errorMessage, setErrorMessage] = useState('')
 
   const generate = async () => {
@@ -320,7 +331,7 @@ function Intervention({ group, analysisId, assessment, sources, onBack, onNext }
         {!isTerminal && <label className="check-row"><input type="checkbox" checked={reviewed} disabled={status === 'saving'} onChange={(event) => setReviewed(event.target.checked)} />I reviewed the student evidence, source passages, and final intervention text.</label>}
         {status === 'saving' && <p className="save-status" role="status">Saving teacher decision…</p>}
         {!isTerminal && <div className="actions review-actions"><button className="button secondary danger-action" disabled={status === 'saving'} onClick={() => void submitReview('reject')}>Reject draft</button><button className="button secondary" disabled={status === 'saving'} onClick={() => void submitReview('save')}>Save edits</button><button className="button primary" disabled={!reviewed || status === 'saving'} onClick={() => void submitReview('approve')}>Approve intervention</button></div>}
-        {record.status === 'approved' && <div className="decision-state decision-state--approved"><div><strong>Approved by teacher</strong><p>The teacher-edited content above is the approved version. The original Gemini generation remains preserved in the backend session.</p></div><button className="button primary" onClick={() => onNext(record)}>Continue to results <ArrowIcon /></button></div>}
+        {record.status === 'approved' && <div className="decision-state decision-state--approved"><div><strong>Approved by teacher</strong><p>The teacher-edited content above is the approved version. The original Gemini generation remains preserved in persistent storage.</p></div><button className="button primary" onClick={() => onNext(record)}>Continue to results <ArrowIcon /></button></div>}
         {record.status === 'rejected' && <div className="decision-state decision-state--rejected"><div><strong>Rejected by teacher</strong><p>This draft will not be treated as an approved intervention.</p></div><button className="button secondary" onClick={onBack}>Return to misconception</button></div>}
       </div>
     </section>}
@@ -370,7 +381,7 @@ function Results({ baseline, group, remediation, initialResult, onResult, onNext
   }
 
   if (!hasApprovedContext || !baseline || !group || !remediation) {
-    return <><PageHeader eyebrow="Step 6 of 6" title="Results" description="Compare baseline and follow-up transparently. Missing data remains unavailable rather than being treated as zero." action={<Badge tone="amber">Comparison unavailable</Badge>} /><StatePanel kind="empty" title="Complete the approved intervention first" description="Results require an analyzed initial assessment, a selected misconception, and an explicitly approved intervention from this backend session." /><div className="callout"><div><strong>No improvement has been inferred</strong><p>Return to the workflow and preserve the evidence chain before loading follow-up responses.</p></div><button className="button secondary" onClick={onNext}>Return to dashboard</button></div></>
+    return <><PageHeader eyebrow="Step 6 of 6" title="Results" description="Compare baseline and follow-up transparently. Missing data remains unavailable rather than being treated as zero." action={<Badge tone="amber">Comparison unavailable</Badge>} /><StatePanel kind="empty" title="Complete the approved intervention first" description="Results require an analyzed initial assessment, a selected misconception, and an explicitly approved persisted intervention." /><div className="callout"><div><strong>No improvement has been inferred</strong><p>Return to the workflow and preserve the evidence chain before loading follow-up responses.</p></div><button className="button secondary" onClick={onNext}>Return to dashboard</button></div></>
   }
 
   const metrics = result?.metrics
