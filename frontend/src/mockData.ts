@@ -16,7 +16,7 @@ export const demoScenario: DemoScenario = {
 }
 
 export const demoSteps: DemoStep[] = [
-  { key: 'dashboard', label: 'Dashboard', path: '/' },
+  { key: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { key: 'upload', label: 'Upload assessment', path: '/upload' },
   { key: 'analysis', label: 'Learning gaps', path: '/analysis' },
   { key: 'misconception', label: 'Misconception detail', path: '/misconception' },

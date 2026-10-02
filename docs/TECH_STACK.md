@@ -14,6 +14,7 @@ This document is the authority for selected technologies, proposed dependencies,
 |---|---|---|---|
 | Frontend | React + TypeScript + Vite | Confirmed; scaffold present | Fast iteration, typed UI, and an existing scaffold. |
 | Styling | CSS; Tailwind only if needed | Confirmed constraint; library choice open | Avoid adding a styling dependency without a concrete need. |
+| Frontend motion | Motion for React (`motion`) | Confirmed; landing page implemented | Short entrance and interaction animations with reduced-motion support. |
 | Backend | Python + FastAPI | Confirmed; health foundation implemented | Fits AI/data tooling and provides typed HTTP contracts with OpenAPI. |
 | Database | Supabase PostgreSQL via psycopg | Confirmed; live workflow and restart recovery verified | Direct transactions keep golden-path writes atomic and server-side. |
 | Vector extension | None for MVP | Confirmed | Exact chunks persist; the tiny corpus is re-embedded into a process cache after restart. |
@@ -28,6 +29,7 @@ This document is the authority for selected technologies, proposed dependencies,
 `frontend/package.json` and the lockfile currently contain:
 
 - React `^19.2.8` and React DOM `^19.2.8`
+- Motion `^13.5.0` for landing-page animation
 - Vite `^8.3.0` with `@vitejs/plugin-react`
 - TypeScript `~6.0.2`
 - ESLint 10 with TypeScript and React Hooks/Refresh plugins

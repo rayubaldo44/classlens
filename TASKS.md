@@ -21,6 +21,7 @@ Checkboxes represent verified repository state as of 2026-10-02. Tasks are order
 - [x] Add the structured API error envelope with the first endpoint that can return domain or validation errors.
 - [x] Make the local demo reachable from both loopback spellings and stop reporting browser-blocked requests as a stopped backend. Recorded as D-016.
 - [x] Diagnose the subsequent API-unavailable report and restore the stopped backend; verify health/CORS for both local origins and the synthetic preview (2026-10-02).
+- [x] Verify hosted health, synthetic preview, and upload preflight permit the exact Vercel production origin (2026-10-02 03:48 UTC); hosted browser golden path remains pending.
 
 **Verification:** backend and frontend start locally; health endpoint and CORS return stable responses; the frontend reaches the configured backend; automated backend and frontend checks pass. Missing secrets and structured errors must be verified when the first dependent endpoint is added. On 2026-10-02 both `127.0.0.1:5173` and `localhost:5173` were confirmed to receive allow-origin headers for the demo preview GET and a POST preflight after `./scripts/demo.sh reset`.
 
@@ -102,10 +103,13 @@ Depends on: Approved intervention and stable demo identifiers.
 
 **Verification:** a clean demo run completes upload → evidence → material retrieval → remediation review → results without manual database edits; a second run is repeatable; deployed URLs pass smoke checks.
 
-The ordinary-upload API path is live-verified against Supabase through real Gemini generation, explicit teacher approval, and persisted results. The prepared follow-up produces 9/43 affected before (20.9%) and 3/43 after (7.0%), while preserving one blank, one absent student, one partially improved student, and three still-struggling students. FastAPI restart, cold material-vector rebuild, React reload, restored approval/results, desktop/mobile layout, and backend-unavailable messaging passed. Vercel and Render services now exist and Render health passes, but production CORS/API wiring and the hosted golden path remain unchecked; the deployment task therefore stays open.
+The ordinary-upload API path is live-verified against Supabase through real Gemini generation, explicit teacher approval, and persisted results. The prepared follow-up produces 9/43 affected before (20.9%) and 3/43 after (7.0%), while preserving one blank, one absent student, one partially improved student, and three still-struggling students. FastAPI restart, cold material-vector rebuild, React reload, restored approval/results, desktop/mobile layout, and backend-unavailable messaging passed. Production health, synthetic preview, and upload preflight now pass with matching Vercel CORS headers. The hosted browser golden path remains unchecked; the deployment task therefore stays open.
 
 ## P1 — optional polish after P0
 
+- [x] Add a simple public landing page at `/` with routes to the teacher dashboard and labeled synthetic demo; preserve the golden path at `/dashboard` and `/upload` (2026-10-02).
+- [x] Add restrained landing-page motion with the Motion React library and reduced-motion support (2026-10-02).
+- [x] Replace the CL logo mark and favicon with the supplied ClassLens mascot (2026-10-02).
 - [ ] Improve responsive layout and keyboard accessibility.
 - [ ] Add richer progress indicators for long analysis and generation jobs.
 - [ ] Allow teachers to rename, merge, or dismiss proposed groups.

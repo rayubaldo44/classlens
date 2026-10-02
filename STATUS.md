@@ -8,7 +8,8 @@
 
 ## Verified working
 
-- React 19, TypeScript, and Vite provide the teacher workflow at `/`, `/upload`, `/analysis`, `/misconception`, `/intervention`, and `/results`. FastAPI exposes the versioned workflow API and health endpoint.
+- The public landing page is available at `/`, with a direct path to the teacher dashboard at `/dashboard` and a clearly labeled synthetic-demo path to `/upload`. The supplied mascot replaces the CL mark in the landing header, workspace sidebar, and favicon. Motion animates the landing entrance, section reveal, and button gestures; reduced-motion preferences suppress movement. Desktop and mobile Firefox captures, direct route loads, frontend lint, and production build passed locally.
+- React 19, TypeScript, and Vite provide the teacher workflow at `/dashboard`, `/upload`, `/analysis`, `/misconception`, `/intervention`, and `/results`. FastAPI exposes the versioned workflow API and health endpoint.
 - `scripts/demo.sh` validates configuration, selects the verified Python 3.11 runtime, starts or resets runner-owned FastAPI/Vite processes, configures matching API/CORS origins, records logs/PIDs, and checks service health.
 - The versioned synthetic photosynthesis baseline contains 45 responses: 43 answered, 2 blank, 14 correct, and 29 incorrect. Real upload preview and normalization reproduced those values.
 - CSV intake rejects empty files, missing/duplicate columns, inconsistent metadata, duplicate student/question pairs, invalid booleans, invalid encodings, unsupported files, and oversized input with structured errors. Blank answers remain visible but are excluded from grouping.
@@ -24,8 +25,8 @@
 - Browser verification covered dashboard navigation, API status, real preview/analysis rendering, restored approval/results after reload, backend-unavailable messaging, and 1440×1000 plus 390×844 layouts without page-level overflow.
 - The final uninterrupted API run used the ordinary upload endpoints—not demo-output shortcuts—and completed baseline upload → analysis → teacher-material upload/retrieval → live Gemini generation → teacher edit/approval → follow-up upload/analysis → results in about 82 seconds.
 - Final automated checks: backend `60 passed, 1 skipped` (the skipped test is the opt-in database integration, run separately and passed), frontend lint passed, frontend production build passed, and `git diff --check` passed before documentation updates.
-- The frontend is provisioned at `https://class-lens-one.vercel.app`. The Render FastAPI service at `https://classlens-t6xn.onrender.com` returned the expected HTTP 200 `/health` contract on 2026-10-02. Production `VITE_API_URL`, exact-origin CORS, and a hosted golden-path smoke are not yet verified together.
-- Live diagnosis on 2026-10-02 confirmed that Vercel's current JavaScript bundle targets the Render URL, but Render returned HTTP 400 `Disallowed CORS origin` for the Vercel production origin. The hosted frontend currently remains API-unavailable until Render sets the plural `CLASSLENS_CORS_ORIGINS` variable to the exact Vercel origin and restarts.
+- The frontend is provisioned at `https://class-lens-one.vercel.app`, and its deployed bundle targets `https://classlens-t6xn.onrender.com`. On 2026-10-02 at 03:48 UTC, live probes with the Vercel production origin verified HTTP 200 and matching `Access-Control-Allow-Origin` on Render health, synthetic photosynthesis preview, and upload POST preflight. Preview counts matched the expected 45 responses, 43 answered, 2 blank, 14 correct, and 29 incorrect.
+- Earlier Render probes rejected the Vercel production origin; the latest live responses now allow it. No application code change was needed. A production browser reload and complete hosted golden-path smoke remain unverified; preview deployment origins were not checked in this verification.
 
 ## Remaining work outside this milestone
 
@@ -59,6 +60,6 @@
 | Before/after calculations and remaining students | Pass; manually checked |
 | FastAPI restart and React reload | Pass |
 | Frontend lint/build and backend suite | Pass |
-| Deployment | Partial: Vercel frontend and Render health live; cross-origin workflow not yet verified |
+| Deployment | Partial: production health, preview, and CORS preflight pass; hosted browser golden path pending |
 
 **Overall:** the local ClassLens golden path is a verified PASS with real embeddings, Supabase persistence, source-backed retrieval, and live Gemini generation. Hosted services exist, but deployment is not complete until the Vercel frontend reaches Render and the hosted workflow passes. External-service availability and an unrehearsed presentation machine remain the principal operational risks.

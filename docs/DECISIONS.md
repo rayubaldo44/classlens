@@ -4,6 +4,20 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-019 — Motion for the public landing page
+
+- **Status:** Accepted and implemented on 2026-10-02
+- **Decision:** Use Motion for React for the landing page's brief entrance, section reveal, and button gestures. Respect the device's reduced-motion preference and keep primary content visible throughout the entrance.
+- **Reason:** The user specifically requested the Motion library. The landing page benefits from a small amount of movement without affecting the teacher workflow.
+- **Consequence:** `motion` is a frontend dependency; animation remains limited to the public landing page.
+
+### D-020 — Supplied mascot as the ClassLens mark
+
+- **Status:** Accepted and implemented on 2026-10-02
+- **Decision:** Use the user-supplied mascot image as the visible ClassLens mark in the landing header, workspace sidebar, and favicon.
+- **Reason:** The user provided the intended logo artwork.
+- **Consequence:** The original image is stored as a public frontend asset and displayed within a white rounded frame that suits its opaque background.
+
 ### D-001 — React, TypeScript, and Vite frontend
 
 - **Status:** Accepted; scaffold present

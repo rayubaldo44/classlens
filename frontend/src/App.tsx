@@ -1,5 +1,6 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import './App.css'
+import { LandingPage } from './LandingPage'
 import { ApiStatus } from './ApiStatus'
 import {
   analyzeAssessment,
@@ -34,7 +35,7 @@ import { ArrowIcon, Badge, Metric, PageHeader, StatePanel } from './components'
 import { demoScenario, demoSteps } from './mockData'
 import type { RouteKey } from './types'
 
-const routeFromPath = (): RouteKey => demoSteps.find((step) => step.path === window.location.pathname)?.key ?? 'dashboard'
+const routeFromPath = (): RouteKey => demoSteps.find((step) => step.path === window.location.pathname)?.key ?? 'landing'
 type AnalysisSource = { kind: 'demo' } | { kind: 'upload'; file: File }
 type WorkflowPointer = { analysis_id?: string; group_id?: string; material_id?: string; remediation_id?: string; comparison_id?: string }
 const WORKFLOW_KEY = 'classlens.workflow.v1'
@@ -43,6 +44,7 @@ const replaceWorkflow = (next: WorkflowPointer) => localStorage.setItem(WORKFLOW
 
 function App() {
   const [route, setRoute] = useState<RouteKey>(routeFromPath)
+  const didRestore = useRef(false)
   const [analysisSource, setAnalysisSource] = useState<AnalysisSource | null>(null)
   const [selectedGroup, setSelectedGroup] = useState<MisconceptionGroup | null>(null)
   const [selectedAssessment, setSelectedAssessment] = useState<AssessmentPreview['assessment'] | null>(null)
@@ -52,6 +54,8 @@ function App() {
   const [savedComparison, setSavedComparison] = useState<FollowUpComparisonRecord | null>(null)
   const [restoreMessage, setRestoreMessage] = useState('')
   useEffect(() => {
+    if (route === 'landing' || didRestore.current) return
+    didRestore.current = true
     const pointer = readWorkflow()
     if (!pointer.analysis_id) return
     void (async () => {
@@ -79,11 +83,12 @@ function App() {
         }
       } catch { setRestoreMessage(`The saved workflow could not be restored. ${NETWORK_FAILURE_HINT}`) }
     })()
-  }, [])
+  }, [route])
   useEffect(() => { const onPopState = () => setRoute(routeFromPath()); window.addEventListener('popstate', onPopState); return () => window.removeEventListener('popstate', onPopState) }, [])
-  const navigate = (next: RouteKey) => { const step = demoSteps.find((item) => item.key === next); if (!step) return; window.history.pushState({}, '', step.path); setRoute(next); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const navigate = (next: RouteKey) => { const path = next === 'landing' ? '/' : demoSteps.find((item) => item.key === next)?.path; if (!path) return; window.history.pushState({}, '', path); setRoute(next); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  if (route === 'landing') return <LandingPage onWorkspace={() => navigate('dashboard')} onDemo={() => navigate('upload')} />
   return <div className="app-shell"><aside className="sidebar">
-    <button className="brand" onClick={() => navigate('dashboard')} aria-label="ClassLens dashboard"><span className="brand-mark">CL</span><span>ClassLens<small>Teacher workspace</small></span></button>
+    <button className="brand" onClick={() => navigate('landing')} aria-label="ClassLens home"><img className="brand-image" src="/classlens-mascot.png" alt="" width="56" height="56" /><span>ClassLens<small>Teacher workspace</small></span></button>
     <div className="demo-label"><Badge tone="amber">Synthetic demo</Badge><p>Photosynthesis scenario</p></div>
     <nav aria-label="Golden path"><p className="nav-heading">Demo sequence</p>{demoSteps.map((step, index) => <button key={step.key} className={route === step.key ? 'nav-item active' : 'nav-item'} onClick={() => navigate(step.key)} aria-current={route === step.key ? 'page' : undefined}><span>{String(index + 1).padStart(2, '0')}</span>{step.label}</button>)}</nav>
     <ApiStatus />

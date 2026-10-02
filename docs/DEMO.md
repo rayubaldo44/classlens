@@ -51,7 +51,7 @@ From the repository root, validate and start the local stack:
 ./scripts/demo.sh status
 ```
 
-Open `http://127.0.0.1:5173`. The runner also permits `http://localhost:5173`. For occupied ports:
+Open `http://127.0.0.1:5173` for the landing page, then choose **Open teacher workspace** to reach the dashboard. The runner also permits `http://localhost:5173`. For occupied ports:
 
 ```bash
 CLASSLENS_BACKEND_PORT=8010 CLASSLENS_FRONTEND_PORT=4179 ./scripts/demo.sh reset
@@ -83,7 +83,7 @@ CLASSLENS_LLM_MODEL=gemini-3.1-flash-lite
 CLASSLENS_CORS_ORIGINS=https://class-lens-one.vercel.app
 ```
 
-The Render `/health` endpoint returned the expected HTTP 200 contract on 2026-10-02. A live CORS probe from `https://class-lens-one.vercel.app` currently returns HTTP 400 `Disallowed CORS origin`; the deployed frontend bundle already targets Render. Set the exact production origin in the plural `CLASSLENS_CORS_ORIGINS` Render variable and restart the service. Do not call the hosted workflow verified until a browser run confirms CORS and the complete assessment-to-results path.
+Live probes on 2026-10-02 at 03:48 UTC verified HTTP 200 and `Access-Control-Allow-Origin: https://class-lens-one.vercel.app` for Render health, synthetic photosynthesis preview, and upload POST preflight. The preview returned the expected 45 responses. Earlier probes rejected this origin; the current service now allows it. If CORS fails again, check the plural `CLASSLENS_CORS_ORIGINS` variable on Render, use the exact browser origin without a trailing slash, and select **Save and deploy** to apply environment changes to the running service. Changes to a local `.env` file alone do not update Render. Do not call the hosted workflow verified until a browser run confirms the complete assessment-to-results path.
 
 ## Safe demo reset
 
@@ -95,7 +95,7 @@ Before each judging run:
 2. Open a new private browser window, or clear only the ClassLens workflow pointer in DevTools:
 
    ```js
-   localStorage.removeItem('classlens.workflow.v1'); location.assign('/');
+   localStorage.removeItem('classlens.workflow.v1'); location.assign('/dashboard');
    ```
 
 3. Confirm the sidebar says **API connected**.
@@ -107,7 +107,7 @@ Starting a new assessment from the Upload screen also clears stale downstream br
 
 ### 0:00–0:30 — Validate the class
 
-1. On the dashboard choose **Load photosynthesis demo**.
+1. From the landing page, choose **Open teacher workspace**. On the dashboard choose **Load photosynthesis demo**.
 2. Under **Choose response file**, select `data/demo/photosynthesis_responses.csv` and choose **Validate selected CSV**.
 3. Confirm **Validated preview** shows 45 students, 45 accepted responses, 29 incorrect, 14 correct, and 2 blank.
 4. Choose **Analyze learning gaps**. A cold analysis can take roughly 15–45 seconds because embedding and remote persistence are synchronous.

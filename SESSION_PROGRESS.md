@@ -728,3 +728,64 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - No application code change is needed for this observed issue. After the environment correction, repeat preflight and browser workflow checks.
 
 ---
+
+## Session / Milestone: Verify restored production CORS
+
+**Date:** 2026-10-02 03:48 UTC (11:48 Asia/Manila)
+
+**Status:** Production-origin health, preview, and preflight verified; browser golden path pending
+
+- Attempted: inspected backend CORS configuration and deployment instructions after browser reports of missing allow-origin headers on HTTP 200 responses.
+- Completed: live requests with `Origin: https://class-lens-one.vercel.app` now returned HTTP 200 and the matching `Access-Control-Allow-Origin` header for `/health`, `/api/v1/assessments/demo/photosynthesis/preview`, and POST preflight to `/api/v1/assessments/preview`.
+- Verified: preview contained 45 responses, 43 answered, 2 blank, 14 correct, and 29 incorrect; preflight allowed POST and Content-Type. The external configuration change was not performed by this session, and its exact timing was not inspected.
+- Files significantly modified: `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this log. Application code and the existing user edit to `backend/.env.example` were left untouched.
+- Problems: initial sandbox DNS lookup failed; the approved network probe succeeded. Earlier rejected production-origin responses have been superseded by passing live probes.
+- Decision: retain explicit environment-configured origins; no code change is needed for the currently passing responses.
+- Remaining / recommended next step: reload the stable production frontend and run the hosted browser golden path. Preview deployment origins and the full hosted workflow remain unverified.
+
+---
+
+## Session / Milestone: Public landing page and dashboard route
+
+**Date:** 2026-10-02
+
+**Status:** Local frontend implementation verified; hosted deployment unchanged
+
+- Attempted and completed: added a concise ClassLens landing page at `/`, moved the existing dashboard to `/dashboard`, linked the landing page to the workspace and synthetic demo, and kept the six-step workflow intact.
+- Files significantly modified: `frontend/src/LandingPage.tsx`, `frontend/src/LandingPage.css`, frontend route/types and metadata files, `docs/DEMO.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified: frontend lint and production build passed; direct local loads of `/`, `/dashboard`, and `/upload` returned the app; desktop and mobile Firefox screenshots showed readable layouts. The hosted page was not redeployed or checked.
+- Problems: a repository-wide diff check reported trailing whitespace in a pre-existing edit to `backend/.env.example`; the frontend-only diff check passed. The existing backend environment edit was left untouched.
+- Decision: use an abstract evidence-flow illustration and label the demo as synthetic, without presenting invented student work or results.
+- Remaining / recommended next step: deploy the updated frontend, then verify the hosted landing page and complete the pending hosted golden-path smoke.
+
+---
+
+## Session / Milestone: Motion on the public landing page
+
+**Date:** 2026-10-02
+
+**Status:** Local frontend implementation verified; hosted deployment unchanged
+
+- Attempted and completed: installed Motion for React and added a brief landing entrance, scroll reveal, ambient illustration pulse, and button gestures. Reduced-motion preferences suppress movement.
+- Files significantly modified: `frontend/src/LandingPage.tsx`, `frontend/src/LandingPage.css`, frontend package manifest and lockfile, `docs/TECH_STACK.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified: frontend lint and production build passed. Desktop and mobile Firefox captures showed the animated page remains readable.
+- Problem and fix: an initial opacity fade left the hero nearly blank in an immediate browser capture; changed the entrance to movement while keeping primary content visible from the first frame.
+- Decision: confine Motion to the landing page and leave the teacher workflow unchanged.
+- Remaining / recommended next step: deploy the frontend, then check the hosted landing page and pending hosted golden path.
+
+---
+
+## Session / Milestone: Supplied mascot branding
+
+**Date:** 2026-10-02
+
+**Status:** Local frontend implementation verified; hosted deployment unchanged
+
+- Attempted and completed: copied the supplied mascot artwork into the frontend and replaced the CL mark in the landing header, workspace sidebar, and favicon.
+- Files significantly modified: `frontend/public/classlens-mascot.png`, frontend header/sidebar styles and markup, `frontend/index.html`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified: frontend lint and production build passed; Firefox captures showed the mascot at desktop and mobile sizes on the landing page and in the workspace sidebar.
+- Problem: the supplied image has an opaque white background; the white rounded logo frame retains the artwork without modifying it.
+- Decision: use the supplied file unchanged as the brand asset.
+- Remaining / recommended next step: deploy the frontend and verify the hosted logo, favicon, and pending golden path.
+
+---
