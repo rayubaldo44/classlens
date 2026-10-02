@@ -29,7 +29,17 @@ class Database:
             try:
                 from psycopg_pool import ConnectionPool
 
-                self._pool = ConnectionPool(self.database_url, min_size=0, max_size=5, open=True)
+                # Supabase's transaction pooler can assign a different server session to
+                # each transaction. Psycopg's automatic prepared statements are session
+                # scoped and can therefore collide with statements prepared by another
+                # pooled client. Keep statements unnamed for reliable pooler operation.
+                self._pool = ConnectionPool(
+                    self.database_url,
+                    min_size=0,
+                    max_size=5,
+                    open=True,
+                    kwargs={"prepare_threshold": None},
+                )
             except Exception as error:
                 raise DatabaseError(
                     "database_unavailable",

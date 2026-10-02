@@ -100,7 +100,7 @@ async def generate_grounded_remediation(
 def get_remediation(remediation_id: str, *, store: RemediationStore) -> RemediationRecord:
     record = store.get(remediation_id)
     if record is None:
-        raise RemediationError("remediation_not_found", "This remediation does not exist in the current backend session.")
+        raise RemediationError("remediation_not_found", "This remediation does not exist in persistent storage.")
     return record
 
 

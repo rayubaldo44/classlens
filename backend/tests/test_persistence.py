@@ -39,6 +39,22 @@ def test_missing_database_configuration_is_actionable() -> None:
     assert "SUPABASE_DB_URL" in caught.value.message
 
 
+def test_database_pool_disables_session_prepared_statements(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakePool:
+        def __init__(self, database_url: str, **kwargs: object) -> None:
+            captured["database_url"] = database_url
+            captured.update(kwargs)
+
+    monkeypatch.setattr("psycopg_pool.ConnectionPool", FakePool)
+
+    pool = Database("postgresql://example.invalid/classlens")._get_pool()
+
+    assert isinstance(pool, FakePool)
+    assert captured["kwargs"] == {"prepare_threshold": None}
+
+
 def test_persisted_chunks_are_reembedded_when_vector_cache_is_empty() -> None:
     class CacheableIndex(InMemoryMaterialIndex):
         def set_embeddings(self, material_id, embeddings):

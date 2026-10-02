@@ -51,7 +51,7 @@ def create_follow_up_comparison(
     if baseline is None:
         raise ResultsError(
             "initial_assessment_not_found",
-            "The initial assessment analysis is not available in this backend session. Analyze it again before adding follow-up results.",
+            "The initial assessment analysis is not available in persistent storage. Analyze it again before adding follow-up results.",
         )
 
     baseline_group = next((group for group in baseline.result.groups if group.group_id == link.group_id), None)
@@ -65,7 +65,7 @@ def create_follow_up_comparison(
     if remediation is None:
         raise ResultsError(
             "intervention_not_found",
-            "The intervention is not available in this backend session.",
+            "The intervention is not available in persistent storage.",
         )
     if remediation.group_id != baseline_group.group_id or remediation.analysis_id != baseline.result.analysis_id:
         raise ResultsError(
@@ -158,7 +158,7 @@ def get_follow_up_comparison(comparison_id: str, *, results_store: ResultsStore)
     if record is None:
         raise ResultsError(
             "results_not_found",
-            "This before/after comparison does not exist in the current backend session.",
+            "This before/after comparison does not exist in persistent storage.",
         )
     return record
 

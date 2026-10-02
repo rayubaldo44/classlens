@@ -1,9 +1,16 @@
+import asyncio
+
 from pydantic import ValidationError
 
 from app.config import get_llm_settings
 from app.schemas.remediations import GeneratedRemediationDraft
 
 from .base import LLMProviderError
+
+
+MAX_PROVIDER_ATTEMPTS = 2
+RETRY_DELAY_SECONDS = 0.75
+TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class GeminiLLMService:
@@ -36,30 +43,43 @@ class GeminiLLMService:
                 api_key=self._api_key,
                 http_options=types.HttpOptions(timeout=self._timeout_ms),
             )
-        try:
-            response = await self._client.aio.models.generate_content(
-                model=self._model_id,
-                contents=prompt,
-                config=self._types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_json_schema=_gemini_json_schema(),
-                    temperature=0.2,
-                    max_output_tokens=2200,
-                ),
-            )
-        except Exception as error:
-            error_name = type(error).__name__.lower()
-            if "timeout" in error_name:
+        response = None
+        for attempt in range(MAX_PROVIDER_ATTEMPTS):
+            try:
+                response = await self._client.aio.models.generate_content(
+                    model=self._model_id,
+                    contents=prompt,
+                    config=self._types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=_gemini_json_schema(),
+                        temperature=0.2,
+                        max_output_tokens=2200,
+                    ),
+                )
+                break
+            except Exception as error:
+                retryable = _is_retryable_provider_error(error)
+                if retryable and attempt + 1 < MAX_PROVIDER_ATTEMPTS:
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                if _is_timeout(error):
+                    raise LLMProviderError(
+                        "llm_timeout",
+                        "Gemini did not respond before the generation timeout. Try again.",
+                        retryable=True,
+                    ) from error
                 raise LLMProviderError(
-                    "llm_timeout",
-                    "Gemini did not respond before the generation timeout. Try again.",
-                    retryable=True,
+                    "llm_provider_unavailable",
+                    "Gemini could not generate the intervention. Check the provider configuration and try again.",
+                    retryable=retryable,
                 ) from error
+
+        if response is None:  # Defensive: every loop path either returns a response or raises.
             raise LLMProviderError(
                 "llm_provider_unavailable",
                 "Gemini could not generate the intervention. Check the provider configuration and try again.",
                 retryable=True,
-            ) from error
+            )
 
         try:
             if isinstance(response.parsed, GeneratedRemediationDraft):
@@ -87,6 +107,20 @@ async def get_llm_service() -> GeminiLLMService:
 def _gemini_json_schema() -> dict:
     """Return Pydantic's schema without metadata rejected by Gemini's schema endpoint."""
     return _remove_unsupported_schema_fields(GeneratedRemediationDraft.model_json_schema())
+
+
+def _is_timeout(error: Exception) -> bool:
+    return "timeout" in type(error).__name__.lower()
+
+
+def _is_retryable_provider_error(error: Exception) -> bool:
+    if _is_timeout(error):
+        return True
+    status = getattr(error, "status_code", None) or getattr(error, "code", None)
+    try:
+        return int(status) in TRANSIENT_STATUS_CODES
+    except (TypeError, ValueError):
+        return type(error).__name__.lower() in {"servererror", "serviceunavailable"}
 
 
 def _remove_unsupported_schema_fields(value):

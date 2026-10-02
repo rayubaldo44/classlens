@@ -323,3 +323,33 @@ def test_gemini_adapter_fails_safely(api_key: str, provider_result: str | None, 
 
     assert caught.value.code == expected_code
     assert "secret timeout detail" not in caught.value.message
+
+
+def test_gemini_adapter_retries_one_transient_provider_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = GeminiLLMService(api_key="test-key", model_id="gemini-test", timeout_ms=5_000)
+    calls = 0
+
+    class FakeTypes:
+        @staticmethod
+        def GenerateContentConfig(**kwargs):
+            return kwargs
+
+    class TransientServerError(Exception):
+        code = 503
+
+    class FakeModels:
+        async def generate_content(self, **_kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise TransientServerError("temporary provider detail")
+            return type("Response", (), {"parsed": grounded_draft(), "text": None})()
+
+    monkeypatch.setattr("app.providers.llm.gemini.RETRY_DELAY_SECONDS", 0)
+    service._types = FakeTypes()
+    service._client = type("Client", (), {"aio": type("Async", (), {"models": FakeModels()})()})()
+
+    result = asyncio.run(service.generate_remediation("grounded prompt"))
+
+    assert calls == 2
+    assert result.source_references == ["chunk_001"]
