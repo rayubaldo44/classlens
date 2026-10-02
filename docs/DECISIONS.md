@@ -41,7 +41,7 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ### D-003 — Supabase PostgreSQL
 
-- **Status:** Accepted; not configured
+- **Status:** Accepted and live-verified on 2026-10-02
 - **Decision:** Use Supabase PostgreSQL for relational persistence.
 - **Reason:** It provides managed PostgreSQL suitable for the hackathon schedule.
 - **Consequence:** D-015 implements relational persistence without pgvector and adds the initial migration.
@@ -76,7 +76,7 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ### D-006 — Teacher in the loop
 
-- **Status:** Accepted; remediation review implemented in process memory
+- **Status:** Accepted; remediation review implemented with PostgreSQL persistence
 - **Decision:** The teacher is the final authority over educational interpretation and intervention approval.
 - **Reason:** AI output is a fallible proposal and educational context matters.
 - **Consequence:** Show evidence and require explicit edit/approve/reject controls.
@@ -84,9 +84,9 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 ### D-013 — Gemini structured remediation with teacher review
 
 - **Status:** Accepted and implemented on 2026-10-01
-- **Decision:** Use the Google Gemini API with stable free-tier `gemini-3.1-flash-lite` behind an `LLMService` protocol. Generate against centralized prompt version `grounded_remediation_v1`, validate structured JSON with Pydantic, reject unknown chunk references, and keep generated/current review records in a process-local store for the hackathon demo.
-- **Reason:** The user selected Gemini and relies on the free tier. `gemini-3.8-flash` and then `gemini-3.6-flash` returned explicit high-demand responses for the full grounded prompt; `gemini-3.1-flash-lite` supports the same structured output and passed the complete live generation and teacher-review smoke. The isolated adapter prevents application services from depending directly on Google SDK types. The repository still has no configured durable database schema.
-- **Consequence:** `GEMINI_API_KEY` remains server-side. Provider failure saves no draft; D-015 now persists successful drafts, edits, and decisions.
+- **Decision:** Use the Google Gemini API with stable free-tier `gemini-3.1-flash-lite` behind an `LLMService` protocol. Generate against centralized prompt version `grounded_remediation_v1`, validate structured JSON with Pydantic, reject unknown chunk references, and persist generated/current review records through D-015.
+- **Reason:** The user selected Gemini and relies on the free tier. `gemini-3.8-flash` and then `gemini-3.6-flash` returned explicit high-demand responses for the full grounded prompt; `gemini-3.1-flash-lite` supports the same structured output and passed the complete live generation and teacher-review workflow. The isolated adapter prevents application services from depending directly on Google SDK types.
+- **Consequence:** `GEMINI_API_KEY` remains server-side. Provider failure saves no draft; successful drafts, edits, sources, and decisions persist.
 
 ### D-014 — Linked follow-up comparison
 
@@ -97,10 +97,24 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ### D-015 — Direct PostgreSQL persistence with rebuildable vector cache
 
-- **Status:** Accepted and implemented locally on 2026-10-02; live Supabase verification pending configuration
+- **Status:** Accepted, implemented, and live-verified against Supabase on 2026-10-02
 - **Decision:** Access Supabase PostgreSQL only through FastAPI using server-side `SUPABASE_DB_URL` and psycopg transactions. Persist normalized assessments, analysis evidence, material chunks, interventions/review state, follow-up assessments, and comparisons. Keep document vectors as a process-memory cache rebuilt from persisted chunks.
 - **Reason:** Direct transactions keep multi-table writes inspectable and atomic. The tiny demo corpus does not justify changing the verified exact-cosine retrieval path to pgvector.
-- **Consequence:** React stores only resume IDs and reloads authoritative records from FastAPI. First retrieval after a backend restart re-embeds that material. Applying the migration and proving a live restart require the Supabase PostgreSQL connection string.
+- **Consequence:** React stores only resume IDs and reloads authoritative records from FastAPI. First retrieval after a backend restart re-embeds that material. Migration application, a fresh-repository integration test, FastAPI restart recovery, and React reload were verified against Supabase.
+
+### D-017 — Supabase transaction-pooler compatibility
+
+- **Status:** Accepted and implemented on 2026-10-02
+- **Decision:** Configure psycopg pools with `prepare_threshold=None` for ClassLens database connections.
+- **Reason:** A live follow-up write through the Supabase transaction pooler failed with `DuplicatePreparedStatement` because session-scoped automatic prepared statements can collide across pooled server sessions.
+- **Consequence:** Queries remain parameterized but are not automatically promoted to named server-side prepared statements. A regression test protects the pool configuration.
+
+### D-018 — One bounded Gemini retry
+
+- **Status:** Accepted and implemented on 2026-10-02
+- **Decision:** Make at most one delayed retry for Gemini timeouts and HTTP 429/500/502/503/504 responses; fail immediately for permanent errors and never synthesize fallback output.
+- **Reason:** Live verification observed intermittent Gemini 503 responses while the same grounded request later succeeded. One bounded retry improves demo reliability without hiding prolonged provider failure or multiplying latency unpredictably.
+- **Consequence:** A continued failure remains a retryable structured API/UI error and stores no remediation. A regression test verifies that one transient failure is retried exactly once.
 
 ### D-007 — Focused MVP, not a full LMS
 
@@ -111,15 +125,15 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ### D-008 — Deployment direction
 
-- **Status:** Partially accepted; not configured
-- **Decision:** Deploy the frontend to Vercel and use Supabase for the database. Backend hosting remains TBD.
-- **Consequence:** Deployment work must preserve server-side secrets and verify cross-origin configuration.
+- **Status:** Accepted; services provisioned on 2026-10-02, hosted workflow verification pending
+- **Decision:** Deploy the Vite frontend to Vercel, the persistent FastAPI service to Render, and relational data to Supabase PostgreSQL.
+- **Reason:** Vercel fits the static Vite build. Render supports the verified Python 3.11 runtime and avoids forcing the PyTorch/sentence-transformer workload into an unverified serverless function lifecycle.
+- **Consequence:** Gemini and database credentials remain only on Render. Vercel receives only the public `VITE_API_URL`; Render must explicitly allow the stable Vercel origin. Provisioning alone does not complete deployment—health, CORS, and the hosted golden path must pass after the committed branch redeploys.
 
 ## Unresolved decisions
 
 | ID | Decision needed | Why it matters | Owner/trigger |
 |---|---|---|---|
-| U-007 | Backend deployment provider | Affects cold starts, CORS, secrets, logs, and demo reliability. | Resolve before deployment work. |
 | U-009 | Explicit Node version policy | Needed for repeatable setup and CI with Vite 8. | Resolve before shared deployment/CI. |
 
 When a decision is made, add a dated accepted entry with its rationale and update [TECH_STACK.md](TECH_STACK.md), [ARCHITECTURE.md](ARCHITECTURE.md), or [AI_PIPELINE.md](AI_PIPELINE.md) only where the decision changes their authority.

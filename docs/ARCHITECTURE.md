@@ -1,6 +1,6 @@
 # Architecture
 
-This document defines system boundaries and data flow. The detailed AI algorithms belong in [AI_PIPELINE.md](AI_PIPELINE.md), database fields in [DATABASE.md](DATABASE.md), and endpoint payloads in [API.md](API.md). The React/FastAPI boundary and PostgreSQL repository path are implemented. Live Supabase migration and restart verification await `SUPABASE_DB_URL`.
+This document defines system boundaries and data flow. The detailed AI algorithms belong in [AI_PIPELINE.md](AI_PIPELINE.md), database fields in [DATABASE.md](DATABASE.md), and endpoint payloads in [API.md](API.md). The React/FastAPI boundary, Supabase PostgreSQL repositories, and restart recovery were live-verified on 2026-10-02.
 
 ## High-level design
 
@@ -11,12 +11,10 @@ flowchart LR
     A --> D[(Supabase PostgreSQL)]
     A --> E[Local embedding model]
     A --> I[MaterialIndex protocol]
-    I --> IM[(Process-local demo index)]
+    I --> D
+    I --> IM[(Process-local vector cache)]
     A --> L[Gemini API]
-    A --> R[(Process-local remediation store)]
-    A --> S[(Process-local analysis/results stores)]
     A --> X[Document extraction]
-    D -. optional persistent vectors .-> V[pgvector]
     X --> A
 ```
 
@@ -43,10 +41,11 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 
 ### PostgreSQL/Supabase
 
-- Future persistence target: store assessments, questions, source responses, analysis results, material metadata/chunks, intervention revisions/state, and results.
+- Stores assessments, questions, source responses, analysis results, material metadata/chunks, intervention revisions/state, and results.
 - Enforce relationships and uniqueness needed for reproducible runs.
-- Store vector columns only if persistence is justified by the demo design.
+- Do not store vectors for the tiny MVP corpus; rebuild the per-process cache from durable chunks.
 - Apply the checked-in SQL migration with `psql` and keep future schema changes additive and reproducible.
+- Disable psycopg automatic prepared statements for compatibility with the configured Supabase transaction pooler.
 
 ### AI and extraction adapters
 
@@ -66,19 +65,19 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 1. The frontend sends the assessment and CSV to FastAPI.
 2. FastAPI validates, normalizes, and creates an assessment snapshot or preview.
 3. After confirmation, the backend identifies eligible incorrect responses per question using the explicit validated correctness field.
-4. The analysis module embeds and groups those responses synchronously and returns group membership and evidence without persistence.
+4. The analysis module embeds and groups those responses synchronously, persists the normalized assessment plus group evidence, and returns the result.
 5. A future LLM adapter may draft a potential-misconception description from bounded evidence.
 6. The frontend displays groups and representative responses to the teacher.
 7. A teacher uploads a `.txt` material or selects the synthetic demo notes; the backend cleans, chunks, embeds, and indexes it through `MaterialIndex`.
 8. Retrieval queries only that material, ranks chunks by cosine similarity, filters by the configured threshold, and returns exact source text or an explicit insufficient-context result.
 9. The Gemini adapter drafts schema-validated remediation and follow-up questions constrained by the passages; unknown passage references reject the complete draft.
 10. PostgreSQL preserves both original generation and teacher-edited content; the teacher explicitly saves, approves, or rejects it.
-11. Each completed analysis is persisted with its normalized input and detected evidence groups.
+11. Each completed analysis is already persisted with its normalized input and detected evidence groups; stable IDs make fixture reruns safe.
 12. The teacher submits a follow-up CSV through the same validation pipeline and links it to the selected group and approved remediation.
 13. The existing analysis pipeline re-evaluates follow-up responses. A dedicated comparison service validates the linkage, matches recurring group membership for the same question, and calculates deterministic counts and percentages.
 14. The Results screen shows before/after values, transition counts, missing follow-up data, and the assessment → misconception → intervention → follow-up trace without claiming causation.
 
-Long provider operations may initially use a simple request/response path if latency is acceptable. If they require job polling, add a small persisted job state within the FastAPI application rather than a new service.
+Long provider operations currently use a simple synchronous request/response path. Gemini retries one transient timeout/429/5xx response; continued failure remains explicit. If latency later requires job polling, add a small persisted job state within the FastAPI application rather than a new service.
 
 ## Proposed folder structure
 

@@ -1,6 +1,6 @@
 # AI Pipeline
 
-**Implementation status:** The working AI pipeline is unchanged. Its assessment evidence, material chunks, teacher review, and follow-up comparison now have PostgreSQL adapters; live Supabase restart verification awaits a direct database URL. Standalone LLM misconception-label interpretation remains unimplemented.
+**Implementation status:** The complete golden-path AI pipeline and its PostgreSQL adapters were live-verified against Supabase on 2026-10-02, including restart recovery and real Gemini generation. Standalone LLM misconception-label interpretation remains unimplemented.
 
 This document is the authority for the proposed AI workflow and its failure behavior. Product requirements and safeguards are in [PRODUCT.md](PRODUCT.md); selected and pending technologies are in [TECH_STACK.md](TECH_STACK.md).
 
@@ -164,9 +164,9 @@ The prompt explicitly says the group is already detected, treats student/source 
 - one to three follow-up questions with expected answers;
 - one or more supporting chunk IDs.
 
-Generation is synchronous for the demo, with temperature `0.2`, a 2,200-token output bound, and configurable `CLASSLENS_LLM_TIMEOUT_MS` (default 45 seconds). If retrieval status is not `retrieved` or has no results, the service returns `insufficient_context` without calling Gemini. Every returned chunk ID must belong to the supplied retrieval result; unknown or empty references reject the whole draft. The record preserves exact source snapshots and generated content.
+Generation is synchronous for the demo, with temperature `0.2`, a 2,200-token output bound, and configurable `CLASSLENS_LLM_TIMEOUT_MS` (default 45 seconds). The adapter makes at most two provider attempts: one initial call and one retry after 0.75 seconds for timeouts or HTTP 429/500/502/503/504 responses. Permanent failures are not retried. If retrieval status is not `retrieved` or has no results, the service returns `insufficient_context` without calling Gemini. Every returned chunk ID must belong to the supplied retrieval result; unknown or empty references reject the whole draft. The record preserves exact source snapshots and generated content.
 
-## 11. Teacher review — implemented in process memory
+## 11. Teacher review — implemented with PostgreSQL persistence
 
 Generation creates status `generated`, never `approved`. The teacher can:
 
@@ -178,7 +178,7 @@ Generation creates status `generated`, never `approved`. The teacher can:
 
 PostgreSQL preserves immutable `generated_content` separately from teacher-edited `content`, exact source snapshots, provider/model/prompt version, status, notes, and timestamps. Approval and rejection remain terminal.
 
-## 9. Follow-up re-analysis and comparison — implemented
+## 12. Follow-up re-analysis and comparison — implemented
 
 Follow-up CSVs use the same schema, validation, normalization, correctness boundary, embedding adapter, and grouping service as baseline assessments. A comparison loads its baseline analysis and explicitly approved linked remediation from persistence.
 
@@ -216,7 +216,7 @@ The versioned photosynthesis fixtures produce 9 of 43 answered students affected
 | Extraction failure or empty text | Mark material failed with a useful cause; do not index it. |
 | No relevant passage | Return `insufficient_relevant_context` with no results; block claims of grounded remediation. |
 | Material embedding, index, or retrieval failure | Return a structured retryable material error; do not return sources as if retrieval succeeded. |
-| Remediation LLM missing configuration, timeout, high demand, or other provider failure | Return a sanitized structured error; keep source evidence; save no fabricated draft; allow retry where appropriate. |
+| Remediation LLM missing configuration, timeout, high demand, or other provider failure | Retry one transient timeout/429/5xx response; otherwise return a sanitized structured error, keep source evidence, and save no fabricated draft. |
 | Malformed structured output or invalid chunk references | Reject the complete generation and save no remediation. |
 | Network/backend failure | Use idempotency where needed and let the client safely retry or poll. |
 | Missing follow-up data | Report missing counts and omit unsupported comparisons. |

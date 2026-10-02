@@ -1,37 +1,50 @@
-# Supabase Persistence Findings
+# Golden Path Reliability Findings
 
-## Active Findings
-- `InMemoryAnalysisStore` holds normalized baseline/follow-up inputs and completed analysis snapshots.
-- `InMemoryMaterialIndex` holds learning-material metadata, exact chunks, and vectors.
-- `InMemoryRemediationStore` holds generated content, teacher edits, review state, and source snapshots.
-- `InMemoryResultsStore` holds comparison records; all four stores are erased on FastAPI restart.
-- No migration exists. Direct transactional persistence requires a new server-only `SUPABASE_DB_URL`; `psql` is installed but the Supabase CLI is not.
-- React keeps all workflow objects and IDs in component state, so browser reload loses its pointers.
-- The CSV has no class identity; follow-up responses should be a linked assessment; intervention source snapshots remove the need for a retrieval-events table.
-- Baseline checks pass: 55 backend tests, frontend lint, and frontend build.
+## Starting State
+- Worktree was clean at campaign start.
+- Current docs claim 58 passing backend tests, frontend lint/build success, real embeddings/RAG/Gemini behavior, PostgreSQL adapters, and an isolated PostgreSQL 16 persistence integration pass.
+- Live Supabase migration/restart durability and a complete browser click rehearsal remain explicitly unverified.
+- Existing planning files described the prior persistence milestone and were refreshed for this campaign.
 
-## Prior Milestone Findings
+## Discoveries
+- Production dependencies resolve to PostgreSQL stores/indexes; in-memory implementations are retained only for dependency-overridden tests.
+- Demo assessment/material/follow-up endpoints load versioned synthetic inputs and call the same parser, embedding, grouping, retrieval, and comparison services as uploads. No hardcoded output percentages or fake delays exist in application code.
+- `backend/.env` is present with hidden Gemini and direct PostgreSQL configuration; no root/frontend environment file is required by the runner. `./scripts/demo.sh check` passes with Python 3.11 and dependencies.
+- The UI still labels persisted material as held only in backend memory; that wording is stale.
+- Reload restoration fetches analysis, retrieval, remediation, and comparison into parent state, but the Intervention component does not receive/restage a restored remediation. Reloading `/intervention` therefore cannot display its persisted review state.
+- The runner's `reset` restarts services but intentionally preserves PostgreSQL and browser localStorage. It is a runtime restart, not by itself a clean workflow reset.
+- Remediation requests carry retrieval text from the client. PostgreSQL validates IDs/foreign keys at save time, but the service does not compare supplied source text/offsets with authoritative stored chunks before sending the prompt. The normal UI path is honest, but this boundary should be hardened if scope permits.
+- Live Supabase follow-up initially failed with `DuplicatePreparedStatement`; the persistent psycopg pool must disable session-scoped automatic prepared statements when using Supabase's transaction pooler.
+- Gemini is intermittently returning controlled provider failures. One real grounded draft succeeded; repeated second-draft attempts failed, motivating a single bounded retry for transient statuses.
 
-# Demo Hardening Findings
+## Verified Results
+- Supabase migration applied idempotently and the gated fresh-repository integration test passed.
+- Live baseline preview reproduced 45 responses/students, 43 answered, 2 blank, 14 correct, and 29 incorrect.
+- Real embeddings reproduced 4 groups, 18 grouped responses, 11 outliers, and the strongest 9-member sunlight-as-food group.
+- Real retrieval returned persisted chunks 1/3/2 at 0.7840/0.5693/0.5417; the top text is exact teacher material.
+- A real Gemini draft addressed sunlight-as-food, cited only chunks 1 and 2, remained generated until a teacher edit was saved and explicitly approved, and preserved the immutable original.
+- After FastAPI restart, analysis evidence, approved edited remediation, material metadata/chunks, and cold-cache retrieval reloaded successfully.
 
-## Confirmed State
-- All eleven local golden-path capabilities are implemented and the service chain was live-verified in one backend process.
-- Analysis, materials, remediation, and results state is process-local and disappears when that backend process exits.
-- `docs/DEMO.md` is stale at the top and still describes implemented fixtures/UI as planned.
-- Remaining P0 items are the repeatable reset/start procedure, browser rehearsal, deployment, and the pre-demo checklist.
-- Backend hosting and durable Supabase/pgvector persistence remain unresolved and are out of scope for this continuation.
+## Known Blockers
+- No blocker remains for the local golden path. Deployment was intentionally not attempted.
 
-## Constraints
-- Python 3.11 is the verified backend runtime; the system Python 3.14 is incompatible with the embedding stack.
-- Gemini free-tier availability can vary. Failures must remain explicit and cannot be replaced silently.
-- The procedure must keep `GEMINI_API_KEY` server-side and must not print it.
+## Final Observations
+- A full ordinary-upload run completed in about 82 seconds with real providers and persisted every golden-path resource.
+- FastAPI restart and browser reload recovered analyses, evidence, material chunks, approval/rejection state, follow-up analysis, and comparison results; only material vectors are intentionally rebuilt.
+- Actual results were 9/43 affected before (20.9%) and 3/43 after (7.0%), a 13.9-point reduction, with three still-struggling students visible.
+- Intermittent Gemini 503s and one cold analysis stall remain operational risks. The code now retries Gemini once but continues to fail closed.
+- Full browser automation was inconclusive because of test-harness synchronization/interruption; focused browser state checks passed, and a timed human rehearsal remains the next operational step.
 
-## Audit Findings
-- `scripts/` has no existing implementation; root and backend READMEs do not provide a whole-stack start/reset command.
-- `frontend/node_modules` is present and Firefox 156 is installed, but Playwright, Puppeteer, Selenium, and `geckodriver` are absent.
-- The frontend defaults to `http://localhost:8000`; the reset runner should set `VITE_API_URL` explicitly to match its backend bind address.
-- All four mutable state boundaries are process-local singletons. Restarting the owned backend process is a complete safe state reset; no data deletion endpoint is needed.
-- The attempt to inspect `backend/app/providers/material_index.py` failed because the implementation is a package at `backend/app/providers/material_index/`; subsequent inspection must use the package files.
-- Port 5173 has a pre-existing user Vite process. The runner's collision protection left it untouched; the isolated rehearsal can use port 4179 with matching generated CORS.
-- The first real headless Firefox run verified dashboard navigation and the backend-backed intake preview (45 students, 29 incorrect, 2 blank). Its only failure was browser-driver interaction with a below-fold control, not an application/API error.
-- Three WebElement/DOM interaction strategies all stalled on the below-fold transition despite the enabled control appearing in captured HTML. Browser automation cannot verify the rest of the click path in this environment; manual browser rehearsal remains required.
+## Deployment Findings — 2026-10-02
+
+- The repository is a monorepo with the deployable Vite app under `frontend/`; there is no existing `vercel.json` or `.vercel` project link.
+- The frontend requires a build-time public `VITE_API_URL`. Its fallback is `http://localhost:8000`, which is invalid for a public deployment.
+- The FastAPI runtime imports `sentence-transformers==5.7.0` and CPU PyTorch and was verified only on Python 3.11. Current Vercel Python Functions offer Python 3.12–3.14, so the backend cannot be called deployment-ready without a compatibility/build/cold-start test.
+- Vercel officially supports FastAPI, but Python functions have bundle/runtime constraints. Large Functions may accommodate bigger AI dependencies on eligible Fluid Compute projects, yet model download/cache behavior and ClassLens cold analysis remain reliability risks.
+- Safe topology for an immediate reliable deployment is Vercel for `frontend/` plus a separately reachable FastAPI deployment. Deploying only the frontend before a public backend URL exists would produce an API-unavailable application.
+- Vercel CLI is not installed globally; `npx` is available. No local Vercel project link exists.
+- The public deployment URL could not be discovered from search, and the configured GitHub remote is not publicly readable. The live URL is required to inspect the built `VITE_API_URL` target and browser CORS behavior.
+- Render backend `https://classlens-t6xn.onrender.com` is live. Direct verification on 2026-10-02 returned HTTP 200 from `/health` with `{"status":"ok","service":"classlens-api"}` and identified Uvicorn as the origin server.
+- Vercel HTML points to `/assets/index-Bsbt1XBe.js`; inspection of that public bundle confirmed the compiled API URL is `https://classlens-t6xn.onrender.com`.
+- A live `GET /health` with `Origin: https://class-lens-one.vercel.app` returned HTTP 200 but omitted `Access-Control-Allow-Origin`; an `OPTIONS` preflight from the same origin returned HTTP 400 `Disallowed CORS origin`. The preview domain `https://class-lens-nsnrffho0-arthurs-projects-7a8a5ea6.vercel.app` was likewise not allowed.
+- Root cause: Render's currently running FastAPI CORS configuration does not include the frontend origin, likely because the environment variable is missing, singularly named, or has not been applied by restart/redeploy. App code reads `CLASSLENS_CORS_ORIGINS` (plural).

@@ -623,3 +623,108 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Remaining / recommended next step: reload `http://localhost:5173` to rerun the health check and continue the manual golden-path rehearsal. Full browser workflow and Supabase durability remain unverified.
 
 ---
+
+## Session / Milestone: Golden path E2E reliability and demo hardening
+
+**Date:** 2026-10-02
+
+**Status:** Complete; local golden path passed with external services
+
+### Goal and attempts
+
+- Audited the complete assessment → misconception evidence → teacher material/RAG → Gemini remediation → teacher review → follow-up → results implementation for mocks, stale state, persistence gaps, and uncontrolled failures.
+- Applied the checked-in schema to the configured Supabase database, ran the database-gated integration test, started isolated FastAPI/Vite services through the documented runner, and exercised both demo-input and ordinary-upload endpoints.
+- Walked key teacher UI states in headless Firefox at desktop and mobile sizes, including persistent-state reload and backend unavailability. A full click automation was not counted as passed: one attempt used a stale text assertion and a second was interrupted during analysis synchronization.
+
+### Files created or significantly modified
+
+- `backend/app/database.py`
+- `backend/app/providers/llm/gemini.py`
+- `backend/app/services/remediation.py`, `backend/app/services/results.py`
+- `backend/tests/test_persistence.py`, `backend/tests/test_remediation.py`
+- `frontend/src/App.tsx`
+- `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, `docs/ARCHITECTURE.md`, `docs/AI_PIPELINE.md`, `docs/API.md`, `docs/DATABASE.md`, `docs/DECISIONS.md`
+- `task_plan.md`, `findings.md`, `progress.md`
+
+### Completed
+
+- Disabled psycopg automatic prepared statements for Supabase transaction-pooler compatibility after a real follow-up write exposed `DuplicatePreparedStatement`.
+- Added one bounded Gemini retry for timeouts and transient 429/5xx responses. Continued provider failure remains explicit and creates no draft.
+- Fixed frontend workflow replacement so a new upstream selection clears stale downstream IDs, exposed partial restore errors, and restored persisted remediation/review content on `/intervention` reload.
+- Corrected UI/backend wording that incorrectly described durable records as process-local.
+- Documented exact files, services, environment, three-minute sequence, checkpoints, safe non-destructive reset, and provider recovery behavior.
+
+### Verified/tested
+
+- Initial upload: 45 responses/students, 43 answered, 2 blank, 14 correct, 29 incorrect.
+- Real embeddings/grouping: 4 groups, 18 grouped, 11 outliers; strongest group 9/29 with exact source responses and no threshold changes.
+- Material/RAG: 3 chunks; real scores 0.7840, 0.5693, 0.5417; all text matched stored source offsets; unrelated material returned no context.
+- Real Gemini: structured grounded draft cited only retrieved chunks 1 and 2; teacher edit persisted; one record approved and a separate record rejected.
+- Follow-up/results: 44 rows, 43 answered, 1 blank, 1 absent; 9/43 (20.9%) before and 3/43 (7.0%) after; 13.9-point reduction; 5 resolved, 1 changed-still-incorrect, 3 still struggling.
+- Manual arithmetic checks confirmed prevalence and correctness changes, including 14/43 to 33/43 (+44.1 points).
+- FastAPI restart and frontend reload recovered all durable workflow resources; material vectors rebuilt from stored chunks.
+- Final uninterrupted ordinary-upload API workflow passed in about 82 seconds.
+- Backend suite: 60 passed, 1 opt-in database test skipped in the default run; that test passed separately against Supabase. Frontend lint and production build passed.
+- Live and automated failure checks covered invalid/empty CSVs, blanks, unavailable backend/database/provider, insufficient material, retrieval/provider/malformed-output failures, and follow-up mismatch.
+
+### Problems encountered
+
+- Gemini returned intermittent transient 503 errors. The bounded retry helps but cannot guarantee provider availability.
+- A cold analysis request stalled past 180 seconds even though direct component timing later completed; the final uninterrupted run passed.
+- Supabase transaction pooling rejected reused named prepared statements until automatic preparation was disabled.
+- Browser automation was useful for rendered-state and responsive checks but brittle for a complete timed click script; no uncompleted automation result was reported as verified.
+
+### Decisions
+
+- Preserve real failure states; do not add seeded or fake-success remediation output.
+- Keep the reset safe and non-destructive: restart runner-owned services and clear only the browser workflow pointer. Deterministic persistent IDs make fixture reruns repeatable.
+- Keep material vectors ephemeral and rebuildable while all source chunks and workflow state remain durable.
+
+### Remaining / recommended next step
+
+- Run two timed human-operated rehearsals on the actual judging machine/network, warm the embedding cache, verify Gemini quota and Supabase reachability, and keep a clearly labeled recording available.
+- Deployment, a prepared fallback artifact, LLM-authored misconception labels, and API-side revalidation of client-supplied source snapshots remain outside this completed hardening milestone.
+
+---
+
+## Session / Milestone: Hosted deployment foundation and commit preparation
+
+**Date:** 2026-10-02
+
+**Status:** Services provisioned; hosted integration pending
+
+### Attempted and completed
+
+- Selected Vercel for the Vite frontend, Render for the persistent Python 3.11 FastAPI service, and the existing Supabase PostgreSQL database.
+- Provisioned the frontend at `https://class-lens-one.vercel.app` and backend at `https://classlens-t6xn.onrender.com` through the user-managed dashboards.
+- Documented the exact public/secret environment-variable boundary: only `VITE_API_URL` belongs on Vercel; Gemini, database, model, Python, and CORS configuration belong on Render.
+- Split the accumulated hardening work into focused backend, frontend, and documentation commits.
+
+### Verified
+
+- Render `/health` returned HTTP 200 with `{"status":"ok","service":"classlens-api"}` over HTTPS.
+- Backend suite passed: 60 tests, 1 opt-in database test skipped in the default run.
+- Frontend lint and Vite production build passed.
+- No real credential appeared in the commit diff; documented values are placeholders or public URLs.
+
+### Decisions and remaining work
+
+- Render was selected over an unverified Vercel Python Function lifecycle because ClassLens uses CPU PyTorch, sentence-transformers, Python 3.11, and a per-process vector cache.
+- Deployment remains incomplete until the commits are pushed, both services redeploy with `VITE_API_URL=https://classlens-t6xn.onrender.com` and `CLASSLENS_CORS_ORIGINS=https://class-lens-one.vercel.app`, and the hosted golden path passes in a browser.
+- Recommended next step: review and push the three commits, wait for both providers, then verify CORS, health, and the full workflow before checking off deployment.
+
+---
+
+## Session / Milestone: Diagnose deployed Vercel API-unavailable state
+
+**Date:** 2026-10-02
+
+**Status:** Root cause isolated to Render CORS configuration; external setting/restart required
+
+- Verified the Vercel app serves HTTP 200 and its production JavaScript bundle compiles `https://classlens-t6xn.onrender.com` as the API URL.
+- Verified Render `/health` returns HTTP 200 with the expected FastAPI contract.
+- Sent requests with both the stable Vercel origin and the preview deployment origin. Render omitted `Access-Control-Allow-Origin` for GET and returned HTTP 400 `Disallowed CORS origin` for OPTIONS preflight for both.
+- Confirmed source configuration reads only `CLASSLENS_CORS_ORIGINS` (plural). The deployed service needs that exact variable containing the browser's origin, followed by a Render restart/redeploy.
+- No application code change is needed for this observed issue. After the environment correction, repeat preflight and browser workflow checks.
+
+---

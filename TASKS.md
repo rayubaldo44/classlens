@@ -1,6 +1,6 @@
 # ClassLens Backlog
 
-Checkboxes represent verified repository state as of 2026-10-01. Tasks are ordered by dependency. Complete P0 before optional work.
+Checkboxes represent verified repository state as of 2026-10-02. Tasks are ordered by dependency. Complete P0 before optional work.
 
 ## P0 — demo critical
 
@@ -97,12 +97,12 @@ Depends on: Approved intervention and stable demo identifiers.
 - [x] Add a deterministic local demo check/start/reset/status/stop procedure that preserves persisted state.
 - [ ] Add an explicit, honestly labeled fallback for live Gemini unavailability; never switch silently.
 - [ ] Deploy the frontend to Vercel and the backend to the selected host; configure Supabase and secrets.
-- [ ] Configure `SUPABASE_DB_URL`, apply the migration, and verify the complete workflow survives FastAPI restart and React reload.
+- [x] Configure `SUPABASE_DB_URL`, apply the migration, and verify the complete workflow survives FastAPI restart and React reload.
 - [ ] Run the pre-demo checklist in [docs/DEMO.md](docs/DEMO.md#pre-demo-checklist).
 
 **Verification:** a clean demo run completes upload → evidence → material retrieval → remediation review → results without manual database edits; a second run is repeatable; deployed URLs pass smoke checks.
 
-The local single-process service path is live-verified through real Gemini generation and results retrieval. The prepared follow-up fixture produces 9/43 affected before (20.9%) and 3/43 after (7.0%), while preserving one blank, one absent student, one partially improved student, and three still-struggling students. The reset runner is verified, including a 200-before/404-after process-state proof. A headless Firefox run verified dashboard navigation and the real 45/29/2 preview, but browser-driver interaction blocked the remaining automated clicks; manual full-path rehearsal, an explicit provider fallback, and deployment remain open.
+The ordinary-upload API path is live-verified against Supabase through real Gemini generation, explicit teacher approval, and persisted results. The prepared follow-up produces 9/43 affected before (20.9%) and 3/43 after (7.0%), while preserving one blank, one absent student, one partially improved student, and three still-struggling students. FastAPI restart, cold material-vector rebuild, React reload, restored approval/results, desktop/mobile layout, and backend-unavailable messaging passed. Vercel and Render services now exist and Render health passes, but production CORS/API wiring and the hosted golden path remain unchecked; the deployment task therefore stays open.
 
 ## P1 — optional polish after P0
 

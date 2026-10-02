@@ -53,10 +53,10 @@ The runner validates Python 3.11 dependencies, frontend dependencies, required f
 | Embeddings | Local sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 |
 | Grouping | Deterministic complete-link cosine clustering |
 | Retrieval | Persistent UTF-8 chunks with a rebuildable exact-cosine vector cache |
-| Remediation | Gemini gemini-3.1-flash-lite with structured validation |
+| Remediation | Gemini gemini-3.1-flash-lite with structured validation and one bounded transient retry |
 | State | PostgreSQL repositories; material vectors are a rebuildable process cache |
-| Database | Supabase PostgreSQL migration and adapters implemented; live connection still requires `SUPABASE_DB_URL` |
-| Deployment | Vercel direction documented; frontend/backend not deployed |
+| Database | Supabase PostgreSQL migration, adapters, integration test, and restart recovery live-verified |
+| Deployment | Vercel frontend and Render backend provisioned; hosted cross-origin workflow verification pending |
 
 ## Verified demo result
 

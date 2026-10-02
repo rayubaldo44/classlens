@@ -1,168 +1,192 @@
 # Demo Guide
 
-**Implementation status:** The complete local workflow, deterministic baseline/follow-up fixtures, teacher material, reset/start runner, and calculated results are implemented as of 2026-10-02. The service chain is live-verified. A headless Firefox rehearsal reached the real validated intake, but local driver interaction blocked the remaining automated clicks; the full manual browser rehearsal and deployment checks remain open.
+**Implementation status:** The complete local workflow was verified on 2026-10-02 through ordinary upload endpoints with real embeddings, Supabase persistence, source-backed retrieval, live Gemini generation, explicit teacher approval, real follow-up analysis, and calculated results. A Vercel frontend and Render backend are provisioned, and Render health passes; their cross-origin golden path remains unverified until the committed branch and matching production environment values redeploy.
 
-This document defines the reproducible hackathon demonstration. It must remain honest about synthetic, seeded, cached, or live-generated content.
+## Scenario and files
 
-## Scenario
+ClassLens demonstrates a Grade 7 photosynthesis assessment for 45 synthetic students. The teacher investigates a recurring pattern that treats sunlight as plant food, grounds an intervention in teacher-selected notes, approves an edited draft, and measures a synthetic follow-up.
 
-- **Subject:** Grade 7 Science
-- **Topic:** Photosynthesis
-- **Class size:** approximately 40–50 synthetic students
-- **Teacher goal:** understand why several students missed a free-response question, then prepare a grounded intervention and inspect follow-up performance.
+Use these exact versioned inputs:
 
-Core example pattern:
+- Initial assessment: `data/demo/photosynthesis_responses.csv`
+- Teacher material: `data/demo/learning_materials/photosynthesis_grade7.txt`
+- Follow-up assessment: `data/demo/photosynthesis_follow_up_responses.csv`
 
-- “Plants eat sunlight.”
-- “Sunlight is the food of plants.”
-- “Plants consume sunlight to grow.”
+The requested conceptual names `photosynthesis_initial_assessment.csv`, `photosynthesis_teacher_material.txt`, and `photosynthesis_followup_assessment.csv` correspond to the three repository files above. Do not rename or regenerate them immediately before judging.
 
-These responses may indicate a recurring misunderstanding of sunlight as food rather than an energy source used to produce glucose during photosynthesis. The demo must present this as a potential misconception supported by responses and reviewed by the teacher, not as a certain diagnosis of student thinking.
+All student identifiers and responses are synthetic. The inputs are deterministic; detected groups, retrieval, Gemini output, and comparison metrics are produced by the real pipeline.
 
-## Reproducible dataset requirements
+## Services and environment
 
-The implemented fixtures and verification contracts are:
+Required services:
 
-1. **Assessment definition** with stable question IDs, exact prompts, learning objectives, expected answers/rubrics, subject, grade, and topic.
-2. **Baseline response CSV** with 40–50 stable synthetic student IDs, valid quoting, several questions if time permits, correctness according to the chosen transparent scoring contract, and a deliberate mix of:
-   - correct explanations;
-   - the sunlight-as-food paraphrases;
-   - other coherent errors that should remain separate;
-   - unique/outlier errors;
-   - at least one blank response;
-   - no real student names or personal data.
-3. **Teacher-provided learning material** that accurately explains sunlight as an energy source and glucose as a product/storage form, with a known passage locator.
-4. **Expected analysis manifest** listing intended row counts, eligibility counts, known pattern members, acceptable outliers, and expected retrieved passage IDs. This supports automated verification without forcing every algorithm result.
-5. **Follow-up response CSV** using the same synthetic student/question IDs, with missing records represented by absence and the file clearly labeled `demo_seed` if outcomes are predetermined.
-6. **Reset/seed command or documented procedure** that restores the same clean state before each run.
+- Supabase PostgreSQL reachable through a direct server-side connection string.
+- FastAPI running under the verified Python 3.11 environment.
+- React/Vite.
+- Google Gemini API access for live remediation generation.
+- The local Hugging Face embedding model cache. Internet access is needed on first download if it is not already warm.
 
-The baseline and follow-up fixtures, manifests, and teacher material are versioned under `data/demo/`. Grouping is deterministic for fixed inputs, model, threshold, and minimum support; no fixture-generation randomness is used at runtime.
+Required values belong in ignored `backend/.env` configuration:
 
-## Clean local start and reset
+```dotenv
+SUPABASE_DB_URL=postgresql://...
+GEMINI_API_KEY=...
+CLASSLENS_LLM_MODEL=gemini-3.1-flash-lite
+CLASSLENS_CORS_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+```
 
-Complete the backend environment setup in [backend/README.md](../backend/README.md), including a server-side `GEMINI_API_KEY`. From the repository root:
+`SUPABASE_URL` and `SUPABASE_SECRET_KEY` may exist for project administration but are not used by the browser or the direct PostgreSQL workflow. `HF_TOKEN` is optional for the public embedding model. Never put database or provider secrets in `VITE_*` variables.
+
+Apply the idempotent migration once for a new Supabase database:
+
+```bash
+psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f database/migrations/001_golden_path_persistence.sql
+```
+
+From the repository root, validate and start the local stack:
 
 ```bash
 ./scripts/demo.sh check
 ./scripts/demo.sh reset
-```
-
-Open `http://127.0.0.1:5173`. The runner permits both the `127.0.0.1` and `localhost` spellings of that origin, so either address works. If that port is occupied, choose another and the runner will configure matching backend CORS automatically:
-
-```bash
-CLASSLENS_FRONTEND_PORT=4179 ./scripts/demo.sh reset
-```
-
-If a screen reports that the browser could not reach the API, the backend may be stopped or the origin may be blocked by CORS. A CORS block is invisible to `curl` and appears in the browser console as a blocked cross-origin request even while the backend is healthy. Check the origin allow-list before restarting FastAPI.
-
-Useful controls:
-
-```bash
 ./scripts/demo.sh status
-./scripts/demo.sh stop
 ```
 
-`reset` stops only process groups previously recorded by the runner. Starting a fresh backend clears all process-local analysis, material, remediation, and comparison state. It does not delete fixtures, model caches, environment files, or secrets. Verification on 2026-10-02 retrieved an indexed material before reset with HTTP 200 and received HTTP 404 `material_not_found` for the same ID afterward.
+Open `http://127.0.0.1:5173`. The runner also permits `http://localhost:5173`. For occupied ports:
 
-## Golden-path click sequence
+```bash
+CLASSLENS_BACKEND_PORT=8010 CLASSLENS_FRONTEND_PORT=4179 ./scripts/demo.sh reset
+```
 
-1. Open the teacher dashboard and choose **Load photosynthesis demo** or upload the assessment and baseline CSV.
-2. Review the validation preview: class size, question count, valid/blank/incorrect counts, and synthetic-data label.
-3. Start analysis and show visible progress rather than a frozen screen.
-4. Open the resulting group **Sunlight treated as plant food** (final title may vary after evaluation).
-5. Point to group support, the question/expected concept, and exact representative responses.
-6. Select or upload the prepared teacher lesson material.
-7. Show the retrieved passage with filename and page/section before generation.
-8. Generate the activity and follow-up questions; show their passage references.
-9. Make a small teacher edit and approve the intervention.
-10. Load clearly labeled synthetic follow-up results.
-11. Show baseline and follow-up counts/percentages plus missing-data and non-causality notes.
+The runner injects the matching public API URL and local CORS origins; no undocumented shell exports are required.
 
-Every screen in the sequence needs a deterministic navigation path back to the next step. Avoid dead-end demo controls.
+## Hosted deployment wiring
 
-## Approximately three-minute pitch
+The provisioned production topology is:
 
-### 0:00–0:30 — Problem and promise
+- Vercel frontend: `https://class-lens-one.vercel.app`
+- Render FastAPI service: `https://classlens-t6xn.onrender.com`
+- Supabase PostgreSQL through the server-side transaction-pooler connection string
 
-“Grades show me which students missed the question. They do not show that twelve students may share the same underlying idea in different words. ClassLens helps a teacher find that pattern and decide what to do next.”
+Vercel must define only the public build-time API location:
 
-Load the synthetic photosynthesis class and point out validation and class counts.
+```dotenv
+VITE_API_URL=https://classlens-t6xn.onrender.com
+```
 
-### 0:30–1:15 — Detect and verify
+Render holds all server-side values:
 
-Run or open the completed analysis. Select the sunlight-as-food group. Show the three example paraphrases, support count, expected concept, and caution that this is a potential misconception for teacher review.
+```dotenv
+PYTHON_VERSION=3.11.11
+GEMINI_API_KEY=...
+SUPABASE_DB_URL=postgresql://...
+CLASSLENS_LLM_MODEL=gemini-3.1-flash-lite
+CLASSLENS_CORS_ORIGINS=https://class-lens-one.vercel.app
+```
 
-Explain the division of responsibility: embeddings surface the pattern; the LLM communicates it; the teacher judges it.
+The Render `/health` endpoint returned the expected HTTP 200 contract on 2026-10-02. A live CORS probe from `https://class-lens-one.vercel.app` currently returns HTTP 400 `Disallowed CORS origin`; the deployed frontend bundle already targets Render. Set the exact production origin in the plural `CLASSLENS_CORS_ORIGINS` Render variable and restart the service. Do not call the hosted workflow verified until a browser run confirms CORS and the complete assessment-to-results path.
 
-### 1:15–2:15 — Ground and approve
+## Safe demo reset
 
-Choose the teacher lesson material. Show the exact retrieved passage about sunlight energy and glucose. Generate remediation, point to source references, make a quick edit, and approve it.
+There is deliberately no destructive reset endpoint. Persistent IDs are content-derived and repeated fixture submissions safely upsert/reuse deterministic records, so old Supabase rows do not change the demonstrated calculations.
 
-Explain that retrieval grounds the intervention in teacher-provided content; it did not create the original misconception group.
+Before each judging run:
 
-### 2:15–2:50 — Measure
+1. Run `./scripts/demo.sh reset` to restart only runner-owned local processes. This preserves Supabase records and model caches.
+2. Open a new private browser window, or clear only the ClassLens workflow pointer in DevTools:
 
-Load the clearly labeled synthetic follow-up. Show transparent before/after counts and missing results. State that the comparison demonstrates workflow and observed change, not causal proof.
+   ```js
+   localStorage.removeItem('classlens.workflow.v1'); location.assign('/');
+   ```
 
-### 2:50–3:00 — Close
+3. Confirm the sidebar says **API connected**.
+4. Use the three versioned files listed above.
+
+Starting a new assessment from the Upload screen also clears stale downstream browser pointers. Do not truncate Supabase tables before a normal demo.
+
+## Exact three-minute walkthrough
+
+### 0:00–0:30 — Validate the class
+
+1. On the dashboard choose **Load photosynthesis demo**.
+2. Under **Choose response file**, select `data/demo/photosynthesis_responses.csv` and choose **Validate selected CSV**.
+3. Confirm **Validated preview** shows 45 students, 45 accepted responses, 29 incorrect, 14 correct, and 2 blank.
+4. Choose **Analyze learning gaps**. A cold analysis can take roughly 15–45 seconds because embedding and remote persistence are synchronous.
+
+### 0:30–1:05 — Inspect real evidence
+
+5. Confirm **4 recurring patterns to inspect**, 18 grouped responses, and 11 outliers.
+6. Open the first **Potential misconception pattern** with 9 of 29 affected responses.
+7. Point out the exact representative answers and the full member list. Say that the label is provisional and teacher review is required.
+
+### 1:05–1:40 — Retrieve teacher material
+
+8. Select `data/demo/learning_materials/photosynthesis_grade7.txt` under **Choose teaching material (.txt)**, then choose **Ingest selected text**.
+9. Confirm 3 chunks with 384-dimensional embeddings, then choose **Find supporting passages**.
+10. Confirm the top passage explains sunlight as energy and glucose as food/stored chemical energy. It should come from the uploaded file; verified relevance was 0.78. Choose **Continue to intervention review**.
+
+### 1:40–2:20 — Generate, edit, and approve
+
+11. Choose **Generate remediation**. Gemini receives the detected group and only the displayed passages. Typical warm generation is several seconds, but provider load varies.
+12. Confirm the draft is labeled **AI-generated** and **Pending teacher review**. Check that its source badges refer only to retrieved chunks.
+13. Make a small visible edit, optionally add a review note, check the teacher-review confirmation, and choose **Approve intervention**.
+14. Confirm **Approved by teacher**, then choose **Continue to results**. Never skip the explicit approval.
+
+### 2:20–2:55 — Analyze follow-up
+
+15. Select `data/demo/photosynthesis_follow_up_responses.csv` under **Choose follow-up CSV**, then choose **Analyze selected follow-up**.
+16. Confirm **Feedback loop complete** and show:
+    - before: 9/43 affected, 20.9%;
+    - after: 3/43 affected, 7.0%;
+    - reduction: 13.9 percentage points;
+    - correctness: 14/43 to 33/43, +44.1 percentage points;
+    - missing follow-up: 2 (one blank and one absent);
+    - transitions: 5 resolved, 1 changed but still incorrect, 3 still struggling.
+
+### 2:55–3:00 — Close
 
 “Grades tell teachers who is struggling. ClassLens helps explain why—and keeps the teacher in control of what happens next.”
 
-## What must work live
+The measured change is observational and comes from synthetic follow-up input; do not claim the intervention caused it.
 
-- The frontend and backend load at the deployed or local demo URLs.
-- The prepared assessment/CSV passes real validation.
-- Analysis returns stored response evidence and a coherent target group.
-- The detail view shows exact fixture responses rather than invented examples.
-- The prepared material is actually extracted/indexed or loaded from a clearly identified preprocessed fixture.
-- Retrieval displays an exact relevant passage and source locator.
-- Remediation is tied to that passage and can be edited and approved.
-- Follow-up data is labeled and the arithmetic is correct.
-- Expected error states have readable UI, even if only the happy path is shown on stage.
+## Verified checkpoints
 
-## Backup strategy
+- Baseline: 45 rows, 43 answered, 2 blank, 14 correct, 29 incorrect.
+- Grouping: 4 groups, 18 grouped, 11 outliers; strongest group 9/29 with coherence 0.8454.
+- Retrieval: 3 exact source chunks ranked 0.7840, 0.5693, and 0.5417. Every returned string was checked against the normalized uploaded material at its stored offsets.
+- Gemini: real `gemini-3.1-flash-lite`, prompt `grounded_remediation_v1`, structured output parsed, chunks 1 and 2 cited, teacher edit and approval persisted.
+- Follow-up: 44 rows, 43 answered, 1 blank, 1 baseline student absent, 33 correct, 10 incorrect.
+- Results: 9/43 (20.9%) to 3/43 (7.0%), 13.9-point reduction; remaining students remain visible.
+- Uninterrupted ordinary-upload API run: about 82 seconds on the verification machine. Allow roughly three minutes for narration and clicks.
 
-Reliability is the priority, so prepare fallbacks before the event:
+## Recovery when a dependency fails
 
-1. Keep local copies of the exact synthetic assessment, CSVs, and teacher material.
-2. Keep the deterministic fixture manifests available to verify counts, group membership, and follow-up transitions.
-3. An explicit seeded Gemini remediation fallback is not implemented. If live generation fails, show the readable provider error and move to a clearly labeled screenshot or recording; do not imply the draft was generated live.
-4. The demo teaching material is already plain text, so no network document extraction is required.
-5. Keep screenshots or a short recording only as the final presentation fallback, labeled as a recorded run.
-
-Never present seeded groups, retrieval, remediation, or follow-up results as live provider output. Never silently replace a failure with fabricated content.
+- **Gemini:** the adapter retries one timeout/transient 429 or 5xx failure. If it still fails, the UI displays **Remediation action failed**, no successful draft is stored, and **Try generation again** is available. Wait briefly and retry once. If judging time is short, show a clearly labeled screenshot/recording from a verified run; never describe it as live generation.
+- **Supabase/database:** keep the page open, run `./scripts/demo.sh status`, verify `SUPABASE_DB_URL` and network reachability, then retry the failed action. Database errors are sanitized and retryable; the UI does not claim success.
+- **Embedding model:** ensure the model cache is warm before presenting. A model load/download failure produces an analysis or retrieval error and no fabricated group/source.
+- **Backend unavailable/CORS:** locally, confirm `./scripts/demo.sh status`. For production, check that Render has the plural `CLASSLENS_CORS_ORIGINS` variable containing the exact Vercel origin (no trailing slash), then restart Render and reload. The health endpoint can be healthy while browser requests are blocked by CORS.
+- **Insufficient material:** choose the provided photosynthesis material and retrieve again. ClassLens blocks grounded generation when no passage clears the relevance threshold.
+- **Saved-workflow restore:** choose **Start a new workflow** on the visible restore error, or perform the safe browser-pointer reset above. Persisted database records remain intact.
 
 ## Pre-demo checklist
 
-### Data and expected outputs
+### Required before leaving for judging
 
-- [x] Synthetic assessment, baseline CSV, material, manifest, and follow-up CSV exist and are versioned.
-- [x] Row counts, blank counts, scoring, group membership, and result arithmetic match the manifest.
-- [x] No real student data appears in the versioned fixtures; stable synthetic identifiers are used.
-- [x] Synthetic/precomputed fixture inputs are labeled in fixtures and UI.
+- [x] Fixtures, migration, server-side configuration names, and runner checks are documented.
+- [x] Supabase migration and database-gated integration test passed.
+- [x] Real baseline, grouping, retrieval, Gemini, review, follow-up, and results path passed.
+- [x] FastAPI restart and frontend resource reload passed.
+- [x] Empty/missing-column CSV, blank answers, backend unavailable, database failure, embedding/RAG/LLM failures, malformed LLM output, insufficient context, and follow-up mismatch have controlled handling through live checks and/or focused automated tests.
+- [x] Desktop and mobile golden-path screens were checked for obvious overflow and stale restore state.
+- [ ] Run two timed human-operated rehearsals on the actual presentation machine/network.
+- [ ] Confirm Gemini quota and Supabase reachability immediately before presenting.
+- [ ] Prearrange files/tabs, mute notifications, check projector zoom, and keep a clearly labeled backup recording available.
 
-### Services and configuration
+## Stop local services
 
-- [x] Local frontend and backend URLs are configured by the demo runner; no database connection is used.
-- [x] Required Gemini configuration is present server-side and absent from the frontend bundle.
-- [ ] CORS and HTTPS work from the presentation machine/network.
-- [ ] Provider quotas, model availability, and timeouts were checked.
-- [x] Health checks and runner-owned log paths are accessible without printing secrets.
+After verification or the demo:
 
-### Golden path
+```bash
+./scripts/demo.sh stop
+```
 
-- [ ] Run the full click sequence from a clean reset twice.
-- [x] Confirm CSV validation and preview counts.
-- [x] Confirm the target group and exact evidence through the live service path.
-- [x] Confirm the expected source passage and locator through the live service path.
-- [x] Confirm remediation references only available passages through the live service path.
-- [x] Confirm edit, approve, and reject states persist correctly within one backend process.
-- [ ] Confirm follow-up missing values and percentages render correctly.
-
-### Presentation
-
-- [ ] Browser zoom, resolution, and text size are readable on the projector.
-- [ ] Demo tabs/files are prearranged and notifications are muted.
-- [ ] The three-minute script is rehearsed with a timer.
-- [ ] Local fixtures, seeded-mode instructions, screenshots, and recording are immediately accessible.
-- [ ] The presenter knows the one-sentence explanation for live, seeded, and preprocessed data.
+This stops only runner-owned processes and does not delete persistent workflow records.

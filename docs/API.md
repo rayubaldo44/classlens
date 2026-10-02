@@ -1,6 +1,6 @@
 # ClassLens API
 
-**Implementation status:** The complete API path has PostgreSQL-backed runtime repositories. Local contracts pass; live Supabase migration/restart verification awaits `SUPABASE_DB_URL`.
+**Implementation status:** The complete API path has PostgreSQL-backed runtime repositories and was live-verified against Supabase on 2026-10-02, including FastAPI restart and frontend resource recovery.
 
 Implemented endpoints are marked and describe the current frontend/backend contract. Other sections remain proposed until implemented. Base path for implemented versioned routes: `/api/v1`.
 

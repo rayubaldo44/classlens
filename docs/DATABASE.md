@@ -1,10 +1,10 @@
 # Implemented Database Design
 
-**Implementation status:** The golden-path PostgreSQL schema and repository adapters are implemented in `database/migrations/001_golden_path_persistence.sql`. Local contract tests pass. Applying the migration to Supabase and proving restart persistence remain unverified until a server-side `SUPABASE_DB_URL` is configured.
+**Implementation status:** The golden-path PostgreSQL schema and repository adapters are implemented in `database/migrations/001_golden_path_persistence.sql`. The migration, database-gated integration test, full workflow, and restart recovery were verified against the configured Supabase PostgreSQL instance on 2026-10-02.
 
 ## Connection and security
 
-FastAPI connects directly to Supabase PostgreSQL through `SUPABASE_DB_URL` using psycopg transactions. The value belongs only in ignored backend configuration and must never use a `VITE_*` name. All application tables have row-level security enabled with no browser policies; React accesses data only through FastAPI.
+FastAPI connects directly to Supabase PostgreSQL through `SUPABASE_DB_URL` using psycopg transactions. The pool disables automatic prepared statements (`prepare_threshold=None`) because the configured Supabase transaction pooler cannot safely retain session-scoped prepared-statement names. The value belongs only in ignored backend configuration and must never use a `VITE_*` name. All application tables have row-level security enabled with no browser policies; React accesses data only through FastAPI.
 
 Apply the migration from the repository root:
 

@@ -1,34 +1,35 @@
-# Supabase Persistence Progress
+# Golden Path Reliability Progress
 
 ## 2026-10-02
-- Read the required repository guidance and authoritative persistence/API/AI documents.
-- Audited backend stores, services, routes, schemas, identifiers, frontend state, environment names, and migration directory.
-- Confirmed four process-local persistence boundaries and the browser-reload pointer gap.
-- Chose direct PostgreSQL, a lazy in-memory vector cache backed by persistent chunks, and local browser resume IDs.
-- Re-ran the verified baseline: 55 backend tests, frontend lint, and frontend build pass.
-- Added the 11-table PostgreSQL migration, direct psycopg connection boundary, PostgreSQL store/index adapters, structured database errors, and server-only configuration.
-- Added stable assessment linkage, persisted analysis reads, remediation-to-analysis linkage, follow-up assessment traces, and browser reload recovery through resource IDs.
-- Preserved exact cosine retrieval with a vector cache that re-embeds persisted chunks after restart.
-- Expanded the suite to 58 passing backend tests; frontend lint and build continue to pass.
-- Live Supabase migration/restart verification remains blocked because `SUPABASE_DB_URL` is not configured.
-- Downloaded an isolated PostgreSQL 16 image, applied the migration successfully, and passed a gated integration workflow across fresh repository instances; the temporary container was removed afterward.
+- Read the planning-with-files instructions and recovered repository planning state.
+- Confirmed the worktree was clean before changes.
+- Read AGENTS, current status/backlog, and the latest persistence/connectivity session history.
+- Started the required authoritative-document and full-implementation audit.
+- Completed the source/config/migration/frontend/API implementation trace and failure-test inventory.
+- Confirmed hidden server-side Gemini and PostgreSQL configuration is now present and the demo runtime check passes.
 
-## Prior Milestone Progress
+## Tests and Runs
+- Supabase migration applied idempotently; database-gated integration test passed.
+- Final uninterrupted ordinary-upload workflow passed in about 82 seconds.
+- Persistence survived FastAPI restart and frontend reload, including cold vector-cache rebuild.
+- Backend suite passed: 60 tests, with 1 opt-in database test skipped in the default environment and passed separately against Supabase.
+- Frontend lint and production build passed.
+- Browser checks passed for real analysis rendering, restored intervention/results state, unavailable-backend messaging, and desktop/mobile layout.
 
-# Demo Reset + Browser Rehearsal Progress
+## Files Changed
+- Reliability fixes: `backend/app/database.py`, `backend/app/providers/llm/gemini.py`, `backend/app/services/remediation.py`, `backend/app/services/results.py`, `frontend/src/App.tsx`.
+- Regression tests: `backend/tests/test_persistence.py`, `backend/tests/test_remediation.py`.
+- Sources of truth: `STATUS.md`, `TASKS.md`, `SESSION_PROGRESS.md`, `docs/DEMO.md`, `docs/ARCHITECTURE.md`, `docs/AI_PIPELINE.md`, `docs/API.md`, `docs/DATABASE.md`, `docs/DECISIONS.md`.
+- Working-session memory: `task_plan.md`, `findings.md`, `progress.md`.
 
-## 2026-10-02
-- Re-read the required repository state, backlog, latest milestone, demo guide, architecture, decisions, and planning-with-files instructions.
-- Scoped this continuation to deterministic local reset/start and browser rehearsal; deployment and Supabase work remain separate decisions.
-- Audited setup documentation, runtime dependencies, local browser availability, frontend API configuration, and process-local stores.
-- Confirmed Firefox is available but browser automation dependencies/driver are not installed.
-- Added `scripts/demo.sh` with safe runtime validation, owned-process start/reset/stop, readiness checks, status reporting, hidden-secret confirmation, and explicit fixture checks.
-- Started a clean isolated stack on backend port 8000 and frontend port 4179; both readiness and runner status checks passed.
-- Installed Selenium only in `/tmp` and ran headless Firefox. The first rehearsal reached and captured the real validated intake before a below-fold click timeout; the retry harness now has scroll and diagnostics.
-- Exhausted three distinct Firefox activation strategies at the same enabled control. Preserved the successful intake screenshot plus failure DOM under `/tmp/classlens-demo-rehearsal`; browser completion remains explicitly unverified.
-- Proved reset semantics with real state: material retrieval returned HTTP 200 before runner reset and HTTP 404 `material_not_found` afterward.
-- Replaced the stale root README with current architecture, verified demo result, setup, reset/start commands, Supabase status, and verification instructions.
-- Clarified three stale UI labels without changing layout or behavior; the required one-time Impeccable detector returned no findings.
-- Final backend regression suite passed all 55 tests; frontend lint and production build passed; runner syntax/runtime check passed.
-- Frontend secret scan, configured-origin CORS preflight, and final whitespace checks passed.
-- Updated DEMO, STATUS, TASKS, backend setup, and SESSION_PROGRESS with verified reset behavior and the explicit browser-automation limitation.
+## Deployment Session — 2026-10-02
+
+- Started a Vercel deployment audit without changing application behavior or exposing secrets.
+- Confirmed the frontend is a standard Vite build and must receive a public `VITE_API_URL` at build time.
+- Confirmed no Vercel configuration/link exists and the current backend has a Python/runtime and heavyweight-model compatibility decision before it can be hosted on Vercel responsibly.
+- Consulted current official Vercel CLI, monorepo, FastAPI, Python runtime, and function-limit documentation.
+- Verified the user-created Render deployment at `https://classlens-t6xn.onrender.com/health`; it returned the expected FastAPI health contract over HTTPS.
+- Diagnosed the continuing browser failure: the live Vercel bundle targets Render, Render `/health` is healthy, but Render omits the production `Access-Control-Allow-Origin` header and responds `400 Disallowed CORS origin` to preflight. The Render environment must use the plural `CLASSLENS_CORS_ORIGINS` and restart.
+- Created commit `d2d4762` (`Harden Supabase and Gemini reliability`) after the backend suite passed with 60 tests and one opt-in database test skipped.
+- Created commit `5031097` (`Restore persisted workflow state in the frontend`) after frontend lint and the Vite production build passed.
+- Updated authoritative deployment documentation to identify Vercel, Render, and Supabase responsibilities without marking the hosted workflow complete.
