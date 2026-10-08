@@ -1,0 +1,36 @@
+/* Shared workspace refinements; the public landing page has its own styles. */
+.app-shell .main-content{margin-inline:auto}
+.app-shell .page-header{margin-bottom:36px}
+.app-shell .page-header h1{font-size:clamp(32px,3.3vw,44px);line-height:1.12;letter-spacing:-.035em}
+.app-shell .badge{font-size:11px}
+.app-shell .button{font-size:14px;transition:background-color .18s ease,border-color .18s ease,filter .18s ease}
+.app-shell .primary:not(:disabled):hover{filter:brightness(1.08)}
+.app-shell .secondary:not(:disabled):hover{border-color:#8fb7a0;background:#f2f7f3}
+.app-shell .metric small,.app-shell .card small{font-size:12px;line-height:1.45}
+.app-shell .facts div{font-size:13px}
+.app-shell .state-panel strong{font-size:15px}
+.app-shell .state-panel p{font-size:14px}
+.app-shell .api-status strong{font-size:12px}
+.app-shell .api-status small{font-size:10px;line-height:1.4}
+.app-shell .file-input{transition:border-color .18s ease,background-color .18s ease}
+.app-shell .file-input:hover{border-color:#699e7b;background:#f2f8f3}
+.app-shell .file-input:focus-within{outline:3px solid #8fc5a6;outline-offset:3px;border-color:#236647}
+.mobile-step-picker{display:none}
+
+@media(max-width:800px){
+  .app-shell .sidebar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:15px 20px}
+  .app-shell .sidebar nav{display:none}
+  .app-shell .brand{min-width:0}
+  .app-shell .main-content{padding:30px 20px 64px}
+  .app-shell .page-header{margin-bottom:26px}
+  .app-shell .page-header h1{font-size:34px}
+  .app-shell .mobile-step-picker{display:grid;grid-column:1/-1;gap:7px;color:#b8c6bf;font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+  .app-shell .mobile-step-picker select{width:100%;min-height:44px;padding:0 12px;border:1px solid #52675c;border-radius:9px;background:#f5f8f5;color:#173d29;font:700 14px 'DM Sans',sans-serif;letter-spacing:normal;text-transform:none}
+  .app-shell .mobile-step-picker select:focus-visible{outline:3px solid #8fc5a6;outline-offset:2px}
+  .app-shell .api-status{display:flex;grid-column:2;grid-row:1;margin:0;padding:9px 10px}
+  .app-shell .api-status small{display:none}
+  .app-shell .api-status strong{font-size:11px;white-space:nowrap}
+  .app-shell .state-panel{padding:18px}
+}
+@media(max-width:380px){.app-shell .brand small{display:none}}
+@media(prefers-reduced-motion:reduce){.app-shell .button,.app-shell .file-input{transition:none}}

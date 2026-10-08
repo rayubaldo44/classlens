@@ -1,5 +1,19 @@
 # Golden Path Reliability Findings
 
+## Current P0 Findings — 2026-10-08
+
+- Vercel SPA routing is deployed from commit `593e475`; production `/dashboard`, `/upload`, and `/analysis` return HTTP 200.
+- Production preview and CORS pass, but ordinary analysis previously returned empty 502 responses after about 80–81 seconds and restarted Uvicorn three times during Hugging Face model loading.
+- The local Python 3.11 model load plus a 29-response encode peaked at 1,113,784 KB RSS. Render's 512 MB plans are below this measured requirement; `1c-2g` is the smallest current web-service plan with sufficient nominal memory.
+- The missing `HF_TOKEN` warning can affect Hub download rate limits but does not explain or solve the model's memory requirement.
+- The local runner only owns processes it starts. An independently started Vite process on port 5173 prevents `demo.sh reset` from taking ownership; do not kill it without first resolving its origin.
+- A fresh production recheck on 2026-10-08 still failed: health and Vercel direct routes passed, while ordinary analysis returned an empty HTTP 502 after 121.6 seconds. Do not repeat hosted analysis until the Render compute plan changes.
+- After identifying both manual process groups as ClassLens Vite/FastAPI, they were stopped and `./scripts/demo.sh reset` established clean runner ownership of ports 5173 and 8000.
+- The first local full browser run completed upload through results in 82.1 seconds, then exposed missing frontend handoff of restored analysis/retrieval state. Backend logs showed every restore request returned HTTP 200.
+- `Analysis` and `Misconception` now initialize from persisted parent records and remount when those records arrive. A focused browser check passed `/analysis`, `/misconception`, `/intervention`, and `/results` reload recovery.
+- The second ordinary-upload local run reached results in 79.2 seconds and completed all reload checks in 98.1 seconds. It reproduced 4 groups and the expected 9/43 before, 3/43 after, 13.9 percentage-point reduction.
+- `docs/DEMO_FALLBACK.md` now provides the P0 provider fallback as a clearly labeled artifact from that verified run. It retains the actual evidence, provider/model, source references, teacher-approved intervention, and observed results while requiring the real provider failure to remain visible.
+
 ## Starting State
 - Worktree was clean at campaign start.
 - Current docs claim 58 passing backend tests, frontend lint/build success, real embeddings/RAG/Gemini behavior, PostgreSQL adapters, and an isolated PostgreSQL 16 persistence integration pass.

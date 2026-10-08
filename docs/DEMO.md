@@ -1,6 +1,6 @@
 # Demo Guide
 
-**Implementation status:** The complete local workflow was verified on 2026-10-02 through ordinary upload endpoints with real embeddings, Supabase persistence, source-backed retrieval, live Gemini generation, explicit teacher approval, real follow-up analysis, and calculated results. A Vercel frontend and Render backend are provisioned, and Render health passes; their cross-origin golden path remains unverified until the committed branch and matching production environment values redeploy.
+**Implementation status:** The complete local workflow was reverified on 2026-10-08 through ordinary upload endpoints with real embeddings, Supabase persistence, source-backed retrieval, live Gemini generation, explicit teacher approval, real follow-up analysis, and calculated results. The run reached results in 79.2 seconds and completed direct-route reload checks in 98.1 seconds. Vercel direct-route loading and Render CORS are verified in production. The hosted golden path remains blocked because the current Render service repeatedly exits during embedding analysis; inspect and increase its compute plan before rehearsal.
 
 ## Scenario and files
 
@@ -85,6 +85,8 @@ CLASSLENS_CORS_ORIGINS=https://class-lens-one.vercel.app
 
 Live probes on 2026-10-02 at 03:48 UTC verified HTTP 200 and `Access-Control-Allow-Origin: https://class-lens-one.vercel.app` for Render health, synthetic photosynthesis preview, and upload POST preflight. The preview returned the expected 45 responses. Earlier probes rejected this origin; the current service now allows it. If CORS fails again, check the plural `CLASSLENS_CORS_ORIGINS` variable on Render, use the exact browser origin without a trailing slash, and select **Save and deploy** to apply environment changes to the running service. Changes to a local `.env` file alone do not update Render. Do not call the hosted workflow verified until a browser run confirms the complete assessment-to-results path.
 
+On 2026-10-08, Vercel commit `593e475` fixed SPA deep links; `/dashboard`, `/upload`, and `/analysis` returned HTTP 200. The production browser then validated the ordinary initial CSV, but analysis did not complete. Two direct repetitions returned empty HTTP 502 responses after 80.4 and 81.4 seconds, each followed by a temporary Render 503 `hibernate-wake-error`. Render logs show three matching sequences in which analysis reached the Hugging Face model request, emitted no completed analysis access log, and was followed by a fresh `uvicorn` process. The equivalent local model load and 29-response encode peaked at about 1.11 GB RSS. Render's 512 MB plans are therefore below the measured requirement; inspect the active plan and memory graph, then use at least the 2 GB `1c-2g` web-service plan before attempting the hosted walkthrough again. Adding `HF_TOKEN` can improve Hub rate limits but will not reduce RAM use. The plan change is billable and must be made deliberately in the Render dashboard.
+
 ## Safe demo reset
 
 There is deliberately no destructive reset endpoint. Persistent IDs are content-derived and repeated fixture submissions safely upsert/reuse deterministic records, so old Supabase rows do not change the demonstrated calculations.
@@ -156,11 +158,11 @@ The measured change is observational and comes from synthetic follow-up input; d
 - Gemini: real `gemini-3.1-flash-lite`, prompt `grounded_remediation_v1`, structured output parsed, chunks 1 and 2 cited, teacher edit and approval persisted.
 - Follow-up: 44 rows, 43 answered, 1 blank, 1 baseline student absent, 33 correct, 10 incorrect.
 - Results: 9/43 (20.9%) to 3/43 (7.0%), 13.9-point reduction; remaining students remain visible.
-- Uninterrupted ordinary-upload API run: about 82 seconds on the verification machine. Allow roughly three minutes for narration and clicks.
+- Ordinary-upload browser run: results in 79.2 seconds and analysis/evidence/intervention/results reload checks complete in 98.1 seconds on the verification machine. Allow roughly three minutes for narration and clicks.
 
 ## Recovery when a dependency fails
 
-- **Gemini:** the adapter retries one timeout/transient 429 or 5xx failure. If it still fails, the UI displays **Remediation action failed**, no successful draft is stored, and **Try generation again** is available. Wait briefly and retry once. If judging time is short, show a clearly labeled screenshot/recording from a verified run; never describe it as live generation.
+- **Gemini:** the adapter retries one timeout/transient 429 or 5xx failure. If it still fails, the UI displays **Remediation action failed**, no successful draft is stored, and **Try generation again** is available. Wait briefly and retry once. If judging time is short, keep that real failure visible and open the [previously generated verified local-run artifact](DEMO_FALLBACK.md). State explicitly that it is not live output; never paste it into the application or imply the failed request succeeded.
 - **Supabase/database:** keep the page open, run `./scripts/demo.sh status`, verify `SUPABASE_DB_URL` and network reachability, then retry the failed action. Database errors are sanitized and retryable; the UI does not claim success.
 - **Embedding model:** ensure the model cache is warm before presenting. A model load/download failure produces an analysis or retrieval error and no fabricated group/source.
 - **Backend unavailable/CORS:** locally, confirm `./scripts/demo.sh status`. For production, check that Render has the plural `CLASSLENS_CORS_ORIGINS` variable containing the exact Vercel origin (no trailing slash), then restart Render and reload. The health endpoint can be healthy while browser requests are blocked by CORS.

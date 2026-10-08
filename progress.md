@@ -1,5 +1,17 @@
 # Golden Path Reliability Progress
 
+## 2026-10-08 — P0 task execution resumed
+- Re-read repository instructions, current status/backlog, recent development history, and planning files.
+- Set the active work order to hosted capacity verification, hosted golden path if available, then local warm-up/rehearsal/fallback work.
+- Preserved all existing uncommitted frontend, documentation, environment-example, and Archify changes.
+- Rechecked production: Vercel routes and Render health passed, but ordinary analysis returned another empty 502 after 121.6 seconds.
+- Reconciled the manual ClassLens Vite/FastAPI processes and started a clean runner-owned local stack; both readiness checks passed.
+- Ran a full local browser rehearsal. The primary workflow reached results in 82.1 seconds, but the regression check caught missing analysis/retrieval rendering after direct-route reloads.
+- Fixed restored state handoff in `frontend/src/App.tsx`; frontend lint and production build passed.
+- Focused reload checks passed for analysis, retrieved passages, approved intervention, and results.
+- Repeated the full ordinary-upload workflow: results completed in 79.2 seconds and all reload checks completed in 98.1 seconds (`LOCAL_GOLDEN_PATH_PASS`).
+- Added and cross-linked `docs/DEMO_FALLBACK.md`, an explicitly non-live artifact from the verified run for use only after a visible Gemini failure; closed the corresponding P0 fallback task.
+
 ## 2026-10-02
 - Read the planning-with-files instructions and recovered repository planning state.
 - Confirmed the worktree was clean before changes.

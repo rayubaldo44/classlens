@@ -789,3 +789,98 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Remaining / recommended next step: deploy the frontend and verify the hosted logo, favicon, and pending golden path.
 
 ---
+
+## Session / Milestone: Teacher-workspace polish
+
+**Date:** 2026-10-02
+
+**Status:** Local frontend implementation verified; hosted deployment unchanged
+
+- Attempted and completed: refined shared workspace typography, control feedback, status readability, and file-input focus; replaced the clipped mobile tab strip with a labeled workflow-step selector and exposed compact API status on mobile. The landing page was left unchanged.
+- Files significantly modified: `frontend/src/App.tsx`, `frontend/src/WorkspacePolish.css`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified: frontend lint and production build passed; Firefox captures at desktop, 390px, and 320px showed readable layouts and the current step visible; the Impeccable detector returned no findings.
+- Problems: no implementation blocker. The separate staged `backend/.env.example` edit remains outside this frontend milestone.
+- Decision: keep the existing ClassLens visual language and focus the polish on task navigation and shared controls.
+- Remaining / recommended next step: verify the full hosted teacher workflow and continue broader accessibility work only where testing identifies a concrete gap.
+
+---
+
+## Session / Milestone: Repository-backed architecture and data-flow diagrams
+
+**Date:** 2026-10-06 (Asia/Manila)
+
+**Status:** Diagram artifacts verified; application and hosted deployment behavior unchanged
+
+- Attempted and completed: traced frontend navigation/API/reload state, FastAPI route registration, CSV validation, local embedding/grouping, teacher-material ingestion/retrieval, Gemini generation, explicit review, follow-up comparison, PostgreSQL I/O and local demo operations; generated two standalone Archify HTML diagrams with pinned source evidence.
+- Files created or significantly modified: `backend/.archify/architecture-classlens-20261006-095348/` and `backend/.archify/dataflow-classlens-20261006-095348/` (candidates, HTML, receipts, captures), `docs/ARCHITECTURE.md`, `STATUS.md`, `TASKS.md` and this append-only log.
+- Verified: both complete finalize commands passed showcase validation, delivery, strict check and real Chromium browser-check with zero diagnostics. Visual-check captured light/dark at 1440×900 and 2048×1320 for both. Manual inspection covered architecture at 1440 light/2048 dark and data flow at 1440 light/dark; labels/routes were clear in those captures. No application test suite or hosted smoke was rerun because the task changes diagrams/documentation only.
+- Problems and fixes: sandbox denied renderer subprocesses (EPERM), so authorized execution ran outside the sandbox; default Chrome discovery missed the installed Playwright Chromium, so ARCHIFY_CHROME supplied its path. Source-range, spacing, return-route, projected-text and viewport constraints were corrected before acceptance. Earlier failed receipts remain as history; the passing receipts are architecture `review-2` and data flow `review-4`.
+- Important decisions: source evidence pins commit `5fb327fd05973018c5dc3debb5c5dc826ccddd82`; existing uncommitted changes are disclosed separately. Depict actual PostgreSQL runtime adapters and ephemeral vectors, CSV-supplied correctness, txt-only material intake and explicit approval gates. Do not imply new hosted verification, automatic approval, AI grading, semantic citation verification or background workers.
+- Remaining work: existing P0 hosted browser golden-path smoke and stage rehearsal remain open.
+- Recommended next step: use the diagrams for the demo explanation, then finish the existing hosted verification/rehearsal backlog.
+
+---
+
+## Session / Milestone: Backlog reorganized by priority and category
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Documentation updated; application and hosted verification unchanged
+
+- Attempted and completed: reorganized TASKS.md into P0 demo gates, P1 reliability/improvements, P2 real-school pilot/product work, and previously completed milestones. Added dependencies, acceptance criteria, and unchecked stack-review recommendations.
+- Files significantly modified: TASKS.md, STATUS.md, and this append-only log.
+- Verified: every previously checked task was retained; the only added checked item corrects the stale backend-host decision to the already documented Render selection. Local Markdown file links and section anchors were checked. Application tests and hosted probes were not rerun for this documentation-only change.
+- Problems: the old backlog left backend-host selection open despite an existing accepted Render selection; corrected it while keeping hosted deployment verification open.
+- Important decisions: prioritize hosted browser verification and rehearsal; keep proposed implementation changes and infrastructure thresholds unchecked. No new technology migration was selected. Preserve the pending LLM-label task and existing MVP exclusions.
+- Remaining work: all unchecked P0/P1/P2 tasks remain unimplemented or unverified as described in TASKS.md.
+- Recommended next step: complete the hosted browser golden path, then run two timed rehearsals on the judging machine/network.
+
+---
+
+## Session / Milestone: Vercel deep-link fix and hosted capacity diagnosis
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Vercel routing fixed and deployed; hosted golden path blocked at Render analysis
+
+- Attempted: started the P0 hosted browser golden path from the production Vercel app using the ordinary versioned CSV, teacher-material, and follow-up files.
+- Files created or significantly modified: `frontend/vercel.json`, `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this append-only log. Existing unrelated worktree changes were preserved.
+- Completed: confirmed the initial production failure (`/` returned 200 while `/dashboard` and `/upload` returned 404), traced it to browser-history routing without a Vercel SPA rewrite, added the official catch-all rewrite, committed it as `593e475`, pushed `main`, and observed Vercel's successful deployment. Direct `/dashboard`, `/upload`, and `/analysis` loads then returned HTTP 200.
+- Verified/tested: `frontend/vercel.json` passed an exact `jq` contract check; frontend lint and production build passed. Production Render health and upload preflight allowed the Vercel origin. Headless Chromium rendered `/upload`, uploaded the ordinary initial CSV, and showed the expected validated 45-student preview.
+- Problem: the hosted browser analysis remained pending for five minutes. Two isolated ordinary-upload requests to `/api/v1/assessments/analyze` reproduced empty HTTP 502 responses after 80.4 and 81.4 seconds. Each failure was followed by HTTP 503 with `x-render-routing: hibernate-wake-error` until the service recovered; health remained fast outside the failing analysis.
+- Diagnosis: the equivalent verified Python 3.11 sentence-transformer load and 29-response encode peaked at 1,113,784 KB RSS locally. This exceeds Render's 512 MB Free and `0.5c-512mb` web-service plans. The active service plan could not be read without Render dashboard/API access, so its exact value remains unverified.
+- Important decision: preserve the selected local embedding model and real failure behavior. Do not replace it or claim hosted success to fit an undersized service. The smallest current Render web-service plan above the measured peak is the billable 2 GB `1c-2g` plan.
+- Remaining work: inspect and change the Render compute plan with billing approval, wait for a healthy deployment, warm analysis and retrieval, rerun the full hosted browser path, then verify reload recovery and complete two timed rehearsals.
+- Recommended next step: select `1c-2g` (2 GB) for the Render web service, redeploy, and resume the existing hosted smoke from the initial CSV upload.
+
+---
+
+## Session / Milestone: Render restart evidence received
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Capacity diagnosis strengthened; hosted workflow remains blocked
+
+- New evidence: Render logs show three repetitions of the same sequence. The service handled preview/health, analysis reached an unauthenticated Hugging Face Hub request, no completed `POST /api/v1/assessments/analyze` access line appeared, and Render started a fresh Uvicorn process 14–42 seconds later with a different PID.
+- Interpretation: together with the repeatable client-side 502/503 behavior and measured 1.11 GB local peak, the logs strongly indicate that the hosting platform terminates the process while loading the embedding runtime. The log excerpt does not itself print an explicit out-of-memory line, so the Render memory graph and active plan remain the final confirmation.
+- Decision: do not treat the missing `HF_TOKEN` warning as the primary failure. A token may improve download rate limits and reliability, but it does not provide the memory needed to load the model.
+- Remaining / recommended next step: inspect the Render plan and memory graph, select at least `1c-2g` (2 GB) with billing approval, redeploy, and rerun the hosted golden path.
+
+---
+
+## Session / Milestone: P0 local rehearsal, reload recovery, and provider fallback
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Local P0 workflow reverified; hosted analysis still blocked by Render capacity
+
+- Attempted: rechecked the production deployment, restored a runner-owned local stack, ran the complete ordinary-upload browser workflow twice, tested every persisted workflow route after reload, and prepared the required Gemini-unavailability artifact.
+- Files created or significantly modified: `frontend/src/App.tsx`, `docs/DEMO_FALLBACK.md`, `docs/DEMO.md`, `STATUS.md`, `TASKS.md`, the working planning files, and this append-only log. Existing unrelated worktree changes were preserved.
+- Completed: production health, CORS, and Vercel direct routes remained available; the latest hosted analysis again returned an empty 502 after 121.6 seconds. Locally, analysis and misconception screens now initialize from restored persisted analysis/retrieval records. The final browser run reached results in 79.2 seconds and completed analysis, evidence, approved-intervention, and results direct-route reload checks in 98.1 seconds. Added a prominently labeled artifact from that run for use only after a visible Gemini failure.
+- Verified/tested: the ordinary versioned initial CSV, teacher text, and follow-up CSV reproduced 4 groups and the expected 9/43 to 3/43 result. A focused reload regression and the complete browser path passed. Frontend lint and production build passed; `git diff --check`, fallback links/input files, and runner health passed.
+- Problems encountered: the first browser run exposed successful backend restoration that was not rendered by the analysis and misconception route components. An initial prop-synchronization implementation violated the React set-state-in-effect lint rule, so keyed remounts and direct initial state were used. The hosted service remains unable to finish model-backed analysis on its current capacity.
+- Important decisions: do not repeat hosted analysis until the Render compute plan changes. Keep live provider failures visible and use the fallback only as previously generated local evidence. Do not mark automated timing as either of the two required human-operated rehearsals.
+- Remaining work: inspect/upgrade Render to at least the 2 GB `1c-2g` plan, redeploy the current frontend revision, run the complete hosted browser and reload workflow, warm the judging machine, and complete two timed human rehearsals plus the final checklist.
+- Recommended next step: change the Render plan, redeploy, and rerun the hosted ordinary-upload smoke; if presenting before that change, use the healthy runner-owned local stack and the documented fallback procedure.
+
+---
