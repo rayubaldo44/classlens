@@ -912,3 +912,19 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: run `./scripts/demo.sh reset`, open `http://127.0.0.1:5173`, and complete the documented three-minute path twice.
 
 ---
+
+## Session / Milestone: Runtime and backend dependency resolution pinned
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Reproducible local runtime milestone verified
+
+- Attempted and completed: declared the supported Node 22 range and verified patch release, recorded Python 3.11.16, and captured the exact backend development/test resolution with CPU-only PyTorch explicitly selected in the lock.
+- Files created or significantly modified: `frontend/.nvmrc`, `frontend/package.json`, `frontend/package-lock.json`, `backend/.python-version`, `backend/requirements.lock`, `backend/README.md`, `docs/TECH_STACK.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this append-only log.
+- Verified/tested: `pip check` passed; the lock exactly matched the installed environment including `torch==2.7.1+cpu`; an offline dry run found every locked package satisfied; runtime declaration assertions passed; backend tests passed with 60 passed and 1 opt-in integration test skipped; frontend lint/build and `./scripts/demo.sh check` passed.
+- Problem encountered: pytest was first invoked from the repository root and could not resolve the backend `app` package. Running the documented command from `backend/` passed without code changes.
+- Important decision: use plain version files and the existing package managers. No dependency-lock generator or runtime manager was added.
+- Remaining work: model files still download on first use; the separate warm/readiness backlog tasks remain open.
+- Recommended next step: make the embedding-model cache reproducible and warm it before readiness without adding a new service.
+
+---

@@ -56,7 +56,7 @@ Depends on: persisted question-specific groups and exact representative evidence
 
 Depends on: a recorded baseline of the currently verified environment and latency.
 
-- [ ] Declare compatible Node and Python versions and lock the tested backend dependency resolution, including CPU-only PyTorch installation.
+- [x] Declare compatible Node and Python versions and lock the tested backend dependency resolution, including CPU-only PyTorch installation.
 - [ ] Make embedding-model files available reproducibly during deployment and warm the model before readiness; avoid a first-user download dependency.
 - [ ] Add a readiness check that distinguishes application liveness from model/database readiness without exposing secrets or consuming Gemini quota on each probe.
 

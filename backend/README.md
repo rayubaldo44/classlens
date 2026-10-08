@@ -1,14 +1,15 @@
 # ClassLens backend
 
-Use Python 3.11 for the AI runtime. The current workspace default, Python 3.14, is not supported by the verified PyTorch stack.
+Use Python 3.11 for the AI runtime. `backend/.python-version` records the verified local patch release. The current workspace default, Python 3.14, is not supported by the verified PyTorch stack.
 
-For a CPU-only local setup, install PyTorch from its CPU wheel index before installing the remaining requirements:
+For the verified CPU-only local setup:
 
 ```bash
 python3.11 -m venv .venv
-.venv/bin/pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
-.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pip install -r requirements.lock
 ```
+
+`requirements.lock` reproduces the exact verified development/test resolution and directs `torch==2.7.1+cpu` to PyTorch's CPU wheel index. `requirements.txt` and `requirements-dev.txt` remain the short dependency manifests to edit when intentionally updating packages; regenerate and verify the lock after such a change.
 
 Copy `.env.example` to `.env` and keep real secrets only in the ignored `.env`. Set `GEMINI_API_KEY` and the direct PostgreSQL `SUPABASE_DB_URL`; never place either in Vite configuration or `.env.example`. Apply the migration before starting the complete workflow:
 

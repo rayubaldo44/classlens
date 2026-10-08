@@ -55,6 +55,7 @@
 - The local embedding model may contact Hugging Face on first download and warns when no `HF_TOKEN` is supplied. A token can improve Hub rate limits and download reliability, but it does not reduce the measured model memory requirement; the token remains optional for this public model.
 - No destructive production reset endpoint exists. See [docs/DEMO.md](docs/DEMO.md#safe-demo-reset) for the safe deterministic reset procedure.
 - Unused mock question, misconception, and response/evidence examples were removed from the frontend; `mockData.ts` now contains only scenario metadata used by the UI and route navigation definitions.
+- Runtime reproduction is pinned to the verified environment: frontend Node `>=22.12 <23` with `.nvmrc` at `22.23.1`, backend `.python-version` at `3.11.16`, CPU-only PyTorch `2.7.1`, and an exact `backend/requirements.lock`. The lock matches the installed environment, `pip check` passes, the backend suite passes with `60 passed, 1 skipped`, frontend lint/build pass, and the demo runtime check passes.
 
 ## Golden-path readiness
 

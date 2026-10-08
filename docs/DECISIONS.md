@@ -4,6 +4,13 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-022 — Pin the verified local runtimes and backend resolution
+
+- **Status:** Accepted and implemented on 2026-10-08
+- **Decision:** Use Node `>=22.12 <23` with verified release `22.23.1`, Python `3.11.16`, CPU-only PyTorch `2.7.1`, and the exact dependency versions in `backend/requirements.lock` for reproducible local setup.
+- **Reason:** Vite 8 requires a modern Node runtime, and unconstrained Python resolution can change the large embedding stack or install unnecessary CUDA packages.
+- **Consequence:** Install the lock, which explicitly selects the PyTorch CPU index and `torch==2.7.1+cpu`. Keep the short requirement manifests as the maintained inputs and regenerate/reverify the lock only during intentional dependency updates.
+
 ### D-021 — Use the verified local runner until hosted capacity is affordable
 
 - **Status:** Accepted on 2026-10-08
@@ -150,11 +157,5 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 - **Decision:** Deploy the Vite frontend to Vercel, the persistent FastAPI service to Render, and relational data to Supabase PostgreSQL.
 - **Reason:** Vercel fits the static Vite build. Render supports the verified Python 3.11 runtime and avoids forcing the PyTorch/sentence-transformer workload into an unverified serverless function lifecycle.
 - **Consequence:** Gemini and database credentials remain only on Render. Vercel receives only the public `VITE_API_URL`; Render must explicitly allow the stable Vercel origin. Provisioning alone does not complete deployment—health, CORS, and the hosted golden path must pass after the committed branch redeploys.
-
-## Unresolved decisions
-
-| ID | Decision needed | Why it matters | Owner/trigger |
-|---|---|---|---|
-| U-009 | Explicit Node version policy | Needed for repeatable setup and CI with Vite 8. | Resolve before shared deployment/CI. |
 
 When a decision is made, add a dated accepted entry with its rationale and update [TECH_STACK.md](TECH_STACK.md), [ARCHITECTURE.md](ARCHITECTURE.md), or [AI_PIPELINE.md](AI_PIPELINE.md) only where the decision changes their authority.

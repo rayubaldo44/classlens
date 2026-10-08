@@ -34,7 +34,7 @@ This document is the authority for selected technologies, proposed dependencies,
 - TypeScript `~6.0.2`
 - ESLint 10 with TypeScript and React Hooks/Refresh plugins
 
-`backend/requirements.txt` and `backend/requirements-dev.txt` now declare:
+`backend/requirements.txt` and `backend/requirements-dev.txt` declare the maintained dependency ranges; `backend/requirements.lock` records the exact verified Python 3.11 development/test resolution:
 
 - FastAPI `>=0.115,<1`, Uvicorn `>=0.30,<1`, and python-multipart `>=0.0.20,<1` for CSV uploads
 - sentence-transformers `5.7.0` with the `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` model for local answer embeddings
@@ -44,9 +44,9 @@ This document is the authority for selected technologies, proposed dependencies,
 
 Material ingestion and retrieval add no new runtime dependency: UTF-8 text decoding, chunking, the existing embedding service, and a PostgreSQL-backed `MaterialIndex` with a rebuildable in-memory vector cache use the current stack.
 
-The installed workspace was observed using Node `v22.23.1` and npm `10.9.8`. Vite's locked dependency metadata requires a compatible modern Node release; the project has not yet declared an explicit Node version policy.
+The frontend declares Node `>=22.12 <23` in `package.json`; `.nvmrc` records the verified `22.23.1` release. The installed npm version was `10.9.8`.
 
-The AI runtime was verified with Python 3.11 and CPU-only PyTorch 2.7.1. Install the CPU wheel first as documented in `backend/README.md`; otherwise a default Linux resolver may download unnecessary CUDA packages. No Supabase browser client, document-extraction, external clustering, or pgvector dependency is present.
+The AI runtime was verified with Python `3.11.16` and CPU-only PyTorch `2.7.1`; `backend/.python-version` records that Python patch release. Install `requirements.lock`, which pins `torch==2.7.1+cpu` and includes PyTorch's CPU wheel index; otherwise a default Linux resolver may download unnecessary CUDA packages. No Supabase browser client, document-extraction, external clustering, or pgvector dependency is present.
 
 ## Proposed dependency categories
 
@@ -67,7 +67,6 @@ These are categories, not approved packages. Record an accepted selection in [DE
 | Decision | Needed before | Selection criteria |
 |---|---|---|
 | Additional material formats and extractors | Supporting PDF/DOCX beyond `.txt` | Demo document needs, source-location preservation, predictable extraction, and minimal dependencies. |
-| Node version policy | Shared setup/CI | Compatibility with locked Vite version and deployment environment. |
 
 ## Constraints
 
