@@ -11,6 +11,7 @@
 - Focused reload checks passed for analysis, retrieved passages, approved intervention, and results.
 - Repeated the full ordinary-upload workflow: results completed in 79.2 seconds and all reload checks completed in 98.1 seconds (`LOCAL_GOLDEN_PATH_PASS`).
 - Added and cross-linked `docs/DEMO_FALLBACK.md`, an explicitly non-live artifact from the verified run for use only after a visible Gemini failure; closed the corresponding P0 fallback task.
+- Committed and pushed the verified changes as `5115e5d`. Vercel served the new bundle and returned HTTP 200 for all six workflow routes; hosted end-to-end recovery remains blocked at Render analysis.
 
 ## 2026-10-02
 - Read the planning-with-files instructions and recovered repository planning state.

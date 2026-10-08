@@ -32,6 +32,7 @@
 - Vercel commit `593e475` added the documented SPA rewrite and deployed successfully on 2026-10-08. Direct production loads of `/dashboard`, `/upload`, and `/analysis` now return the application shell with HTTP 200; frontend lint and production build passed before deployment.
 - A fresh local ordinary-upload browser run on 2026-10-08 completed upload through calculated results in 79.2 seconds. Direct reloads then recovered the analysis groups, retrieved teacher passages, approved intervention, and results; the full run and reload checks finished in 98.1 seconds. `Analysis` and `Misconception` now initialize from restored persisted records rather than showing empty state after the parent restore succeeds.
 - [`docs/DEMO_FALLBACK.md`](docs/DEMO_FALLBACK.md) preserves an explicitly labeled, previously generated artifact from that verified local run for Gemini downtime. It includes real evidence, provider/model provenance, teacher-approved content, and calculated synthetic follow-up results, and instructs the presenter to keep the live provider failure visible.
+- Commit `5115e5d` deployed the reload recovery and workspace polish to Vercel on 2026-10-08. The live bundle contains the new workflow-step selector/styles, and `/dashboard`, `/upload`, `/analysis`, `/misconception`, `/intervention`, and `/results` each return HTTP 200. Hosted state recovery remains unverified end to end because Render analysis still exits before creating the required persisted workflow.
 
 ## Remaining work outside this milestone
 

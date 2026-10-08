@@ -884,3 +884,16 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: change the Render plan, redeploy, and rerun the hosted ordinary-upload smoke; if presenting before that change, use the healthy runner-owned local stack and the documented fallback procedure.
 
 ---
+
+## Session / Milestone: Reload-recovery frontend deployed
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Vercel revision live; hosted workflow still blocked at Render analysis
+
+- Completed: committed and pushed the verified reload recovery, workspace polish, fallback artifact, and current P0 documentation as `5115e5d`.
+- Verified: Vercel served the new JavaScript/CSS revision, including the workflow-step selector markers, and all six workflow routes returned HTTP 200.
+- Limitation: this confirms frontend deployment and route loading only. Hosted state recovery cannot be exercised until Render completes analysis and creates a persisted workflow.
+- Remaining / recommended next step: upgrade Render to at least `1c-2g`, redeploy, and rerun the complete hosted ordinary-upload and reload smoke.
+
+---
