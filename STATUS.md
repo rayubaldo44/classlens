@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-10-08
 
-**Current phase:** Final P0 golden path verified locally; hosted analysis blocked by Render capacity
+**Current phase:** Final P0 golden path verified locally; local demo selected while the paid Render upgrade is deferred
 
 **Deadline context:** Hackathon MVP intended to be demo-ready tomorrow
 
@@ -38,7 +38,7 @@
 
 - The backlog was reorganized on 2026-10-08 into priority/category groups, retaining completed milestones and adding proposed stack-review hardening and pilot gates. See [TASKS.md](TASKS.md). Application behavior and hosted verification are unchanged.
 
-- Move the Render web service to a compute plan with enough memory for the measured embedding runtime, then rerun the hosted integration smoke. The smallest current Render web-service plan above 512 MB is `1c-2g` (2 GB); changing the plan is a billable dashboard action.
+- The paid Render upgrade is deferred for budget reasons. Use the verified local runner for the demo. Hosted analysis and reload verification remain open until a 2 GB plan is affordable.
 - LLM-authored misconception labels are not implemented; labels remain deliberately generic and provisional.
 - No seeded remediation is substituted into the application when Gemini fails. The separate, clearly labeled verified-run artifact is available for presentation continuity while the real provider failure remains visible.
 - A timed human-operated three-minute stage rehearsal on the judging machine is still required. Browser automation verified the important screens/states but its full click-through was interrupted by brittle text synchronization and was not counted as a pass.
@@ -54,6 +54,7 @@
 - Python 3.11 with CPU-only PyTorch 2.7.1 is the verified backend runtime. The workspace Python 3.14 default is not supported by that stack.
 - The local embedding model may contact Hugging Face on first download and warns when no `HF_TOKEN` is supplied. A token can improve Hub rate limits and download reliability, but it does not reduce the measured model memory requirement; the token remains optional for this public model.
 - No destructive production reset endpoint exists. See [docs/DEMO.md](docs/DEMO.md#safe-demo-reset) for the safe deterministic reset procedure.
+- Unused mock question, misconception, and response/evidence examples were removed from the frontend; `mockData.ts` now contains only scenario metadata used by the UI and route navigation definitions.
 
 ## Golden-path readiness
 

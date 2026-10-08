@@ -4,6 +4,13 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-021 — Use the verified local runner until hosted capacity is affordable
+
+- **Status:** Accepted on 2026-10-08
+- **Decision:** Defer the paid Render `1c-2g` upgrade and use `./scripts/demo.sh reset` plus the local frontend for the hackathon demo.
+- **Reason:** The current budget does not allow the required hosted compute plan, while the complete local workflow and reload recovery already pass.
+- **Consequence:** Keep hosted analysis tasks open, do not repeatedly retry the known 512 MB failure, and complete the remaining rehearsals on the presentation machine using the documented local runner and fallback artifact.
+
 ### D-019 — Motion for the public landing page
 
 - **Status:** Accepted and implemented on 2026-10-02

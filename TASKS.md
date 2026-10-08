@@ -12,7 +12,7 @@ Tasks are grouped by priority, then category. Within each category, work from to
 | P1 | Reliability, testing, and optional product improvements | After the P0 demo gates pass |
 | P2 | Real-school pilot safeguards and later product work | After the demo; safeguards must pass before real student data |
 
-**Next action:** complete the hosted browser golden path, then run two timed rehearsals on the judging machine/network. Keep the existing stack while addressing measured problems.
+**Next action:** use the verified local runner for the unfunded demo, then run two timed rehearsals on the judging machine/network. Hosted analysis stays deferred until a 2 GB Render plan is affordable.
 
 ## P0 — demo critical
 
@@ -26,6 +26,8 @@ Depends on: the implemented local workflow, provisioned Vercel/Render services, 
 - [ ] Inspect the actual Render plan, memory usage, model cache behavior, and cold/warm latency. If idle shutdown or insufficient RAM prevents a reliable demo, select suitable always-on capacity before deploying a configuration change.
 
 Current evidence (2026-10-08): Vercel direct workflow routes are fixed and live. Commit `5115e5d` also deployed the verified local reload-recovery revision; all six workflow routes return HTTP 200. The hosted browser reaches and validates the ordinary 45-row CSV, but analysis is blocked: direct analysis attempts returned empty 502 responses after about 80–122 seconds and temporarily left Render at 503 `hibernate-wake-error`. Render logs show three analysis-time process restarts shortly after the Hugging Face model request, with no completed analysis response. The same local model/encode path peaked at about 1.11 GB RSS. Inspect the active Render plan and memory graph in the dashboard and, with billing approval, use at least the 2 GB `1c-2g` web-service plan before rerunning the smoke. `HF_TOKEN` may improve model-download reliability but is not a substitute for sufficient RAM.
+
+Funding decision (2026-10-08): the paid Render upgrade is deferred. Keep the hosted tasks open and use the verified local runner for the demo; do not spend time repeatedly exercising the known 512 MB failure.
 
 **Acceptance:** the production frontend completes the workflow against Render/PostgreSQL; health and CORS probes alone do not close deployment. Use [docs/DEMO.md](docs/DEMO.md) for the authoritative procedure and expected results.
 
@@ -100,7 +102,7 @@ Depends on: P0 gates; preserve the implemented workflow.
 - [ ] Add richer progress indicators for long analysis and generation requests.
 - [ ] Allow teachers to rename, merge, or dismiss proposed groups while preserving evidence and review history.
 - [ ] Export an approved intervention and evidence summary.
-- [ ] Remove unused response/evidence examples from `frontend/src/mockData.ts`; retain scenario metadata and navigation definitions.
+- [x] Remove unused response/evidence examples from `frontend/src/mockData.ts`; retain scenario metadata and navigation definitions.
 - [ ] Reconcile stale implementation wording in authoritative documentation with verified code/state; keep proposed features visibly separate.
 - [ ] Add more robust document format support only if required by the actual demo/pilot material; select extractors before implementation and preserve source locations.
 

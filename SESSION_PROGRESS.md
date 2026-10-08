@@ -897,3 +897,18 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Remaining / recommended next step: upgrade Render to at least `1c-2g`, redeploy, and rerun the complete hosted ordinary-upload and reload smoke.
 
 ---
+
+## Session / Milestone: Local demo selected and unused mock evidence removed
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Local path retained; paid hosted capacity deferred
+
+- Attempted and completed: recorded the decision to defer the paid Render upgrade and removed unused mock question, misconception, and response/evidence fields from the frontend while retaining used scenario metadata and navigation definitions.
+- Files significantly modified: `frontend/src/mockData.ts`, `frontend/src/types.ts`, `TASKS.md`, `STATUS.md`, `docs/DECISIONS.md`, and this append-only log.
+- Verified/tested: frontend lint and production build passed; TypeScript caught one used scenario field during the first build, which was restored before the passing run. `git diff --check` passed.
+- Important decision: use the verified local runner for the unfunded demo and leave hosted verification open until the required Render capacity is affordable.
+- Remaining work: run two timed human rehearsals and the pre-demo checklist on the presentation machine. LLM-authored labels remain deferred because another provider call would add latency and failure risk to the working demo.
+- Recommended next step: run `./scripts/demo.sh reset`, open `http://127.0.0.1:5173`, and complete the documented three-minute path twice.
+
+---
