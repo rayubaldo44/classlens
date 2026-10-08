@@ -24,7 +24,7 @@ Required services:
 - FastAPI running under the verified Python 3.11 environment.
 - React/Vite.
 - Google Gemini API access for live remediation generation.
-- The local Hugging Face embedding model cache. Internet access is needed on first download if it is not already warm.
+- The pinned Hugging Face embedding model. The local runner downloads and warms it before API health responds; internet access is needed on first setup.
 
 Required values belong in ignored `backend/.env` configuration:
 
@@ -81,7 +81,11 @@ GEMINI_API_KEY=...
 SUPABASE_DB_URL=postgresql://...
 CLASSLENS_LLM_MODEL=gemini-3.1-flash-lite
 CLASSLENS_CORS_ORIGINS=https://class-lens-one.vercel.app
+CLASSLENS_WARM_EMBEDDING_MODEL=false
+CLASSLENS_EMBEDDING_REVISION=e8f8c211226b894fcb81acc59f3b34ba3efd5f42
 ```
+
+The model revision defaults to the pinned value documented in [AI_PIPELINE.md](AI_PIPELINE.md#4-embedding-generation--implemented). Keep hosted startup warming disabled on the current 512 MB Render service: local measurements reached about 1.11 GB RSS. `/ready` reports model and database state without changing the existing process liveness check at `/health`.
 
 Live probes on 2026-10-02 at 03:48 UTC verified HTTP 200 and `Access-Control-Allow-Origin: https://class-lens-one.vercel.app` for Render health, synthetic photosynthesis preview, and upload POST preflight. The preview returned the expected 45 responses. Earlier probes rejected this origin; the current service now allows it. If CORS fails again, check the plural `CLASSLENS_CORS_ORIGINS` variable on Render, use the exact browser origin without a trailing slash, and select **Save and deploy** to apply environment changes to the running service. Changes to a local `.env` file alone do not update Render. Do not call the hosted workflow verified until a browser run confirms the complete assessment-to-results path.
 
@@ -164,7 +168,7 @@ The measured change is observational and comes from synthetic follow-up input; d
 
 - **Gemini:** the adapter retries one timeout/transient 429 or 5xx failure. If it still fails, the UI displays **Remediation action failed**, no successful draft is stored, and **Try generation again** is available. Wait briefly and retry once. If judging time is short, keep that real failure visible and open the [previously generated verified local-run artifact](DEMO_FALLBACK.md). State explicitly that it is not live output; never paste it into the application or imply the failed request succeeded.
 - **Supabase/database:** keep the page open, run `./scripts/demo.sh status`, verify `SUPABASE_DB_URL` and network reachability, then retry the failed action. Database errors are sanitized and retryable; the UI does not claim success.
-- **Embedding model:** ensure the model cache is warm before presenting. A model load/download failure produces an analysis or retrieval error and no fabricated group/source.
+- **Embedding model:** `./scripts/demo.sh reset` warms the pinned model before API health responds. A model load/download failure prevents the local service from becoming ready; the UI does not invent a group or source.
 - **Backend unavailable/CORS:** locally, confirm `./scripts/demo.sh status`. For production, check that Render has the plural `CLASSLENS_CORS_ORIGINS` variable containing the exact Vercel origin (no trailing slash), then restart Render and reload. The health endpoint can be healthy while browser requests are blocked by CORS.
 - **Insufficient material:** choose the provided photosynthesis material and retrieve again. ClassLens blocks grounded generation when no passage clears the relevance threshold.
 - **Saved-workflow restore:** choose **Start a new workflow** on the visible restore error, or perform the safe browser-pointer reset above. Persisted database records remain intact.

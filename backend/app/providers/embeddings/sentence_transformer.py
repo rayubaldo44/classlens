@@ -1,11 +1,12 @@
 from functools import lru_cache
 
-from app.config import get_analysis_settings
+from app.config import DEFAULT_EMBEDDING_REVISION, get_analysis_settings
 
 
 class SentenceTransformerEmbeddingService:
-    def __init__(self, model_id: str) -> None:
+    def __init__(self, model_id: str, revision: str = DEFAULT_EMBEDDING_REVISION) -> None:
         self._model_id = model_id
+        self._revision = revision
 
     @property
     def model_id(self) -> str:
@@ -14,7 +15,7 @@ class SentenceTransformerEmbeddingService:
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        vectors = _load_model(self._model_id).encode(
+        vectors = _load_model(self._model_id, self._revision).encode(
             texts,
             batch_size=32,
             convert_to_numpy=True,
@@ -25,16 +26,21 @@ class SentenceTransformerEmbeddingService:
 
 
 @lru_cache(maxsize=1)
-def _get_embedding_service(model_id: str) -> SentenceTransformerEmbeddingService:
-    return SentenceTransformerEmbeddingService(model_id)
+def _get_embedding_service(model_id: str, revision: str) -> SentenceTransformerEmbeddingService:
+    return SentenceTransformerEmbeddingService(model_id, revision)
 
 
 async def get_embedding_service() -> SentenceTransformerEmbeddingService:
-    return _get_embedding_service(get_analysis_settings().embedding_model)
+    settings = get_analysis_settings()
+    return _get_embedding_service(settings.embedding_model, settings.embedding_revision)
 
 
 @lru_cache(maxsize=1)
-def _load_model(model_id: str):
+def _load_model(model_id: str, revision: str):
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(model_id)
+    return SentenceTransformer(model_id, revision=revision)
+
+
+def embedding_model_loaded() -> bool:
+    return _load_model.cache_info().currsize > 0

@@ -66,7 +66,7 @@ Correct and blank responses should contribute to baseline counts but should not 
 
 The backend embeds only eligible incorrect answer text using local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. The model adapter is isolated under `backend/app/providers/embeddings/`; analysis code depends on its typed protocol, not the package directly. The current preprocessing version is `answer_only_v1`; original answers remain unchanged for evidence. The response records:
 
-- exact model identifier and revision when available;
+- exact model identifier; the immutable artifact revision is pinned in runtime configuration;
 - preprocessing/template version;
 - vector dimension;
 - stable analysis run identifier;
@@ -74,7 +74,7 @@ The backend embeds only eligible incorrect answer text using local `sentence-tra
 
 Batch calls within provider limits, apply a timeout, and validate response count and vector dimensions. A partial or malformed embedding batch must fail the affected analysis rather than inventing or zero-filling vectors.
 
-Vectors are batched, normalized, and validated for count, consistent dimensions, finite values, and non-zero magnitude. Provider or malformed-vector failures return a retryable structured error and no groups. Model files are downloaded and cached locally on first use; Python 3.11 and a CPU-only PyTorch wheel are the verified development setup.
+Vectors are batched, normalized, and validated for count, consistent dimensions, finite values, and non-zero magnitude. Provider or malformed-vector failures return a retryable structured error and no groups. The selected model is pinned to Hugging Face revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42` using `CLASSLENS_EMBEDDING_REVISION`; the immutable revision keeps the downloaded files stable. Python 3.11 and a CPU-only PyTorch wheel are the verified development setup. The local runner warms the model before the API reports health; on a hosted service, startup warming must wait until the memory limit can hold the loaded model.
 
 ## 5. Similarity and grouping — implemented
 

@@ -928,3 +928,18 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: make the embedding-model cache reproducible and warm it before readiness without adding a new service.
 
 ---
+
+## Session / Milestone: Pinned embedding model and dependency readiness
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Local model warm-up and readiness implemented; hosted warm-up deferred by memory limit
+
+- Attempted and completed: pinned the selected embedding model to the exact cached Hugging Face commit, warmed it during local FastAPI startup before health responds, and added `/ready` for database/model status.
+- Files created or significantly modified: `backend/app/config.py`, `backend/app/providers/embeddings/sentence_transformer.py`, `backend/app/main.py`, `scripts/demo.sh`, `backend/README.md`, `docs/API.md`, `docs/AI_PIPELINE.md`, `docs/DEMO.md`, `docs/TECH_STACK.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified: `./scripts/demo.sh reset` restarted the local stack in 20.7 seconds; startup logs show model weights loaded before “Application startup complete.” `/health` returned HTTP 200, `/ready` returned HTTP 200 with database/model both `ready`, and runner status reported both services healthy. No automated test suite was added.
+- Important decision: keep Render startup warming disabled until the service has enough memory; the current plan is 512 MB while local peak RSS measured about 1.11 GB.
+- Remaining work: choose/configure a persistent build-time model cache for Render and enable its warm-up only after adequate capacity is available. The local model cache task is partially complete; liveness/readiness is verified locally.
+- Recommended next step: continue with the next independent P1 reliability task while leaving Render cache/warm-up deferred until the capacity constraint changes.
+
+---

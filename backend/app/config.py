@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 DEFAULT_CORS_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
+DEFAULT_EMBEDDING_REVISION = "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
 
 
 def get_cors_origins() -> list[str]:
@@ -23,6 +24,7 @@ class AnalysisSettings:
     embedding_model: str
     similarity_threshold: float
     min_group_size: int
+    embedding_revision: str = DEFAULT_EMBEDDING_REVISION
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,8 @@ def get_analysis_settings() -> AnalysisSettings:
         ),
         similarity_threshold=threshold,
         min_group_size=min_group_size,
+        embedding_revision=os.getenv("CLASSLENS_EMBEDDING_REVISION", DEFAULT_EMBEDDING_REVISION).strip()
+        or DEFAULT_EMBEDDING_REVISION,
     )
 
 

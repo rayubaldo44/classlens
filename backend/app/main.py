@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from typing import Literal
 from uuid import uuid4
 
@@ -18,7 +20,9 @@ from .services.material_ingestion import MaterialError
 from .providers.llm import LLMProviderError
 from .services.remediation import RemediationError
 from .services.results import ResultsError
-from .database import DatabaseError
+from .database import DatabaseError, get_database
+from .providers.embeddings import get_embedding_service
+from .providers.embeddings.sentence_transformer import embedding_model_loaded
 
 
 class HealthResponse(BaseModel):
@@ -26,7 +30,20 @@ class HealthResponse(BaseModel):
     service: Literal["classlens-api"]
 
 
-app = FastAPI(title="ClassLens API", version="0.1.0")
+class ReadinessResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    checks: dict[str, Literal["ready", "not_ready"]]
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if os.getenv("CLASSLENS_WARM_EMBEDDING_MODEL", "").strip().lower() in {"1", "true", "yes"}:
+        embedding_service = await get_embedding_service()
+        embedding_service.embed(["ClassLens startup warm-up"])
+    yield
+
+
+app = FastAPI(title="ClassLens API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
@@ -180,3 +197,23 @@ async def handle_database_error(_request: Request, error: DatabaseError) -> JSON
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     return HealthResponse(status="ok", service="classlens-api")
+
+
+@app.get("/ready", response_model=ReadinessResponse)
+def readiness() -> JSONResponse:
+    try:
+        with get_database().connection() as connection:
+            connection.execute("select 1")
+        database_status = "ready"
+    except Exception:
+        database_status = "not_ready"
+
+    checks = {
+        "database": database_status,
+        "embedding_model": "ready" if embedding_model_loaded() else "not_ready",
+    }
+    status = "ready" if all(value == "ready" for value in checks.values()) else "not_ready"
+    return JSONResponse(
+        status_code=200 if status == "ready" else 503,
+        content=ReadinessResponse(status=status, checks=checks).model_dump(),
+    )

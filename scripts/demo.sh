@@ -127,7 +127,9 @@ port_is_available() {
 wait_for_url() {
   local label="$1"
   local url="$2"
-  for _ in {1..120}; do
+  local attempts="${3:-120}"
+  local attempt
+  for ((attempt = 0; attempt < attempts; attempt++)); do
     if curl --fail --silent --show-error --max-time 1 "${url}" >/dev/null 2>&1; then
       printf '%s ready: %s\n' "${label}" "${url}"
       return 0
@@ -151,6 +153,7 @@ start_demo() {
   (
     cd "${BACKEND_DIR}"
     export CLASSLENS_CORS_ORIGINS="${APP_URL},http://localhost:${FRONTEND_PORT}"
+    export CLASSLENS_WARM_EMBEDDING_MODEL=1
     exec setsid "${backend_python}" -m uvicorn app.main:app --host "${BACKEND_HOST}" --port "${BACKEND_PORT}"
   ) >"${RUNTIME_DIR}/backend.log" 2>&1 &
   printf '%s\n' "$!" > "${RUNTIME_DIR}/backend.pid"
@@ -162,7 +165,7 @@ start_demo() {
   ) >"${RUNTIME_DIR}/frontend.log" 2>&1 &
   printf '%s\n' "$!" > "${RUNTIME_DIR}/frontend.pid"
 
-  if ! wait_for_url 'Backend' "${API_URL}/health"; then
+  if ! wait_for_url 'Backend' "${API_URL}/health" 600; then
     stop_demo || true
     fail "Backend failed to become ready. Inspect ${RUNTIME_DIR}/backend.log."
   fi

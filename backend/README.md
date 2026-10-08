@@ -17,7 +17,7 @@ Copy `.env.example` to `.env` and keep real secrets only in the ignored `.env`. 
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f ../database/migrations/001_golden_path_persistence.sql
 ```
 
-The local embedding model downloads from Hugging Face on first use and is cached locally. Material vectors are rebuilt from persistent chunks after a process restart.
+The embedding model uses a pinned Hugging Face revision and is cached locally. `./scripts/demo.sh reset` loads and warms it before `/health` responds, so a first download happens during startup rather than on a teacher request. `/ready` reports PostgreSQL and model readiness without calling Gemini. Material vectors are rebuilt from persistent chunks after a process restart.
 
 Run the API and tests from `backend/`:
 

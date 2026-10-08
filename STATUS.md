@@ -52,10 +52,13 @@
 - The normal frontend passes retrieved text directly from the retrieval response. The generation service validates referenced chunk IDs and PostgreSQL relationships but does not independently re-read and compare every supplied chunk snapshot before the Gemini call. This is an API trust-boundary hardening opportunity, not an observed golden-path data-integrity failure.
 - Material vectors are per-process by design; exact normalized source text, offsets, metadata, and all workflow records are durable.
 - Python 3.11 with CPU-only PyTorch 2.7.1 is the verified backend runtime. The workspace Python 3.14 default is not supported by that stack.
-- The local embedding model may contact Hugging Face on first download and warns when no `HF_TOKEN` is supplied. A token can improve Hub rate limits and download reliability, but it does not reduce the measured model memory requirement; the token remains optional for this public model.
+- The local runner warms the pinned embedding model before `/health` responds. A cold cache still downloads the model at startup and can emit an unauthenticated Hugging Face warning; `HF_TOKEN` may improve download reliability but does not reduce model memory use.
 - No destructive production reset endpoint exists. See [docs/DEMO.md](docs/DEMO.md#safe-demo-reset) for the safe deterministic reset procedure.
 - Unused mock question, misconception, and response/evidence examples were removed from the frontend; `mockData.ts` now contains only scenario metadata used by the UI and route navigation definitions.
 - Runtime reproduction is pinned to the verified environment: frontend Node `>=22.12 <23` with `.nvmrc` at `22.23.1`, backend `.python-version` at `3.11.16`, CPU-only PyTorch `2.7.1`, and an exact `backend/requirements.lock`. The lock matches the installed environment, `pip check` passes, the backend suite passes with `60 passed, 1 skipped`, frontend lint/build pass, and the demo runtime check passes.
+- The embedding model is pinned to Hugging Face revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`. The local runner warms it before `/health` responds. `/ready` reports sanitized database and in-process model status without calling Gemini; hosted startup warming remains disabled because the current 512 MB plan is below the measured 1.11 GB local peak.
+- Hosted Render remains liveness-checkable through `/health`; `/ready` remains `not_ready` until the model loads in its process. Do not enable `CLASSLENS_WARM_EMBEDDING_MODEL` there while on the 512 MB plan, since startup would likely fail before the service can answer requests.
+- Local verification on 2026-10-08: `./scripts/demo.sh reset` completed in 20.7 seconds; logs show model load before startup completion. `/health` returned 200, `/ready` returned 200 with PostgreSQL and embedding model both ready, and both runner-owned services passed status checks.
 
 ## Golden-path readiness
 

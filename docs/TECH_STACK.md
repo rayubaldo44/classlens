@@ -46,7 +46,7 @@ Material ingestion and retrieval add no new runtime dependency: UTF-8 text decod
 
 The frontend declares Node `>=22.12 <23` in `package.json`; `.nvmrc` records the verified `22.23.1` release. The installed npm version was `10.9.8`.
 
-The AI runtime was verified with Python `3.11.16` and CPU-only PyTorch `2.7.1`; `backend/.python-version` records that Python patch release. Install `requirements.lock`, which pins `torch==2.7.1+cpu` and includes PyTorch's CPU wheel index; otherwise a default Linux resolver may download unnecessary CUDA packages. No Supabase browser client, document-extraction, external clustering, or pgvector dependency is present.
+The AI runtime was verified with Python `3.11.16` and CPU-only PyTorch `2.7.1`; `backend/.python-version` records that Python patch release. Install `requirements.lock`, which pins `torch==2.7.1+cpu` and includes PyTorch's CPU wheel index; otherwise a default Linux resolver may download unnecessary CUDA packages. The selected embedding model is pinned to Hugging Face commit `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`; the local runner warms it before health responds. No Supabase browser client, document-extraction, external clustering, or pgvector dependency is present.
 
 ## Proposed dependency categories
 

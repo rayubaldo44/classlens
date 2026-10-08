@@ -50,18 +50,25 @@ Expected domain outcomes such as `insufficient_data` or `insufficient_relevant_c
 
 ## Health
 
-### `GET /health` — implemented
+### `GET /health` — implemented liveness check
 
-Verified minimal readiness response:
+This reports that the FastAPI process is running. It does not check external dependencies.
+
+### `GET /ready` — implemented dependency readiness check
+
+Returns HTTP 200 only when PostgreSQL accepts `SELECT 1` and the embedding model is loaded in this process. Otherwise it returns HTTP 503 with sanitized check statuses, without provider details or secrets:
 
 ```json
 {
-  "status": "ok",
-  "service": "classlens-api"
+  "status": "not_ready",
+  "checks": {
+    "database": "ready",
+    "embedding_model": "not_ready"
+  }
 }
 ```
 
-Do not report external AI providers healthy unless the endpoint actually checks them; keep expensive provider diagnostics separate.
+`/ready` does not call Gemini. The local demo runner warms the embedding model before startup completes; hosted services should enable `CLASSLENS_WARM_EMBEDDING_MODEL=true` only when their memory limit can hold the model.
 
 ## Assessment intake — implemented preview contract
 

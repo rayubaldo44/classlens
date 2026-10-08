@@ -58,7 +58,9 @@ Depends on: a recorded baseline of the currently verified environment and latenc
 
 - [x] Declare compatible Node and Python versions and lock the tested backend dependency resolution, including CPU-only PyTorch installation.
 - [ ] Make embedding-model files available reproducibly during deployment and warm the model before readiness; avoid a first-user download dependency.
-- [ ] Add a readiness check that distinguishes application liveness from model/database readiness without exposing secrets or consuming Gemini quota on each probe.
+- [x] Add a readiness check that distinguishes application liveness from model/database readiness without exposing secrets or consuming Gemini quota on each probe.
+
+Current evidence (2026-10-08): the existing embedding model is pinned to cached Hugging Face commit `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`. The local demo runner warms it before health responds, and `/ready` checks PostgreSQL plus loaded-model state without calling Gemini. Hosted startup warming remains off because measured local peak RSS is about 1.11 GB and the current Render service is 512 MB; the hosting part of the model-cache task stays open until adequate memory is available.
 
 **Acceptance:** a clean environment reproduces the verified runtime and serves a warm request; document any accepted configuration change in [docs/TECH_STACK.md](docs/TECH_STACK.md) and [docs/DECISIONS.md](docs/DECISIONS.md).
 

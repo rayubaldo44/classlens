@@ -4,6 +4,13 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-023 — Pin and warm the existing embedding model
+
+- **Status:** Accepted and implemented locally on 2026-10-08; hosted warm-up deferred
+- **Decision:** Keep the selected Sentence Transformers model and pin it to the already verified Hugging Face commit `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`. Warm it during local FastAPI startup before health responds. Permit hosted startup warming only when the service has enough memory for the model.
+- **Reason:** A mutable `main` model reference could change embeddings, while first-request loading delays the teacher workflow. Measured local peak RSS is about 1.11 GB; the current 512 MB Render plan cannot safely warm the model.
+- **Consequence:** The local runner sets `CLASSLENS_WARM_EMBEDDING_MODEL=1`. Keep hosted warming disabled until capacity is sufficient; `/ready` reports model/database state independently of `/health` and does not call Gemini.
+
 ### D-022 — Pin the verified local runtimes and backend resolution
 
 - **Status:** Accepted and implemented on 2026-10-08
