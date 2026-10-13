@@ -40,6 +40,7 @@ class LLMSettings:
     provider: str
     model: str
     timeout_ms: int
+    total_budget_ms: int
     api_key: str = field(repr=False)
 
 
@@ -85,11 +86,15 @@ def get_material_settings() -> MaterialSettings:
 
 def get_llm_settings() -> LLMSettings:
     timeout_ms = int(os.getenv("CLASSLENS_LLM_TIMEOUT_MS", "45000"))
+    total_budget_ms = int(os.getenv("CLASSLENS_LLM_TOTAL_BUDGET_MS", "60000"))
     if not 5_000 <= timeout_ms <= 120_000:
         raise ValueError("CLASSLENS_LLM_TIMEOUT_MS must be between 5000 and 120000.")
+    if not 5_000 <= total_budget_ms <= 180_000:
+        raise ValueError("CLASSLENS_LLM_TOTAL_BUDGET_MS must be between 5000 and 180000.")
     return LLMSettings(
         provider="google-gemini",
         model=os.getenv("CLASSLENS_LLM_MODEL", "gemini-3.1-flash-lite").strip(),
         timeout_ms=timeout_ms,
+        total_budget_ms=total_budget_ms,
         api_key=os.getenv("GEMINI_API_KEY", "").strip(),
     )

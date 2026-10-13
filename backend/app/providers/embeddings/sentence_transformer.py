@@ -1,6 +1,10 @@
 from functools import lru_cache
+from threading import Lock
 
 from app.config import DEFAULT_EMBEDDING_REVISION, get_analysis_settings
+
+
+_MODEL_LOCK = Lock()
 
 
 class SentenceTransformerEmbeddingService:
@@ -15,13 +19,14 @@ class SentenceTransformerEmbeddingService:
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        vectors = _load_model(self._model_id, self._revision).encode(
-            texts,
-            batch_size=32,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
+        with _MODEL_LOCK:
+            vectors = _load_model(self._model_id, self._revision).encode(
+                texts,
+                batch_size=32,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
         return vectors.tolist()
 
 

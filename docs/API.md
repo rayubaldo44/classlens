@@ -48,7 +48,15 @@ Proposed mappings:
 
 Expected domain outcomes such as `insufficient_data` or `insufficient_relevant_context` should usually be successful resource states, not fabricated successes or generic server errors.
 
+### Frontend contract enforcement
+
+The React client treats every successful JSON body as `unknown` until recursive runtime checks validate its required nested fields. This applies to assessment previews and analyses, material ingestion and retrieval, remediation generation/review records, and follow-up comparisons. A malformed success response becomes `invalid_response` with an action appropriate to that workflow stage; it is never cast directly into rendered evidence.
+
+The browser's `classlens.workflow.v1` recovery pointer accepts only nonempty string identifiers in this dependency order: analysis → group → material → remediation → comparison. Restoration also checks that fetched records still match those upstream identifiers. Invalid JSON, skipped prerequisites, or cross-linked records produce a visible recovery message and remove stale downstream pointers while preserving the last valid stage.
+
 ## Health
+
+Synchronous parsing, inference/grouping, retrieval, and database operations invoked by async endpoints run in a process-local executor capped at five concurrent operations. Embedding load/encode is serialized within each process. This keeps the event loop available for liveness and other requests; the cap and model lock are not shared across multiple Uvicorn processes.
 
 ### `GET /health` — implemented liveness check
 
@@ -87,7 +95,8 @@ assessment_title,subject,grade_level,topic,student_id,question_id,question,answe
 - Each `student_id`/`question_id` pair must be unique.
 - Assessment metadata must be consistent across rows. A `question_id` must always use the same question and correct answer.
 - Source answer text is preserved; trimming is used only to determine whether it is blank.
-- Files must use a `.csv` extension, UTF-8 encoding, and be no larger than 1 MB.
+- Files must use a `.csv` extension, UTF-8 encoding, contain no more than 500 response rows, and be no larger than 1 MB.
+- Each question may contain at most 100 eligible responses for grouping. Eligible responses are answered rows explicitly marked incorrect; correct and blank rows do not count toward this limit.
 - Intake does not infer scores or persist data. The explicit correctness value is the deterministic MVP scoring boundary.
 
 ### `POST /api/v1/assessments/preview`
@@ -135,7 +144,7 @@ Accepts multipart field `file` and optional `data_label` (`teacher_upload` by de
 
 Runs the versioned synthetic fixture through the same parser and returns the preview with `data_label: "synthetic_demo"`.
 
-Implemented error codes include `unsupported_file_type`, `file_too_large`, `csv_empty`, `csv_encoding_error`, `csv_malformed`, `csv_duplicate_columns`, `csv_missing_columns`, `csv_blank_required_value`, `csv_invalid_correctness`, `csv_inconsistent_assessment`, `csv_inconsistent_question`, and `csv_duplicate_response`.
+Implemented error codes include `unsupported_file_type`, `file_too_large`, `csv_row_limit_exceeded`, `csv_question_eligible_limit_exceeded`, `csv_empty`, `csv_encoding_error`, `csv_malformed`, `csv_duplicate_columns`, `csv_missing_columns`, `csv_blank_required_value`, `csv_invalid_correctness`, `csv_inconsistent_assessment`, `csv_inconsistent_question`, and `csv_duplicate_response`. Both limit errors return HTTP `413` with the actual and maximum counts; the per-question error also identifies the affected `question_id`.
 
 ## Analysis — implemented synchronous MVP contract
 
@@ -307,12 +316,13 @@ Remediation records persist in PostgreSQL. The API preserves the original Gemini
 
 ### `POST /api/v1/remediations`
 
-Accepts required `analysis_id`, the selected detected group, class context, and complete typed retrieval response. The database verifies the intervention's analysis/group and material/chunk relationships.
+Accepts required `generation_request_id`, `analysis_id`, the selected detected group, class context, and complete typed retrieval response. Before Gemini is called, the service reloads the analysis/group and material/chunks from server-side persistence. Every browser-supplied class, group, material, chunk ID, chunk index, text, and offset field must match those canonical records. Missing canonical context returns `404 remediation_context_not_found`; altered or cross-linked snapshots return `409 remediation_context_mismatch`. Neither case calls Gemini or saves a draft.
 
 Abbreviated request shape:
 
 ```json
 {
+  "generation_request_id": "c5c1d654-9be8-42d0-9ca1-23e94210fc68",
   "analysis_id": "analysis_1a191d0a7331cb82",
   "grade_level": "7",
   "subject": "Science",
@@ -340,6 +350,8 @@ Abbreviated request shape:
 
 The runtime request must include every required `material`, retrieval-metadata, chunk-index, and offset field from the retrieval contract; the example is abbreviated for readability.
 
+`generation_request_id` is an 8–100 character client-generated identifier containing letters, digits, `_`, or `-`. ClassLens combines it with canonical analysis, group, material, and chunk identifiers to derive the remediation ID. Identical retries first read that ID from persistence and share a process-local generation lock, so a browser retry returns the existing draft instead of calling Gemini again or creating a second record. A new intentional generation uses a new request ID.
+
 `200 OK` returns either `status: "generated"` with a remediation or the controlled state below without calling Gemini:
 
 ```json
@@ -354,10 +366,12 @@ A generated remediation has lifecycle status `generated` and includes:
 
 - `generated_content`: immutable original Gemini structure;
 - `content`: current teacher-editable structure;
-- `sources`: exact retrieved source snapshots;
+- `sources`: source snapshots rebuilt from the canonical stored material chunks;
 - provider/model/prompt version and timestamps.
 
 Both content objects include `misconception_summary`, `learning_objective`, `teacher_explanation`, `corrected_concept`, `activity`, optional `analogy`, one to three `{prompt, expected_answer}` follow-up questions, and validated `source_references` containing only supplied chunk IDs.
+
+Retrieval similarity remains response/provenance metadata. It is excluded from the Gemini prompt because the current PostgreSQL model persists canonical chunks but not a canonical retrieval-result snapshot.
 
 ### `GET /api/v1/remediations/{remediation_id}`
 
@@ -387,7 +401,7 @@ Accepts `action: "save" | "approve" | "reject"`, optional teacher `review_notes`
 
 Saving keeps status `generated`; approval or rejection is terminal and returns status `approved` or `rejected`. A later mutation returns `409 remediation_invalid_transition`.
 
-Generation errors include `llm_not_configured`, `llm_timeout`, `llm_provider_unavailable`, `llm_malformed_output`, `llm_ungrounded_output`, and `llm_generation_failed`. Provider/schema/citation failure saves no remediation and never returns fabricated content.
+Generation errors include `remediation_context_not_found`, `remediation_context_mismatch`, `llm_not_configured`, `llm_timeout`, `llm_provider_unavailable`, `llm_malformed_output`, `llm_ungrounded_output`, and `llm_generation_failed`. Context/provider/schema/citation failure saves no remediation and never returns fabricated content. The default backend budget is 60 seconds across both provider attempts and the retry delay. The browser aborts after 70 seconds, keeps the selected evidence, and offers a manual retry with the same pending `generation_request_id`.
 
 ## Follow-up results and comparison — implemented
 

@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from app.concurrency import run_in_worker
 
 from app.config import get_material_settings
 from app.providers.embeddings import EmbeddingService, get_embedding_service
@@ -36,7 +37,8 @@ async def ingest_uploaded_material(
     if not filename.lower().endswith(".txt"):
         raise MaterialError("unsupported_material_type", "Choose a UTF-8 plain text file with a .txt extension.")
     content = await file.read(MAX_MATERIAL_BYTES + 1)
-    return ingest_learning_material(
+    return await run_in_worker(
+        ingest_learning_material,
         content,
         filename=filename,
         title=title,
@@ -56,14 +58,16 @@ async def ingest_photosynthesis_demo_material(
     embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
     material_index: Annotated[MaterialIndex, Depends(get_material_index)],
 ) -> MaterialIngestionResponse:
-    return ingest_learning_material(
-        DEMO_MATERIAL_PATH.read_bytes(),
-        filename=DEMO_MATERIAL_PATH.name,
-        title="Grade 7 Photosynthesis Learning Notes",
-        source_kind="synthetic_demo",
-        embedding_service=embedding_service,
-        material_index=material_index,
-        settings=get_material_settings(),
+    return await run_in_worker(
+        lambda: ingest_learning_material(
+            DEMO_MATERIAL_PATH.read_bytes(),
+            filename=DEMO_MATERIAL_PATH.name,
+            title="Grade 7 Photosynthesis Learning Notes",
+            source_kind="synthetic_demo",
+            embedding_service=embedding_service,
+            material_index=material_index,
+            settings=get_material_settings(),
+        )
     )
 
 
@@ -78,7 +82,8 @@ async def retrieve_material_for_misconception(
     embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
     material_index: Annotated[MaterialIndex, Depends(get_material_index)],
 ) -> MaterialRetrievalResponse:
-    return retrieve_for_misconception(
+    return await run_in_worker(
+        retrieve_for_misconception,
         material_id,
         context,
         embedding_service=embedding_service,

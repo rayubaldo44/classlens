@@ -52,7 +52,6 @@ def build_remediation_prompt(request: RemediationGenerationRequest) -> str:
                 "chunk_id": item.chunk_id,
                 "chunk_index": item.chunk_index,
                 "text": item.text,
-                "relevance_score": item.similarity,
             }
             for item in request.retrieval.results
         ],

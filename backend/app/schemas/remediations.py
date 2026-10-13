@@ -48,6 +48,11 @@ class RemediationMisconceptionContext(BaseModel):
 
 
 class RemediationGenerationRequest(BaseModel):
+    generation_request_id: str = Field(
+        min_length=8,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
     analysis_id: str = Field(min_length=1, max_length=100)
     grade_level: str = Field(min_length=1, max_length=100)
     subject: str = Field(min_length=1, max_length=200)

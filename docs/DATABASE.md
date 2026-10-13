@@ -49,6 +49,13 @@ baseline analysis/group + approved intervention + follow-up analysis ─ compari
 - Lifecycle/status columns use checks; blank answers cannot be marked correct.
 - Assessment/analysis/group/member writes and material/chunk writes use transactions.
 - Teacher review updates preserve immutable generated content and reject changes after approval/rejection.
+- Before generation, the application reloads the analysis/group and material/chunks through their PostgreSQL-backed repositories. Browser snapshot fields must match those records before Gemini is called; saved intervention source text, identifiers, indexes, and offsets are rebuilt from the canonical chunks.
+
+## Analysis-write batching
+
+The analysis save keeps one PostgreSQL transaction around the assessment, questions, responses, analysis run, groups, and members. Student-response inserts and misconception-member inserts use Psycopg `executemany()` within that transaction; the response `ON CONFLICT (question_id, student_key) DO NOTHING` rule and the existing analysis-run retry guard are unchanged. Psycopg 3.1 and later pipeline `executemany()` calls internally, reducing request/response round trips while preserving execution order and transaction handling ([Psycopg pipeline documentation](https://www.psycopg.org/psycopg3/docs/advanced/pipeline.html)).
+
+A rollback-only benchmark against the configured Supabase instance used the synthetic 45-response result (4 groups, 18 members). The old per-row writer took 22.4 seconds in one trial. The batched writer took 4.02, 3.77, and 3.70 seconds across three trials (3.77-second median), an 83% reduction relative to that baseline. Each trial explicitly rolled back and a follow-up query found zero assessment rows for the generated benchmark ID. These are workload/network observations, not service-level latency guarantees.
 
 ## Vector decision
 

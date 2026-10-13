@@ -1,3 +1,14 @@
+import { RequestTimeoutError, withAbortTimeout } from './requestReliability'
+import {
+  isAnalysisResponse,
+  isAssessmentPreview,
+  isFollowUpComparison,
+  isMaterialIngestionResponse,
+  isMaterialRetrievalResponse,
+  isRemediationGenerationResponse,
+  isRemediationRecord,
+} from './contracts'
+
 export type HealthResponse = { status: 'ok'; service: 'classlens-api' }
 export type NormalizedResponse = { row_number: number; student_id: string; question_id: string; question: string; answer: string; correct_answer: string; answer_status: 'answered' | 'blank'; is_correct: boolean }
 export type AssessmentPreview = {
@@ -119,6 +130,7 @@ export type RemediationRecord = {
   updated_at: string
 }
 export type RemediationGenerationRequest = {
+  generation_request_id: string
   analysis_id: string
   grade_level: string
   subject: string
@@ -211,6 +223,7 @@ export class ApiError extends Error {
 }
 
 export const NETWORK_FAILURE_HINT = 'The browser could not reach the API. It may be stopped, or this origin may be blocked by CORS.'
+export const REMEDIATION_REQUEST_TIMEOUT_MS = 70_000
 
 const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
@@ -229,12 +242,6 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return data
 }
 
-function isAssessmentPreview(value: unknown): value is AssessmentPreview {
-  if (typeof value !== 'object' || value === null) return false
-  const candidate = value as Record<string, unknown>
-  return candidate.status === 'validated' && typeof candidate.assessment === 'object' && candidate.assessment !== null && typeof candidate.summary === 'object' && candidate.summary !== null && Array.isArray(candidate.sample_responses)
-}
-
 async function readPreviewResponse(response: Response): Promise<AssessmentPreview> {
   const data: unknown = await response.json().catch(() => null)
   if (!response.ok) {
@@ -243,19 +250,6 @@ async function readPreviewResponse(response: Response): Promise<AssessmentPrevie
   }
   if (!isAssessmentPreview(data)) throw new ApiError('invalid_response', 'The assessment preview response was not valid.')
   return data
-}
-
-function isAnalysisResponse(value: unknown): value is AnalysisResponse {
-  if (typeof value !== 'object' || value === null) return false
-  const candidate = value as Record<string, unknown>
-  return (candidate.status === 'completed' || candidate.status === 'insufficient_data')
-    && typeof candidate.summary === 'object'
-    && candidate.summary !== null
-    && typeof candidate.embedding === 'object'
-    && candidate.embedding !== null
-    && typeof candidate.grouping === 'object'
-    && candidate.grouping !== null
-    && Array.isArray(candidate.groups)
 }
 
 async function readAnalysisResponse(response: Response): Promise<AnalysisResponse> {
@@ -305,10 +299,10 @@ async function readMaterialResponse(response: Response): Promise<MaterialIngesti
     const error = typeof data === 'object' && data !== null && 'error' in data ? (data as { error?: { code?: unknown; message?: unknown } }).error : undefined
     throw new ApiError(typeof error?.code === 'string' ? error.code : 'request_failed', typeof error?.message === 'string' ? error.message : `Material ingestion failed with status ${response.status}.`)
   }
-  if (typeof data !== 'object' || data === null || !('material' in data) || typeof (data as { material?: unknown }).material !== 'object') {
+  if (!isMaterialIngestionResponse(data)) {
     throw new ApiError('invalid_response', 'The learning material response was not valid.')
   }
-  return data as MaterialIngestionResponse
+  return data
 }
 
 export async function ingestLearningMaterial(file: File): Promise<MaterialIngestionResponse> {
@@ -339,49 +333,62 @@ export async function retrieveMaterialForGroup(
     const error = typeof data === 'object' && data !== null && 'error' in data ? (data as { error?: { code?: unknown; message?: unknown } }).error : undefined
     throw new ApiError(typeof error?.code === 'string' ? error.code : 'request_failed', typeof error?.message === 'string' ? error.message : `Material retrieval failed with status ${response.status}.`)
   }
-  if (typeof data !== 'object' || data === null || !('results' in data) || !Array.isArray((data as { results?: unknown }).results)) {
+  if (!isMaterialRetrievalResponse(data)) {
     throw new ApiError('invalid_response', 'The material retrieval response was not valid.')
   }
-  return data as MaterialRetrievalResponse
+  return data
 }
 
-async function readApiResponse<T>(response: Response, isValid: (data: unknown) => boolean, fallback: string): Promise<T> {
+async function readApiResponse<T>(
+  response: Response,
+  isValid: (data: unknown) => data is T,
+  fallback: string,
+  invalidResponseMessage: string,
+): Promise<T> {
   const data: unknown = await response.json().catch(() => null)
   if (!response.ok) {
     const error = typeof data === 'object' && data !== null && 'error' in data ? (data as { error?: { code?: unknown; message?: unknown } }).error : undefined
     throw new ApiError(typeof error?.code === 'string' ? error.code : 'request_failed', typeof error?.message === 'string' ? error.message : fallback)
   }
-  if (!isValid(data)) throw new ApiError('invalid_response', 'The API response was not valid.')
-  return data as T
-}
-
-const isRemediationRecord = (data: unknown): data is RemediationRecord => {
-  if (typeof data !== 'object' || data === null) return false
-  const value = data as Record<string, unknown>
-  return typeof value.remediation_id === 'string'
-    && (value.status === 'generated' || value.status === 'approved' || value.status === 'rejected')
-    && typeof value.content === 'object'
-    && value.content !== null
-    && Array.isArray(value.sources)
+  if (!isValid(data)) throw new ApiError('invalid_response', invalidResponseMessage)
+  return data
 }
 
 export async function generateRemediation(request: RemediationGenerationRequest): Promise<RemediationGenerationResponse> {
-  const response = await fetch(`${apiUrl}/api/v1/remediations`, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  })
-  return readApiResponse<RemediationGenerationResponse>(
-    response,
-    (data) => typeof data === 'object' && data !== null
-      && ((data as { status?: unknown }).status === 'generated' || (data as { status?: unknown }).status === 'insufficient_context'),
-    `Remediation generation failed with status ${response.status}.`,
-  )
+  try {
+    return await withAbortTimeout(REMEDIATION_REQUEST_TIMEOUT_MS, async (signal) => {
+      const response = await fetch(`${apiUrl}/api/v1/remediations`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal,
+      })
+      return readApiResponse<RemediationGenerationResponse>(
+        response,
+        isRemediationGenerationResponse,
+        `Remediation generation failed with status ${response.status}.`,
+        'The API returned incomplete remediation data. Your evidence is unchanged; retry generation or restart this workflow.',
+      )
+    })
+  } catch (error: unknown) {
+    if (error instanceof RequestTimeoutError) {
+      throw new ApiError(
+        'request_timeout',
+        'Generation reached the 70-second browser limit. Your evidence is still available; retrying will reuse this request and will not create a duplicate draft.',
+      )
+    }
+    throw error
+  }
 }
 
 export async function getRemediation(remediationId: string): Promise<RemediationRecord> {
   const response = await fetch(`${apiUrl}/api/v1/remediations/${encodeURIComponent(remediationId)}`, { headers: { Accept: 'application/json' } })
-  return readApiResponse<RemediationRecord>(response, isRemediationRecord, `Remediation retrieval failed with status ${response.status}.`)
+  return readApiResponse<RemediationRecord>(
+    response,
+    isRemediationRecord,
+    `Remediation retrieval failed with status ${response.status}.`,
+    'The saved remediation response was incomplete. Reload the workflow from its analysis evidence.',
+  )
 }
 
 export async function reviewRemediation(remediationId: string, request: RemediationReviewRequest): Promise<RemediationRecord> {
@@ -390,15 +397,12 @@ export async function reviewRemediation(remediationId: string, request: Remediat
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   })
-  return readApiResponse<RemediationRecord>(response, isRemediationRecord, `Remediation review failed with status ${response.status}.`)
-}
-
-const isFollowUpComparison = (data: unknown): data is FollowUpComparisonRecord => {
-  if (typeof data !== 'object' || data === null) return false
-  const value = data as Record<string, unknown>
-  return typeof value.comparison_id === 'string'
-    && (value.status === 'completed' || value.status === 'insufficient_data')
-    && (value.metrics === null || typeof value.metrics === 'object')
+  return readApiResponse<RemediationRecord>(
+    response,
+    isRemediationRecord,
+    `Remediation review failed with status ${response.status}.`,
+    'The API returned an incomplete teacher-review record. Your edits remain on this screen; try saving again.',
+  )
 }
 
 export async function submitFollowUpComparison(
@@ -415,6 +419,7 @@ export async function submitFollowUpComparison(
     response,
     isFollowUpComparison,
     `Follow-up comparison failed with status ${response.status}.`,
+    'The API returned incomplete follow-up results. Retry the comparison from the approved intervention.',
   )
 }
 
@@ -430,6 +435,7 @@ export async function submitPhotosynthesisDemoComparison(
     response,
     isFollowUpComparison,
     `Demo follow-up comparison failed with status ${response.status}.`,
+    'The API returned incomplete demo follow-up results. Retry the comparison from the approved intervention.',
   )
 }
 
@@ -441,5 +447,6 @@ export async function getFollowUpComparison(comparisonId: string): Promise<Follo
     response,
     isFollowUpComparison,
     `Follow-up results retrieval failed with status ${response.status}.`,
+    'The saved follow-up result was incomplete. Rerun the comparison from the approved intervention.',
   )
 }

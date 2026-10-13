@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 from functools import lru_cache
+from threading import Lock
 from typing import Any, Iterator
 
 
@@ -17,6 +18,7 @@ class Database:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         self._pool = None
+        self._pool_lock = Lock()
 
     def _get_pool(self):
         if not self.database_url:
@@ -26,26 +28,28 @@ class Database:
                 retryable=False,
             )
         if self._pool is None:
-            try:
-                from psycopg_pool import ConnectionPool
+            with self._pool_lock:
+                if self._pool is None:
+                    try:
+                        from psycopg_pool import ConnectionPool
 
-                # Supabase's transaction pooler can assign a different server session to
-                # each transaction. Psycopg's automatic prepared statements are session
-                # scoped and can therefore collide with statements prepared by another
-                # pooled client. Keep statements unnamed for reliable pooler operation.
-                self._pool = ConnectionPool(
-                    self.database_url,
-                    min_size=0,
-                    max_size=5,
-                    open=True,
-                    kwargs={"prepare_threshold": None},
-                )
-            except Exception as error:
-                raise DatabaseError(
-                    "database_unavailable",
-                    "Persistent storage is unavailable.",
-                    details={"database_error": type(error).__name__},
-                ) from error
+                        # Supabase's transaction pooler can assign a different server session to
+                        # each transaction. Psycopg's automatic prepared statements are session
+                        # scoped and can therefore collide with statements prepared by another
+                        # pooled client. Keep statements unnamed for reliable pooler operation.
+                        self._pool = ConnectionPool(
+                            self.database_url,
+                            min_size=0,
+                            max_size=5,
+                            open=True,
+                            kwargs={"prepare_threshold": None},
+                        )
+                    except Exception as error:
+                        raise DatabaseError(
+                            "database_unavailable",
+                            "Persistent storage is unavailable.",
+                            details={"database_error": type(error).__name__},
+                        ) from error
         return self._pool
 
     @contextmanager

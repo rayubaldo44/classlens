@@ -3,6 +3,15 @@ import './App.css'
 import './WorkspacePolish.css'
 import { LandingPage } from './LandingPage'
 import { ApiStatus } from './ApiStatus'
+import { clearPendingRequestId, getOrCreatePendingRequestId } from './api/requestReliability'
+import {
+  analysisMatchesWorkflow,
+  comparisonMatchesWorkflow,
+  parseWorkflowPointer,
+  remediationMatchesWorkflow,
+  retrievalMatchesWorkflow,
+  type WorkflowPointer,
+} from './workflowStorage'
 import {
   analyzeAssessment,
   analyzePhotosynthesisDemo,
@@ -38,10 +47,17 @@ import type { RouteKey } from './types'
 
 const routeFromPath = (): RouteKey => demoSteps.find((step) => step.path === window.location.pathname)?.key ?? 'landing'
 type AnalysisSource = { kind: 'demo' } | { kind: 'upload'; file: File }
-type WorkflowPointer = { analysis_id?: string; group_id?: string; material_id?: string; remediation_id?: string; comparison_id?: string }
 const WORKFLOW_KEY = 'classlens.workflow.v1'
-const readWorkflow = (): WorkflowPointer => { try { return JSON.parse(localStorage.getItem(WORKFLOW_KEY) ?? '{}') as WorkflowPointer } catch { return {} } }
-const replaceWorkflow = (next: WorkflowPointer) => localStorage.setItem(WORKFLOW_KEY, JSON.stringify(next))
+const readWorkflow = () => {
+  try { return parseWorkflowPointer(localStorage.getItem(WORKFLOW_KEY)) }
+  catch { return parseWorkflowPointer('{unavailable') }
+}
+const replaceWorkflow = (next: WorkflowPointer) => {
+  try { localStorage.setItem(WORKFLOW_KEY, JSON.stringify(next)) } catch { /* Workflow remains usable without reload recovery. */ }
+}
+const restoreErrorMessage = (fallback: string, error: unknown) => error instanceof ApiError
+  ? `${fallback} ${error.message}`
+  : `${fallback} ${NETWORK_FAILURE_HINT}`
 
 function App() {
   const [route, setRoute] = useState<RouteKey>(routeFromPath)
@@ -57,12 +73,26 @@ function App() {
   useEffect(() => {
     if (route === 'landing' || didRestore.current) return
     didRestore.current = true
-    const pointer = readWorkflow()
-    if (!pointer.analysis_id) return
     void (async () => {
+      const saved = readWorkflow()
+      if (!saved.pointer) {
+        setRestoreMessage(saved.issue?.message ?? 'The saved workflow reference was not valid. Start a new workflow to replace it.')
+        return
+      }
+      const pointer = saved.pointer
+      const analysisId = pointer.analysis_id
+      if (!analysisId) return
       try {
-        const analysis = await getAnalysis(pointer.analysis_id!)
+        const analysis = await getAnalysis(analysisId)
         const group = analysis.groups.find((item) => item.group_id === pointer.group_id) ?? null
+        if (!analysisMatchesWorkflow(pointer, analysis)) {
+          if (analysis.analysis_id === pointer.analysis_id) {
+            setSelectedAnalysis(analysis); setSelectedAssessment(analysis.assessment)
+            replaceWorkflow({ analysis_id: analysis.analysis_id })
+          }
+          setRestoreMessage('The saved misconception no longer belongs to this analysis. Return to Learning Gaps and select the evidence again.')
+          return
+        }
         setSelectedAnalysis(analysis); setSelectedAssessment(analysis.assessment); setSelectedGroup(group)
         if (group && pointer.material_id) {
           try {
@@ -71,18 +101,50 @@ function App() {
               correct_answer: group.correct_answer,
               representative_answers: group.representative_responses.map((item) => item.answer),
             })
+            if (!retrievalMatchesWorkflow(pointer, retrieval)) {
+              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id })
+              setRestoreMessage('The saved teaching material no longer belongs to this misconception. Retrieve supporting passages again.')
+              return
+            }
             setRetrievedSources(retrieval)
-          } catch { setRestoreMessage('The saved teaching-material retrieval could not be restored. Reload it from the misconception detail.') }
+          } catch (error: unknown) {
+            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id })
+            setRestoreMessage(restoreErrorMessage('The saved teaching-material retrieval could not be restored.', error))
+            return
+          }
         }
         if (pointer.remediation_id) {
-          try { setApprovedRemediation(await getRemediation(pointer.remediation_id)) }
-          catch { setRestoreMessage('Some saved intervention state could not be restored. The persisted evidence remains available from the start of the workflow.') }
+          try {
+            const remediation = await getRemediation(pointer.remediation_id)
+            if (!remediationMatchesWorkflow(pointer, remediation)) {
+              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id })
+              setRestoreMessage('The saved intervention no longer belongs to this analysis and misconception. Generate or select the intervention again.')
+              return
+            }
+            setApprovedRemediation(remediation)
+          } catch (error: unknown) {
+            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id })
+            setRestoreMessage(restoreErrorMessage('The saved intervention could not be restored.', error))
+            return
+          }
         }
         if (pointer.comparison_id) {
-          try { setSavedComparison(await getFollowUpComparison(pointer.comparison_id)) }
-          catch { setRestoreMessage('The saved comparison could not be restored. You can rerun the follow-up from the approved intervention.') }
+          try {
+            const comparison = await getFollowUpComparison(pointer.comparison_id)
+            if (!comparisonMatchesWorkflow(pointer, comparison)) {
+              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id, remediation_id: pointer.remediation_id })
+              setRestoreMessage('The saved comparison no longer belongs to this approved intervention. Rerun the follow-up comparison.')
+              return
+            }
+            setSavedComparison(comparison)
+          } catch (error: unknown) {
+            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id, remediation_id: pointer.remediation_id })
+            setRestoreMessage(restoreErrorMessage('The saved comparison could not be restored.', error))
+          }
         }
-      } catch { setRestoreMessage(`The saved workflow could not be restored. ${NETWORK_FAILURE_HINT}`) }
+      } catch (error: unknown) {
+        setRestoreMessage(restoreErrorMessage('The saved workflow could not be restored.', error))
+      }
     })()
   }, [route])
   useEffect(() => { const onPopState = () => setRoute(routeFromPath()); window.addEventListener('popstate', onPopState); return () => window.removeEventListener('popstate', onPopState) }, [])
@@ -231,6 +293,14 @@ function editableFromRecord(record: RemediationRecord): EditableRemediationConte
   }
 }
 
+function getSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
 function Intervention({ group, analysisId, assessment, sources, initialRemediation, onBack, onNext }: {
   group: MisconceptionGroup | null
   analysisId: string | null
@@ -246,12 +316,32 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
   const [reviewed, setReviewed] = useState(false)
   const [reviewNotes, setReviewNotes] = useState(initialRemediation?.review_notes ?? '')
   const [errorMessage, setErrorMessage] = useState('')
+  const pendingGenerationId = useRef<string | null>(null)
+  const generationStorageKey = group && sources
+    ? `classlens:remediation-generation:${analysisId ?? 'unknown'}:${group.group_id}:${sources.material.material_id}:${sources.material.content_hash}`
+    : null
+
+  const getGenerationRequestId = () => {
+    if (pendingGenerationId.current) return pendingGenerationId.current
+    const requestId = generationStorageKey
+      ? getOrCreatePendingRequestId(getSessionStorage(), generationStorageKey, () => window.crypto.randomUUID())
+      : window.crypto.randomUUID()
+    pendingGenerationId.current = requestId
+    return requestId
+  }
+
+  const clearGenerationRequestId = () => {
+    pendingGenerationId.current = null
+    if (!generationStorageKey) return
+    clearPendingRequestId(getSessionStorage(), generationStorageKey)
+  }
 
   const generate = async () => {
     if (!group || !analysisId || !assessment || !sources) return
-    setStatus('loading'); setErrorMessage(''); setRecord(null); setEditable(null); setReviewed(false)
+    setStatus('loading'); setErrorMessage(''); setReviewed(false)
     try {
       const response = await generateRemediation({
+        generation_request_id: getGenerationRequestId(),
         analysis_id: analysisId,
         grade_level: assessment.grade_level,
         subject: assessment.subject,
@@ -268,6 +358,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
         },
         retrieval: sources,
       })
+      clearGenerationRequestId()
       if (response.status === 'insufficient_context' || !response.remediation) {
         setStatus('insufficient')
         setErrorMessage(response.message ?? 'Insufficient teacher-provided material to generate grounded remediation.')
@@ -321,7 +412,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
 
     {!hasGrounding && <StatePanel kind="empty" title="Grounded generation is unavailable" description="Return to the misconception detail and retrieve relevant teacher-provided material. ClassLens will not generate an unsupported intervention." action={<button className="text-button" onClick={onBack}>Choose better teaching material →</button>} />}
     {hasGrounding && status === 'idle' && <section className="generation-start"><div><strong>Ready to prepare a grounded draft</strong><p>Gemini will receive this detected group and only the passages shown above. The result will remain pending until you approve or reject it.</p></div><button className="button primary" onClick={() => void generate()}>Generate remediation</button></section>}
-    {status === 'loading' && <StatePanel kind="loading" title="Generating grounded remediation" description="Gemini is preparing a concise intervention from the selected student evidence and teacher passages." />}
+    {status === 'loading' && <StatePanel kind="loading" title="Generating grounded remediation" description="Gemini is preparing a concise intervention from the selected student evidence and teacher passages. The request is limited to about one minute." />}
     {status === 'insufficient' && <StatePanel kind="empty" title="Insufficient teacher-provided material" description={errorMessage} action={<button className="text-button" onClick={onBack}>Return to teaching material →</button>} />}
     {status === 'error' && <StatePanel kind="error" title="Remediation action failed" description={errorMessage} action={record ? <button className="text-button" onClick={() => setStatus('ready')}>Return to your draft →</button> : <button className="text-button" onClick={() => void generate()}>Try generation again →</button>} />}
 

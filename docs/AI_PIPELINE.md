@@ -34,7 +34,7 @@ The implemented import schema is documented in [API.md](API.md). Each row includ
 
 Assessment input must separately provide each question's prompt and expected answer or rubric. Before any AI call:
 
-1. Validate file type and configured byte/row limits.
+1. Validate file type and the implemented 1 MB/500-row limits.
 2. Decode using the supported encoding and parse with proper CSV quoting rules.
 3. Normalize column names only according to the frozen contract; reject ambiguous mappings.
 4. Validate required columns, unique response identity, known question identifiers, and valid boolean values.
@@ -62,6 +62,8 @@ The MVP uses a validated `is_correct` field supplied with each row. ClassLens do
 
 Correct and blank responses should contribute to baseline counts but should not enter misconception grouping. If correctness is uncertain, represent that uncertainty rather than treating the response as definitely wrong.
 
+Intake rejects any question with more than 100 eligible incorrect responses before embedding or persistence. This bounds complete-link grouping to at most 4,950 response pairs per question while leaving correct and blank rows available for baseline counts.
+
 ## 4. Embedding generation — implemented
 
 The backend embeds only eligible incorrect answer text using local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. The model adapter is isolated under `backend/app/providers/embeddings/`; analysis code depends on its typed protocol, not the package directly. The current preprocessing version is `answer_only_v1`; original answers remain unchanged for evidence. The response records:
@@ -75,6 +77,10 @@ The backend embeds only eligible incorrect answer text using local `sentence-tra
 Batch calls within provider limits, apply a timeout, and validate response count and vector dimensions. A partial or malformed embedding batch must fail the affected analysis rather than inventing or zero-filling vectors.
 
 Vectors are batched, normalized, and validated for count, consistent dimensions, finite values, and non-zero magnitude. Provider or malformed-vector failures return a retryable structured error and no groups. The selected model is pinned to Hugging Face revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42` using `CLASSLENS_EMBEDDING_REVISION`; the immutable revision keeps the downloaded files stable. Python 3.11 and a CPU-only PyTorch wheel are the verified development setup. The local runner warms the model before the API reports health; on a hosted service, startup warming must wait until the memory limit can hold the loaded model.
+
+### Operational logging
+
+The API logs request route templates and elapsed time, plus stage durations for CSV parsing, response/material embeddings, grouping, retrieval, Gemini calls, and persistence. Error records contain stable error codes and exception class names only; Gemini records token counts when the provider returns usage metadata. Logs must not include request bodies, prompts, student response text, provider response text, credentials, or raw URLs containing record identifiers. Counts, model IDs, stage names, and persistence operation names are safe operational fields.
 
 ## 5. Similarity and grouping — implemented
 
@@ -153,7 +159,9 @@ The backend uses the isolated Gemini adapter with stable free-tier `gemini-3.1-f
 - group/question identifiers and the current provisional label;
 - exact question and correct concept;
 - affected/eligible response counts and exact representative answers;
-- exact material/document metadata, chunk IDs, chunk text, and retrieval scores.
+- exact material/document metadata, chunk IDs, and chunk text.
+
+Before building the prompt, the service reloads the requested analysis/group and material/chunks from server-side persistence. It requires the browser's class context, group evidence, material metadata, chunk IDs, indexes, text, and offsets to match the canonical records exactly. Missing context returns `remediation_context_not_found`; altered or cross-linked context returns `remediation_context_mismatch`. Both stop before Gemini and save nothing. The prompt and saved source snapshots are rebuilt from the canonical records. Browser-supplied similarity scores remain provenance metadata and are excluded from the prompt.
 
 The prompt explicitly says the group is already detected, treats student/source text as untrusted data, forbids unsupported claims, and requests concise age-appropriate teacher content. Gemini structured JSON is parsed into Pydantic fields:
 
@@ -164,7 +172,9 @@ The prompt explicitly says the group is already detected, treats student/source 
 - one to three follow-up questions with expected answers;
 - one or more supporting chunk IDs.
 
-Generation is synchronous for the demo, with temperature `0.2`, a 2,200-token output bound, and configurable `CLASSLENS_LLM_TIMEOUT_MS` (default 45 seconds). The adapter makes at most two provider attempts: one initial call and one retry after 0.75 seconds for timeouts or HTTP 429/500/502/503/504 responses. Permanent failures are not retried. If retrieval status is not `retrieved` or has no results, the service returns `insufficient_context` without calling Gemini. Every returned chunk ID must belong to the supplied retrieval result; unknown or empty references reject the whole draft. The record preserves exact source snapshots and generated content.
+Generation is synchronous for the demo, with temperature `0.2`, a 2,200-token output bound, a per-attempt transport timeout from `CLASSLENS_LLM_TIMEOUT_MS` (default 45 seconds), and a total `CLASSLENS_LLM_TOTAL_BUDGET_MS` budget (default 60 seconds). The total budget includes the initial provider call, the 0.75-second retry delay, and one retry for timeouts or HTTP 429/500/502/503/504 responses; the retry receives only the time still available. Permanent failures are not retried. If retrieval status is not `retrieved` or has no results, the service returns `insufficient_context` without calling Gemini. Every returned chunk ID must belong to the supplied retrieval result; unknown or empty references reject the whole draft. The record preserves exact source snapshots and generated content.
+
+The browser aborts its generation request after 70 seconds and retains the selected group and source evidence. It keeps a pending `generation_request_id` in session storage until a valid response arrives. Manual retries reuse that identifier. The backend derives a deterministic remediation ID from the identifier plus canonical analysis/group/material/chunk IDs, checks persistence, and serializes identical in-process requests, preventing a timed-out retry from creating another persisted draft.
 
 ## 11. Teacher review — implemented with PostgreSQL persistence
 
@@ -218,7 +228,8 @@ The versioned photosynthesis fixtures produce 9 of 43 answered students affected
 | Material embedding, index, or retrieval failure | Return a structured retryable material error; do not return sources as if retrieval succeeded. |
 | Remediation LLM missing configuration, timeout, high demand, or other provider failure | Retry one transient timeout/429/5xx response; otherwise return a sanitized structured error, keep source evidence, and save no fabricated draft. |
 | Malformed structured output or invalid chunk references | Reject the complete generation and save no remediation. |
-| Network/backend failure | Use idempotency where needed and let the client safely retry or poll. |
+| Missing, altered, or cross-linked generation context | Reload canonical analysis and material records; return `remediation_context_not_found` or `remediation_context_mismatch` before Gemini and save nothing. |
+| Network/backend failure | Keep evidence and pending request identity in the browser; allow a manual idempotent retry without creating another remediation draft. |
 | Missing follow-up data | Report missing counts and omit unsupported comparisons. |
 
 No provider failure may be replaced with fabricated analysis, passages, citations, or student text.

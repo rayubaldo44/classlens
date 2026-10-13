@@ -68,11 +68,11 @@ Current evidence (2026-10-08): the existing embedding model is pinned to cached 
 
 Depends on: stage timing measurements; benchmark before selecting an optimization.
 
-- [ ] Add structured request/stage timings for parsing, embedding, grouping, retrieval, database persistence, and Gemini calls. Record sanitized errors and token usage without student response text.
-- [ ] Offload bounded synchronous inference and database work from `async` route handlers; limit concurrent inference and verify cache/model thread safety and API responsiveness during analysis.
-- [ ] Investigate slow database saves and replace individual inserts with transaction-preserving batches where measurements justify it; compare before/after timing and verify atomicity/idempotency.
-- [ ] Add explicit CSV row and eligible-response-per-question limits, with actionable errors, to bound pairwise grouping work.
-- [ ] Define a total generation/request time budget that includes provider retries; add frontend timeout/retry behavior that preserves valid state and avoids duplicate drafts.
+- [x] Add structured request/stage timings for parsing, embedding, grouping, retrieval, database persistence, and Gemini calls. Record sanitized errors and token usage without student response text.
+- [x] Offload bounded synchronous inference and database work from `async` route handlers; limit concurrent inference and verify cache/model thread safety and API responsiveness during analysis (2026-10-08).
+- [x] Investigate slow database saves and replace individual inserts with transaction-preserving batches where measurements justify it; compare before/after timing and verify atomicity/idempotency (2026-10-09).
+- [x] Add explicit CSV row and eligible-response-per-question limits, with actionable errors, to bound pairwise grouping work (2026-10-13).
+- [x] Define a total generation/request time budget that includes provider retries; add frontend timeout/retry behavior that preserves valid state and avoids duplicate drafts (2026-10-13).
 
 **Acceptance:** representative workloads stay within documented limits, concurrent health/read requests remain responsive, and optimization preserves evidence, transactions, and deterministic results.
 
@@ -80,8 +80,8 @@ Depends on: stage timing measurements; benchmark before selecting an optimizatio
 
 Depends on: existing persisted analysis/groups and material chunks.
 
-- [ ] Load canonical question/group evidence and teacher passages server-side before generation; validate analysis/group/material/chunk relationships and reject altered or mismatched browser snapshots before calling Gemini.
-- [ ] Strengthen frontend runtime validation of nested API responses and saved workflow pointers; show actionable errors for malformed data.
+- [x] Load canonical question/group evidence and teacher passages server-side before generation; validate analysis/group/material/chunk relationships and reject altered or mismatched browser snapshots before calling Gemini (2026-10-13).
+- [x] Strengthen frontend runtime validation of nested API responses and saved workflow pointers; show actionable errors for malformed data (2026-10-13).
 
 **Acceptance:** tampered text or identifiers cannot become trusted generation context; existing valid workflows and immutable source snapshots remain recoverable. See [docs/API.md](docs/API.md) and [docs/DATABASE.md](docs/DATABASE.md).
 
@@ -89,8 +89,8 @@ Depends on: existing persisted analysis/groups and material chunks.
 
 Depends on: reproducible runtime; use an isolated test database for database integration.
 
-- [ ] Add CI for frontend lint/build and backend tests, with a separately configured PostgreSQL integration job.
-- [ ] Add an automated browser golden-path smoke covering upload, evidence, retrieval, review/approval, results, reload recovery, and a controlled failure state.
+- [x] Add CI for frontend tests/lint/build and backend tests, with a separately configured PostgreSQL integration job. (2026-10-13)
+- [x] Add an automated browser golden-path smoke covering upload, evidence, retrieval, review/approval, results, reload recovery, and a controlled failure state. (2026-10-13)
 - [ ] Add real-embedding regression evaluation across multiple teacher-reviewed examples; measure group quality, outliers, retrieval relevance, and stability beyond the photosynthesis fixture.
 - [ ] Evaluate grounded-generation faithfulness, invalid citations, prompt-injection examples, latency, token usage, and provider-unavailable behavior; distinguish valid citation IDs from supported educational claims.
 

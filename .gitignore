@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+frontend/playwright-report/
+frontend/test-results/
 .env
 .env.*
 !.env.example

@@ -1,0 +1,416 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ClassLens \u2014 System Architecture",
+    "output": ".archify/architecture-classlens-20261006-095348/classlens-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/rayubaldo44/classlens.git",
+      "revision": "5fb327fd05973018c5dc3debb5c5dc826ccddd82",
+      "provider": "github",
+      "link_mode": "web"
+    }
+  },
+  "components": [
+    {
+      "id": "teacher",
+      "type": "external",
+      "label": "Teacher",
+      "sublabel": "Upload \u2022 inspect \u2022 edit \u2022 approve",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/App.tsx",
+          "line": 265,
+          "end_line": 355
+        }
+      ],
+      "tag": "Final review authority"
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "React + TypeScript",
+      "sublabel": "Vite \u2022 landing + six workflow screens",
+      "pos": [
+        350,
+        280
+      ],
+      "size": [
+        202,
+        86
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/App.tsx",
+          "line": 38,
+          "end_line": 100
+        },
+        {
+          "path": "frontend/src/api/client.ts",
+          "line": 271,
+          "end_line": 445
+        },
+        {
+          "path": "frontend/package.json",
+          "line": 1,
+          "end_line": 31
+        }
+      ]
+    },
+    {
+      "id": "pointers",
+      "type": "database",
+      "label": "Browser localStorage",
+      "sublabel": "Workflow IDs \u2022 reload via API",
+      "pos": [
+        350,
+        70
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/App.tsx",
+          "line": 40,
+          "end_line": 84
+        }
+      ],
+      "tag": "Pointers only"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI API",
+      "sublabel": "/health + /api/v1 \u2022 CORS \u2022 errors",
+      "pos": [
+        660,
+        280
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 9,
+          "end_line": 40
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 43,
+          "end_line": 182
+        },
+        {
+          "path": "backend/app/config.py",
+          "line": 8,
+          "end_line": 18
+        }
+      ]
+    },
+    {
+      "id": "services",
+      "type": "backend",
+      "label": "Workflow services",
+      "sublabel": "Intake \u2022 groups \u2022 RAG \u2022 review \u2022 results",
+      "pos": [
+        660,
+        550
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/results.py",
+          "line": 40,
+          "end_line": 153
+        },
+        {
+          "path": "backend/app/services/remediation.py",
+          "line": 36,
+          "end_line": 150
+        },
+        {
+          "path": "backend/app/api/routes/materials.py",
+          "line": 29,
+          "end_line": 87
+        }
+      ],
+      "tag": "One backend process"
+    },
+    {
+      "id": "embeddings",
+      "type": "backend",
+      "label": "Local embeddings",
+      "sublabel": "MiniLM-L12-v2 \u2022 CPU \u2022 batched",
+      "pos": [
+        350,
+        550
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/providers/embeddings/sentence_transformer.py",
+          "line": 6,
+          "end_line": 40
+        },
+        {
+          "path": "backend/app/config.py",
+          "line": 44,
+          "end_line": 58
+        },
+        {
+          "path": "backend/app/services/misconception_analysis.py",
+          "line": 38,
+          "end_line": 115
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Gemini API",
+      "sublabel": "Structured draft \u2022 one transient retry",
+      "pos": [
+        970,
+        550
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/providers/llm/gemini.py",
+          "line": 30,
+          "end_line": 95
+        },
+        {
+          "path": "backend/app/config.py",
+          "line": 82,
+          "end_line": 91
+        },
+        {
+          "path": "backend/app/prompts/remediation.py",
+          "line": 8,
+          "end_line": 60
+        }
+      ],
+      "tag": "Model set server-side"
+    },
+    {
+      "id": "repositories",
+      "type": "backend",
+      "label": "Postgres adapters",
+      "sublabel": "Analysis \u2022 materials \u2022 drafts \u2022 results",
+      "pos": [
+        660,
+        820
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 20,
+          "end_line": 175
+        },
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 178,
+          "end_line": 299
+        },
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 302,
+          "end_line": 347
+        }
+      ]
+    },
+    {
+      "id": "vectors",
+      "type": "database",
+      "label": "Material vector cache",
+      "sublabel": "Per-process \u2022 rebuilt from chunks",
+      "pos": [
+        1017,
+        820
+      ],
+      "size": [
+        183,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 178,
+          "end_line": 256
+        },
+        {
+          "path": "backend/app/services/material_retrieval.py",
+          "line": 24,
+          "end_line": 64
+        }
+      ],
+      "tag": "Ephemeral"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Supabase PostgreSQL",
+      "sublabel": "Source text + workflow records",
+      "pos": [
+        660,
+        1080
+      ],
+      "size": [
+        230,
+        86
+      ],
+      "sources": [
+        {
+          "path": "backend/app/database.py",
+          "line": 16,
+          "end_line": 75
+        },
+        {
+          "path": "database/migrations/001_golden_path_persistence.sql",
+          "line": 5,
+          "end_line": 181
+        }
+      ],
+      "tag": "Durable \u2022 11 tables"
+    }
+  ],
+  "connections": [
+    {
+      "id": "teacher-to-web",
+      "from": "teacher",
+      "to": "web",
+      "label": "Teacher actions",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-to-pointers",
+      "from": "web",
+      "to": "pointers",
+      "label": "Store / read IDs",
+      "variant": "default"
+    },
+    {
+      "id": "web-to-api",
+      "from": "web",
+      "to": "api",
+      "label": "HTTP JSON / files",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-services",
+      "from": "api",
+      "to": "services",
+      "label": "Validate + dispatch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "services-to-embeddings",
+      "from": "services",
+      "to": "embeddings",
+      "label": "Embed text",
+      "variant": "default"
+    },
+    {
+      "id": "services-to-gemini",
+      "from": "services",
+      "to": "gemini",
+      "label": "Grounded prompt",
+      "variant": "default"
+    },
+    {
+      "id": "services-to-repositories",
+      "from": "services",
+      "to": "repositories",
+      "label": "Save / load / rank",
+      "variant": "default"
+    },
+    {
+      "id": "repositories-to-vectors",
+      "from": "repositories",
+      "to": "vectors",
+      "label": "Cache / cosine search",
+      "variant": "default"
+    },
+    {
+      "id": "repositories-to-postgres",
+      "from": "repositories",
+      "to": "postgres",
+      "label": "SQL via psycopg",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Frontend and API",
+      "items": [
+        "LandingPage.tsx supplies the public page; App.tsx owns dashboard, upload, analysis, misconception, intervention and results screens.",
+        "api/client.ts sends multipart files and typed JSON. ApiStatus.tsx probes /health. localStorage contains IDs; API GETs restore durable records.",
+        "FastAPI registers five route modules; Pydantic schemas validate request/response structures. Browser access uses configured CORS; user authentication is not implemented."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Detection and retrieval",
+      "items": [
+        "CSV correctness is the supplied is_correct boolean, not AI grading. Only answered incorrect responses enter question-specific complete-link cosine grouping.",
+        "Defaults: similarity 0.70, support at least 3. Groups retain exact representative answers, membership and coherence; labels remain generic and provisional.",
+        "UTF-8 .txt material only: normalization, 900-character chunks with 120-character overlap, local embeddings, top 3 retrieval hits above 0.42. Cache rebuilds on first retrieval after restart."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Generation and approval",
+      "items": [
+        "grounded_remediation_v1 packages selected group evidence and retrieved passages. Default configured model: gemini-3.1-flash-lite.",
+        "Gemini returns JSON; schema, content and referenced chunk IDs are checked before saving. Missing context and provider failure produce no draft.",
+        "Teacher PATCH saves edits or explicitly approves/rejects. Approved/rejected records are terminal; follow-up comparison requires approval."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Persistence and comparison",
+      "items": [
+        "Postgres adapters own actual SQL I/O. Psycopg pool has max size 5 and prepared statements disabled for transaction-pooler compatibility.",
+        "Tables: assessments, questions, student_responses, analysis_runs, misconception_groups, misconception_members, learning_materials, document_chunks, interventions, intervention_sources, assessment_comparisons.",
+        "Follow-up uses the same parser and detector, validates context, matches the same question with at least 2 overlapping group members, and stores observed before/after metrics without claiming causation."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Repository and operations",
+      "items": [
+        "Source references pin commit 5fb327fd05973018c5dc3debb5c5dc826ccddd82. Existing uncommitted changes: STATUS.md, TASKS.md, SESSION_PROGRESS.md, backend/.env.example, frontend/src/App.tsx and WorkspacePolish.css.",
+        "data/demo supplies explicitly synthetic baseline/follow-up CSVs and teaching notes through ordinary parser/model paths; mockData.ts supplies UI scenario/navigation metadata.",
+        "scripts/demo.sh manages local Vite/Uvicorn processes, configuration and health. backend/tests covers validation, AI failures, grounding, persistence and results; PostgreSQL integration is opt-in.",
+        "Current documentation reports Vercel frontend and Render backend; hosted browser golden-path verification remains pending. Hosting is reported context, not a source-configured deployment boundary."
+      ]
+    }
+  ]
+}

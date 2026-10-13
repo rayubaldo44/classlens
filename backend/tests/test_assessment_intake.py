@@ -1,7 +1,7 @@
-import asyncio
 from pathlib import Path
 
 import httpx
+from conftest import run_test_async
 
 from app.main import app
 
@@ -18,11 +18,23 @@ def request(method: str, path: str, **kwargs: object) -> httpx.Response:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             return await client.request(method, path, **kwargs)
 
-    return asyncio.run(send())
+    return run_test_async(send())
 
 
 def upload(content: bytes, filename: str = "responses.csv") -> httpx.Response:
     return request("POST", "/api/v1/assessments/preview", files={"file": (filename, content, "text/csv")})
+
+
+def make_incorrect_response_csv(response_count: int, *, question_count: int) -> bytes:
+    rows = []
+    for index in range(response_count):
+        question_number = index % question_count + 1
+        rows.append(
+            "Demo,Science,7,Photosynthesis,"
+            f"S{index + 1:04d},Q{question_number},Question {question_number},"
+            f"Incorrect answer {index + 1},Correct answer {question_number},false\n"
+        )
+    return (HEADER + "".join(rows)).encode()
 
 
 def test_demo_csv_returns_deterministic_normalized_preview() -> None:
@@ -131,3 +143,61 @@ def test_blank_answer_cannot_be_marked_correct() -> None:
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "csv_invalid_correctness"
+
+
+def test_exact_csv_and_question_limits_are_accepted() -> None:
+    response = upload(make_incorrect_response_csv(500, question_count=5))
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == {
+        "response_count": 500,
+        "answered_count": 500,
+        "blank_count": 0,
+        "correct_count": 0,
+        "incorrect_count": 500,
+        "student_count": 500,
+        "question_count": 5,
+    }
+
+
+def test_csv_above_row_limit_returns_actionable_error() -> None:
+    response = upload(make_incorrect_response_csv(501, question_count=6))
+
+    assert response.status_code == 413
+    error = response.json()["error"]
+    assert error["code"] == "csv_row_limit_exceeded"
+    assert error["details"] == {"actual_rows": 501, "max_rows": 500}
+    assert error["retryable"] is False
+
+
+def test_question_above_eligible_response_limit_returns_actionable_error() -> None:
+    response = upload(make_incorrect_response_csv(101, question_count=1))
+
+    assert response.status_code == 413
+    error = response.json()["error"]
+    assert error["code"] == "csv_question_eligible_limit_exceeded"
+    assert error["details"] == {
+        "question_id": "Q1",
+        "actual_eligible_responses": 101,
+        "max_eligible_responses": 100,
+    }
+    assert error["retryable"] is False
+
+
+def test_correct_and_blank_answers_do_not_count_toward_question_eligible_limit() -> None:
+    content = make_incorrect_response_csv(100, question_count=1).decode()
+    content += "Demo,Science,7,Photosynthesis,S0101,Q1,Question 1,Correct answer 1,Correct answer 1,true\n"
+    content += "Demo,Science,7,Photosynthesis,S0102,Q1,Question 1,   ,Correct answer 1,false\n"
+
+    response = upload(content.encode())
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == {
+        "response_count": 102,
+        "answered_count": 101,
+        "blank_count": 1,
+        "correct_count": 1,
+        "incorrect_count": 100,
+        "student_count": 102,
+        "question_count": 1,
+    }

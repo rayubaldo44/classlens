@@ -943,3 +943,163 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: continue with the next independent P1 reliability task while leaving Render cache/warm-up deferred until the capacity constraint changes.
 
 ---
+
+## Session / Milestone: P1 operational timing and sanitized error logs
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Instrumentation implemented; local startup verified; representative stage log capture remains pending
+
+- Attempted and completed: added standard-library structured timing/error logs for API requests, CSV parsing, response and material embeddings, grouping, retrieval, persistence, and Gemini calls. Gemini usage token counts are recorded when returned by the SDK.
+- Files significantly modified: `backend/app/telemetry.py`, API routes, AI services/providers, `docs/AI_PIPELINE.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified: Python compilation and `git diff --check` passed. The local runner started and warmed the model before reporting startup complete.
+- Problem: the runner-owned process exited before a representative analysis request could be made, so actual analysis-stage log lines were not captured. No student answer, prompt, provider response, credential, or raw record URL is passed to the telemetry logger.
+- Important decision: use Python logging and `perf_counter` only; do not add a monitoring dependency or log content-bearing data.
+- Remaining work: capture stage timings on a representative local golden-path run before using them as a database or workload optimization baseline.
+- Recommended next step: continue with the next independent P1 reliability task; revisit timing-based optimization only after a successful measurement run.
+
+---
+
+## Session / Milestone: Bounded backend work implemented; route test adaptation pending
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** Partial implementation verified through local Uvicorn; automated route checks remain open
+
+- Attempted: offloaded synchronous parsing, inference/grouping, retrieval, and database operations; bounded the executor to five workers; serialized model load/encode and lazy database-pool creation.
+- Files significantly modified: `backend/app/concurrency.py`, API routes, `backend/app/services/remediation.py`, `backend/app/database.py`, `backend/app/providers/embeddings/sentence_transformer.py`, `backend/tests/test_concurrency.py`, `docs/API.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and the approved task plan/spec.
+- Completed: added process-local locks and the five-worker executor. The real local Uvicorn runner completed demo analysis with HTTP 200 in 19.3 seconds and four evidence groups; a health request during analysis returned HTTP 200 in 1.3 ms. The preview endpoint returned the expected 45-response summary.
+- Verified: Python compilation, `git diff --check`, three focused concurrency tests, five non-route misconception-analysis tests, and two health tests passed. A live route-level analysis plus concurrent health probe passed against the restarted runner.
+- Problem: existing in-process API tests built on `asyncio.run` and `httpx.ASGITransport` hang when the route awaits executor-backed work in this environment. A synchronous `TestClient` smoke stalled too. The API test itself did not complete, so route error-envelope behavior is not covered by the new tests yet.
+- Important decision: replaced the approved AnyIO-pool implementation detail with an explicit five-thread executor; this keeps the required cap app-owned and matched the real Uvicorn smoke. No Render plan changes were made.
+- Remaining work: adapt route-level tests to a compatible client/runtime, verify worker-raised error envelopes and responsive read requests, then run affected backend coverage and the local ordinary-upload golden path before checking off the task.
+- Recommended next step: diagnose why in-process ASGI clients stall while the same routes complete under the local Uvicorn server, then restore automated route and error-envelope coverage before marking the task complete.
+
+---
+
+## Session / Milestone: Bounded backend work verified
+
+**Date:** 2026-10-08 (Asia/Manila)
+
+**Status:** P1 bounded-work task complete and documented
+
+- Completed: added a test-only event-loop heartbeat so executor completion callbacks are serviced during in-process ASGI tests; restored route responsiveness and structured worker-error checks. The approved AnyIO implementation detail was replaced with an explicit five-thread executor, while the user-approved behavior and limits remain unchanged.
+- Verified: full backend suite passed (`65 passed, 1 skipped`); Python compilation and `git diff --check` passed. Cache/model serialization, one-time pool creation, five-worker cap, health/read responsiveness, and the existing API error envelope all have focused checks. The local Uvicorn demo analysis returned HTTP 200 in 19.3 seconds with four groups; a concurrent health request returned HTTP 200 in 1.3 ms. Preview returned the expected 45 responses, 43 answered, 2 blank, 14 correct, and 29 incorrect.
+- Problem resolved: test event loops in this environment needed periodic timer wakeups to process callbacks from executor worker threads. The heartbeat is confined to the test helper; production endpoints use the normal event loop and executor.
+- Important decision: keep the worker bound process-local at five and model access serialized per process. No hosted compute change was made.
+- Remaining work: none for this task. The database integration test was skipped in the full suite because it is opt-in and had passed separately against Supabase.
+- Recommended next step: continue with the next unchecked P1 task in `TASKS.md`.
+
+---
+
+## Session / Milestone: PostgreSQL analysis inserts batched
+
+**Date:** 2026-10-09 (Asia/Manila)
+
+**Status:** Database save optimization verified; no benchmark data committed
+
+- Attempted and completed: measured a rollback-only analysis save, then batched student-response and misconception-member inserts with Psycopg `executemany()` while retaining the original transaction and conflict behavior.
+- Files significantly modified: `backend/app/providers/postgres.py`, `backend/tests/test_persistence.py`, `backend/tests/test_postgres_integration.py`, `docs/DATABASE.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, this log, and the task plan.
+- Verified: for 45 responses, 4 groups, and 18 members, the pre-change trial took 22.38 seconds. Three post-change rollback-only trials took 4.02, 3.77, and 3.70 seconds (3.77-second median, approximately 83% faster). Duplicate saves in one transaction yielded exactly one persisted set of each analysis record; rollback left zero benchmark assessments. The full backend suite passed (`66 passed, 1 skipped`), Python compilation passed, and `git diff --check` passed.
+- Problem encountered: the first live benchmark exposed that Psycopg implements `executemany()` on cursors, not connections. The call site was corrected before the successful measurement; the failed run's transaction was rolled back.
+- Important decisions: batch only the high-volume response and member inserts. Keep group inserts, required reads, conflict semantics, schema, and transaction boundaries unchanged. No Render plan change was made.
+- Remaining work: none for this database-batching item. The opt-in isolated-database integration test was skipped because `CLASSLENS_TEST_DATABASE_URL` is not configured; rollback and retry behavior were separately verified in a non-committing Supabase transaction using synthetic records.
+- Recommended next step: continue to the next unchecked P1 item, explicit CSV and per-question response limits.
+
+---
+
+## Session / Milestone: CSV and per-question grouping limits implemented
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** P1 intake workload-limit task complete and verified
+
+- Attempted and completed: bounded every assessment CSV at 500 response rows and each question at 100 eligible answered-incorrect responses before embedding or persistence. Added structured HTTP 413 errors with actual/configured counts and the affected question ID.
+- Files significantly modified: `backend/app/services/assessment_intake.py`, `backend/app/main.py`, `backend/tests/test_assessment_intake.py`, `docs/API.md`, `docs/AI_PIPELINE.md`, `docs/DECISIONS.md`, `STATUS.md`, and `TASKS.md`.
+- Verified: exact 500-row and 100-eligible-response boundaries pass; 501 rows and 101 eligible responses fail with the documented errors; correct and blank rows do not consume the grouping limit. The focused intake suite passed with 15 tests, and the full backend suite passed with 70 tests and one opt-in database integration test skipped.
+- Problems encountered: the checkout directory was renamed externally from `Hackthon project` to `Hackthon-project` during verification. The repository and edits remained intact; pytest cache writes at the renamed path were blocked by the active sandbox, so the full suite ran with its cache provider disabled.
+- Important decision: keep the limits fixed for the MVP. The 100-response per-question ceiling bounds complete-link work to 4,950 pairs while leaving both demo fixtures unchanged.
+- Remaining work: none for this task. Hosted model execution remains deferred until adequate Render memory is affordable.
+- Recommended next step: define a total generation/request time budget and add frontend timeout/retry behavior that preserves valid workflow state and avoids duplicate drafts.
+
+---
+
+## Session / Milestone: Remediation timeout and idempotent retry implemented
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** P1 generation/request-budget task complete and verified
+
+- Attempted and completed: added a 60-second Gemini budget covering the initial call, retry delay, and one retry; added a 70-second browser timeout with session-scoped request identity and manual retry; derived deterministic remediation IDs from the request identity and validated request; and serialized identical in-process generation requests.
+- Files significantly modified: `backend/app/config.py`, `backend/app/providers/llm/gemini.py`, `backend/app/schemas/remediations.py`, `backend/app/services/remediation.py`, `backend/tests/test_remediation.py`, `frontend/src/api/client.ts`, `frontend/src/api/requestReliability.ts`, `frontend/src/App.tsx`, `frontend/tests/requestReliability.test.ts`, `frontend/package.json`, `backend/.env.example`, `backend/README.md`, `docs/API.md`, `docs/AI_PIPELINE.md`, `docs/DECISIONS.md`, `STATUS.md`, and `TASKS.md`.
+- Verified: a forced budget expiry stops during the retry delay with `llm_timeout`; two concurrent identical generation requests call the fake provider once and receive the same persisted remediation ID; omitting `generation_request_id` returns HTTP 422. Frontend reliability tests verify that timeout aborts the request and that the pending identifier is reused until a valid response clears it. The full backend suite passed with 73 tests and one opt-in database integration test skipped. Frontend tests, lint, and production build passed.
+- Problems encountered: none. No live Gemini call was needed because deterministic fake-provider tests exercise the timeout and duplicate-request paths without quota use.
+- Important decision: use manual browser retry with the same pending identifier instead of automatic retry. This keeps the wait bounded and prevents hidden extra provider work. A successful response clears the pending identifier so a later intentional generation can start a new draft.
+- Remaining work: none for this task. Process-local locking prevents duplicate provider work in the current single-process deployment; deterministic IDs prevent duplicate database rows if multiple processes receive the same retry.
+- Recommended next step: harden the remediation trust boundary by loading canonical analysis/group/material/chunk evidence server-side before Gemini generation and rejecting altered browser snapshots.
+
+---
+
+## Session / Milestone: Canonical remediation evidence enforced
+
+**Date:** 2026-10-13 11:43 PST
+
+**Status:** P1 remediation evidence-integrity task complete and verified
+
+- Attempted and completed: changed remediation generation to reload the selected analysis/group and learning material/chunks from server-side repositories, compare every canonical-backed browser field, and rebuild the prompt and persisted source snapshots from the stored records. Missing context now returns `404 remediation_context_not_found`; altered or cross-linked context returns `409 remediation_context_mismatch`; both stop before Gemini and save nothing. Retrieval similarity remains provenance metadata and was removed from the prompt because retrieval-result scores are not persisted canonically.
+- Files significantly modified: `backend/app/services/remediation.py`, `backend/app/api/routes/remediations.py`, `backend/app/prompts/remediation.py`, `backend/app/main.py`, `backend/tests/test_remediation.py`, `docs/API.md`, `docs/AI_PIPELINE.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/DECISIONS.md`, `STATUS.md`, and `TASKS.md`.
+- Verified/tested: focused remediation coverage passed with 24 tests. The full backend suite passed with 82 tests and one opt-in PostgreSQL integration test skipped. Python compilation and `git diff --check` passed. Tests prove that altered class context, question text, representative answers, material metadata, chunk IDs, chunk text, and offsets never reach the fake Gemini adapter; the API returns the documented 409 envelope.
+- Problem encountered: a direct post-change PostgreSQL `select 1` could not run because `SUPABASE_DB_URL` is not configured in this shell. No schema or SQL statement changed; the existing PostgreSQL integration test remains opt-in and had passed in an earlier configured run.
+- Important decisions: retain the current frontend request shape for reload compatibility, treat browser snapshots as assertions, reuse the existing analysis and material repositories, and avoid a new retrieval-events table or second embedding pass. Deterministic remediation IDs now use the request ID plus canonical analysis/group/material/chunk identifiers rather than browser-controlled score metadata.
+- Remaining work: frontend runtime validation still needs to reject malformed nested API responses and stale saved workflow pointers with actionable errors.
+- Recommended next step: implement the next unchecked evidence-integrity task in `TASKS.md`: strengthen frontend runtime validation and saved-pointer recovery.
+
+---
+
+## Session / Milestone: Frontend API and workflow-pointer validation enforced
+
+**Date:** 2026-10-13 11:59 PST
+
+**Status:** P1 frontend contract-integrity task complete and verified
+
+- Attempted and completed: replaced shallow successful-response checks and direct local-storage casting with recursive runtime validation. Added guards for assessment previews/analyses, learning materials/retrieval, remediation generation/review records, and follow-up comparisons. Saved workflow pointers now accept only nonempty string IDs in their required order, and reload recovery verifies that fetched analysis, group, material, remediation, and comparison records still belong to the saved chain.
+- Files created or significantly modified: `frontend/src/api/contracts.ts`, `frontend/src/workflowStorage.ts`, `frontend/src/api/client.ts`, `frontend/src/App.tsx`, `frontend/tests/contracts.test.ts`, `frontend/tests/workflowStorage.test.ts`, `docs/API.md`, `docs/DECISIONS.md`, `STATUS.md`, and `TASKS.md`.
+- Verified/tested: test-first runs failed against missing/stub validators, then passed after implementation. The final `npm test` run passed all three frontend test files; `npm run lint`, `npm run build`, and `git diff --check` passed. The focused cases cover malformed nested summaries, evidence, material/chunk fields, remediation content, comparison metrics, invalid JSON, wrong ID types, incomplete pointer chains, and cross-linked restored records.
+- Problems encountered: the first integration build found that the generic array helper required type-predicate callbacks even though nested validators return booleans, and ESLint rejected a synchronous state update directly inside the restoration effect. The array helper now accepts boolean validators while retaining its array guard, and all restoration state changes run inside the existing async restoration operation.
+- Important decisions: use small dependency-free guards because the current contract surface is bounded; preserve valid upstream state while trimming stale downstream IDs; surface endpoint-specific recovery messages instead of rendering malformed evidence or reducing every failure to a generic network hint.
+- Remaining work: none for this evidence-integrity task. Hosted workflow verification remains constrained by the deferred Render memory upgrade.
+- Recommended next step: proceed to the first unchecked testing task in `TASKS.md`, adding CI for frontend checks and backend tests with a separately configured PostgreSQL integration job.
+
+---
+
+## Session / Milestone: Continuous integration configured and locally verified
+
+**Date:** 2026-10-13 12:19 PST
+
+**Status:** P1 CI task complete; first hosted GitHub Actions run awaits the next push
+
+- Attempted and completed: added one GitHub Actions workflow with independent frontend, backend, and PostgreSQL integration jobs. Frontend runs tests, lint, and build with the pinned Node version. Backend runs the unit suite with the pinned Python version and dependency lock. The database job starts PostgreSQL 17, applies the real migration, and runs only the opt-in persistence integration test with disposable local credentials.
+- Files created or significantly modified: `.github/workflows/ci.yml`, `README.md`, `docs/TECH_STACK.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified/tested: the workflow parsed with the expected three-job structure. Locally mirrored checks passed: 82 backend tests; three frontend test files; frontend lint and production build; migration against an ephemeral `postgres:17-alpine` container; and the isolated PostgreSQL integration test (`1 passed`). `git diff --check` passed before documentation updates.
+- Problems encountered: sandboxed access to the Docker daemon and its mapped port required approved local execution. The image was not initially cached, so it was downloaded before verification. The temporary container was stopped and removed after the test.
+- Important decisions: keep database integration separate from ordinary backend tests and use an ephemeral PostgreSQL service rather than Supabase credentials. Run all three jobs for pushes, pull requests, and manual dispatches.
+- Remaining work: the workflow itself has not run on GitHub because this task did not push the repository. Its first hosted result will appear after the next push or manual dispatch.
+- Recommended next step: add the automated browser golden-path smoke described in the next unchecked testing task, using controlled provider/database fixtures so CI does not spend Gemini quota or depend on hosted services.
+
+---
+
+## Session / Milestone: Deterministic browser golden-path smoke implemented
+
+**Date:** 2026-10-13 13:39 PST
+
+**Status:** P1 browser-smoke task complete and locally verified
+
+- Attempted and completed: added Playwright Chromium coverage for the ordinary-upload frontend flow from baseline CSV validation through evidence selection, teacher-material retrieval, remediation review/approval, follow-up results, and reload recovery. The first remediation request intentionally returns a controlled 503; the visible retry succeeds, and the test verifies the teacher-edited explanation after restoration.
+- Files created or significantly modified: `frontend/playwright.config.ts`, `frontend/tests/e2e/golden-path.spec.ts`, `frontend/package.json`, `frontend/package-lock.json`, `.github/workflows/ci.yml`, `.gitignore`, `README.md`, `docs/TECH_STACK.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified/tested: `npm run test:e2e` passed in Chromium (`1 passed`, 4.7 seconds). All three frontend unit-test files, ESLint, and the production build passed. The CI workflow parsed with the expected four jobs, including the independent browser smoke, and `git diff --check` passed before documentation updates.
+- Problems encountered: the sandbox blocked Vite from binding its local test port, so browser runs required approved local execution. The first assertions assumed wording or heading semantics that differed from the rendered accessible tree; Playwright artifacts confirmed the correct UI state, and the locators were aligned with the real alert and evidence text. The reload check was corrected to verify approval on the Intervention screen and results on the Results screen.
+- Important decisions: use intercepted contract-valid API responses and real versioned upload files. Keep backend unit and PostgreSQL persistence coverage separate; the browser smoke must not spend Gemini quota, download the embedding model, or depend on hosted services.
+- Remaining work: the new CI job has not run on GitHub until the repository is pushed. Live provider/database behavior remains covered by the previously verified local golden path and still requires human rehearsal.
+- Recommended next step: add real-embedding regression evaluation across multiple teacher-reviewed examples, measuring group quality, outliers, retrieval relevance, and stability beyond the photosynthesis fixture.
+
+---

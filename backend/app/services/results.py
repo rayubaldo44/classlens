@@ -1,6 +1,7 @@
+from datetime import UTC, datetime
+from time import perf_counter
 import hashlib
 import json
-from datetime import UTC, datetime
 from typing import Any
 
 from app.config import AnalysisSettings
@@ -20,6 +21,7 @@ from app.schemas.results import (
 )
 from app.services.assessment_intake import ParsedAssessment
 from app.services.misconception_analysis import analyze_assessment
+from app.telemetry import log_stage
 
 
 class ResultsError(Exception):
@@ -80,12 +82,14 @@ def create_follow_up_comparison(
 
     _validate_follow_up_context(baseline.parsed, follow_up, baseline_group)
     follow_up_analysis = analyze_assessment(follow_up, embedding_service, settings)
+    started = perf_counter()
     analysis_store.save(
         follow_up,
         follow_up_analysis,
         assessment_kind="follow_up",
         baseline_assessment_id=baseline.result.assessment_id,
     )
+    log_stage("database_persistence", (perf_counter() - started) * 1000, operation="follow_up_analysis_save")
 
     follow_up_group = _match_follow_up_group(baseline_group, follow_up_analysis.groups)
     comparison_id = _comparison_id(link, follow_up_analysis.analysis_id)
@@ -119,7 +123,9 @@ def create_follow_up_comparison(
             ),
             created_at=datetime.now(UTC),
         )
+        started = perf_counter()
         results_store.save(record)
+        log_stage("database_persistence", (perf_counter() - started) * 1000, operation="comparison_save")
         return record
 
     metrics = _calculate_metrics(
@@ -149,7 +155,9 @@ def create_follow_up_comparison(
         message="Observed before/after change only; this comparison does not establish that the intervention caused the change.",
         created_at=datetime.now(UTC),
     )
+    started = perf_counter()
     results_store.save(record)
+    log_stage("database_persistence", (perf_counter() - started) * 1000, operation="comparison_save")
     return record
 
 

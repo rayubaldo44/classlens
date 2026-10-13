@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import Sequence
 
 import httpx
+from conftest import run_test_async
 import pytest
 
 from app.api.routes.analysis import get_embedding_service
@@ -161,7 +162,7 @@ def test_analysis_api_returns_typed_result_with_dependency_override() -> None:
             return created, fetched
 
     try:
-        response, fetched = asyncio.run(send())
+        response, fetched = run_test_async(send())
     finally:
         app.dependency_overrides.clear()
 
@@ -191,7 +192,7 @@ def test_analysis_api_rejects_malformed_assessment_before_embedding() -> None:
             )
 
     try:
-        response = asyncio.run(send())
+        response = run_test_async(send())
     finally:
         app.dependency_overrides.clear()
 

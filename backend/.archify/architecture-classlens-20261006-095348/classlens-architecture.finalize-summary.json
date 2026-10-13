@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/architecture-classlens-20261006-095348/candidate.json",
+    "sha256": "6d3f8ebe6ee21008e3176b9ea4234b50f81b9969c3c1a6e1d308193d84f16e81",
+    "bytes": 11278
+  },
+  "artifact": {
+    "path": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/architecture-classlens-20261006-095348/classlens-architecture.html",
+    "sha256": "b6699d58226340b55153d591794c39e4c62cbd57426269b9dc97618d84531825",
+    "bytes": 772602
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/architecture-classlens-20261006-095348/classlens-architecture.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/architecture-classlens-20261006-095348/classlens-architecture.finalize.json",
+    "summaryReceipt": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/architecture-classlens-20261006-095348/classlens-architecture.finalize-summary.json",
+    "browserCheckReceipt": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/architecture-classlens-20261006-095348/classlens-architecture.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-06T01:55:47.284Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1051
+}

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/candidate.json",
+    "sha256": "3d94906c6eac2ae9ce1a492691ccdc47d923b7b8556c9638e72ad3aa3b75cb44",
+    "bytes": 15220
+  },
+  "artifact": {
+    "path": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/classlens-dataflow.html",
+    "sha256": "8b2dd89470303488dcfd0319e326118d527c01315854ddd02a161e76e4096cc5",
+    "bytes": 780778
+  },
+  "gates": {
+    "validate": "fail",
+    "deliver": "not-run",
+    "check": "not-run",
+    "browser-check": "not-run"
+  },
+  "failedStage": "validate",
+  "diagnostics": [
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Node \"followup\" exceeds the readable diagram area — keep y between 104 and 616 (adjust row/yOffset or increase meta.viewBox[1]).",
+      "subject": {
+        "diagramType": "dataflow"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Node \"link\" exceeds the readable diagram area — keep y between 104 and 616 (adjust row/yOffset or increase meta.viewBox[1]).",
+      "subject": {
+        "diagramType": "dataflow"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Node \"repeat\" exceeds the readable diagram area — keep y between 104 and 616 (adjust row/yOffset or increase meta.viewBox[1]).",
+      "subject": {
+        "diagramType": "dataflow"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Node \"compare\" exceeds the readable diagram area — keep y between 104 and 616 (adjust row/yOffset or increase meta.viewBox[1]).",
+      "subject": {
+        "diagramType": "dataflow"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Node \"results\" exceeds the readable diagram area — keep y between 104 and 616 (adjust row/yOffset or increase meta.viewBox[1]).",
+      "subject": {
+        "diagramType": "dataflow"
+      }
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 5,
+    "shown": 5,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/review-2/classlens-dataflow.finalize.json",
+    "summaryReceipt": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/review-2/classlens-dataflow.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-06T01:55:47.284Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 490,
+  "nextAction": {
+    "action": "edit-in-place",
+    "candidate": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/candidate.json",
+    "constraint": "Preserve unaffected semantics and geometry; do not replace the whole candidate.",
+    "then": "finalize-once"
+  }
+}

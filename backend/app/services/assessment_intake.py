@@ -24,6 +24,8 @@ REQUIRED_COLUMNS = (
     "is_correct",
 )
 MAX_CSV_BYTES = 1_000_000
+MAX_CSV_ROWS = 500
+MAX_ELIGIBLE_RESPONSES_PER_QUESTION = 100
 SAMPLE_SIZE = 5
 
 
@@ -83,10 +85,20 @@ def parse_assessment_csv_full(
 
     if not rows:
         raise IntakeError("csv_empty", "The CSV must contain at least one response row.")
+    if len(rows) > MAX_CSV_ROWS:
+        raise IntakeError(
+            "csv_row_limit_exceeded",
+            (
+                f"The CSV contains {len(rows)} response rows; the limit is {MAX_CSV_ROWS}. "
+                "Reduce or split the upload."
+            ),
+            {"actual_rows": len(rows), "max_rows": MAX_CSV_ROWS},
+        )
 
     normalized: list[NormalizedResponse] = []
     assessment_values: tuple[str, str, str, str] | None = None
     question_values: dict[str, tuple[str, str]] = {}
+    eligible_counts: dict[str, int] = {}
     seen_response_keys: set[tuple[str, str]] = set()
 
     for row_index, row in enumerate(rows, start=2):
@@ -150,6 +162,9 @@ def parse_assessment_csv_full(
             )
         seen_response_keys.add(response_key)
 
+        if answer.strip() and not is_correct:
+            eligible_counts[question_id] = eligible_counts.get(question_id, 0) + 1
+
         normalized.append(
             NormalizedResponse(
                 row_number=row_index,
@@ -165,6 +180,22 @@ def parse_assessment_csv_full(
 
     if assessment_values is None:
         raise IntakeError("csv_empty", "The CSV must contain at least one response row.")
+
+    for question_id, eligible_count in eligible_counts.items():
+        if eligible_count > MAX_ELIGIBLE_RESPONSES_PER_QUESTION:
+            raise IntakeError(
+                "csv_question_eligible_limit_exceeded",
+                (
+                    f"Question '{question_id}' has {eligible_count} eligible incorrect responses; "
+                    f"the limit is {MAX_ELIGIBLE_RESPONSES_PER_QUESTION}. "
+                    "Reduce or split the responses for this question."
+                ),
+                {
+                    "question_id": question_id,
+                    "actual_eligible_responses": eligible_count,
+                    "max_eligible_responses": MAX_ELIGIBLE_RESPONSES_PER_QUESTION,
+                },
+            )
 
     title, subject, grade_level, topic = assessment_values
     blank_count = sum(response.answer_status == "blank" for response in normalized)

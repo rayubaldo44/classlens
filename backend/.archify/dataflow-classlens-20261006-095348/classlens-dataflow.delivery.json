@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "fad505cc-7593-4a4f-932a-545e3882e266",
+  "status": "current",
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/candidate.json",
+  "output": "/home/rayubaldo44/Projects/Hackthon project/ClassLensDev/classlens/backend/.archify/dataflow-classlens-20261006-095348/classlens-dataflow.html",
+  "specification": {
+    "sha256": "40061283881e26744ad5c25f6c0641fde2a74f1fbef4b15ac9c815418a225bb9",
+    "bytes": 15330
+  },
+  "artifact": {
+    "sha256": "c250f4a91b04c3c5d812fb9ae43386c677bbd111a5364997b4265da46080d949",
+    "bytes": 780778
+  }
+}

@@ -1,13 +1,15 @@
+from pathlib import Path
+from time import perf_counter
 import hashlib
 import math
 import re
-from pathlib import Path
 from typing import Literal
 
 from app.config import MaterialSettings
 from app.providers.embeddings import EmbeddingService
 from app.providers.material_index import MaterialIndex, MaterialRecord
 from app.schemas.materials import LearningMaterial, MaterialChunk, MaterialIngestionResponse
+from app.telemetry import log_error, log_stage
 
 MAX_MATERIAL_BYTES = 1_000_000
 
@@ -43,17 +45,20 @@ def ingest_learning_material(
     if not chunks:
         raise MaterialError("no_chunks_generated", "No usable text chunks could be generated from this material.")
 
+    started = perf_counter()
     try:
         embeddings = _normalize_embeddings(embedding_service.embed([chunk.text for chunk in chunks]), len(chunks))
     except MaterialError:
         raise
     except Exception as error:
+        log_error("material_embedding", "material_embedding_failed", provider_error=type(error).__name__, chunk_count=len(chunks))
         raise MaterialError(
             "material_embedding_failed",
             "The learning material could not be embedded.",
             retryable=True,
             details={"provider_error": type(error).__name__},
         ) from error
+    log_stage("material_embedding", (perf_counter() - started) * 1000, chunk_count=len(chunks), model=embedding_service.model_id)
 
     content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
     material_id = f"mat_{content_hash[:16]}"
@@ -70,15 +75,18 @@ def ingest_learning_material(
         embedding_model=embedding_service.model_id,
         embedding_dimension=len(embeddings[0]),
     )
+    started = perf_counter()
     try:
         material_index.upsert(MaterialRecord(material=material, chunks=tuple(chunks), embeddings=tuple(map(tuple, embeddings))))
     except Exception as error:
+        log_error("material_index", "material_index_failed", error_type=type(error).__name__)
         raise MaterialError(
             "material_index_failed",
             "The learning material could not be added to the retrieval index.",
             retryable=True,
             details={"index_error": type(error).__name__},
         ) from error
+    log_stage("material_index", (perf_counter() - started) * 1000, chunk_count=len(chunks))
 
     return MaterialIngestionResponse(
         status="ready",

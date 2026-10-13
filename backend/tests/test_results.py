@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+from conftest import run_test_async
 import pytest
 
 from app.config import AnalysisSettings
@@ -352,7 +353,7 @@ def test_results_api_is_typed_reuses_csv_validation_and_supports_get() -> None:
             return created, fetched, invalid
 
     try:
-        created, fetched, invalid = asyncio.run(send())
+        created, fetched, invalid = run_test_async(send())
     finally:
         app.dependency_overrides.clear()
 

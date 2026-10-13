@@ -17,6 +17,8 @@ Copy `.env.example` to `.env` and keep real secrets only in the ignored `.env`. 
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f ../database/migrations/001_golden_path_persistence.sql
 ```
 
+Gemini uses `CLASSLENS_LLM_TIMEOUT_MS=45000` as its per-attempt transport timeout and `CLASSLENS_LLM_TOTAL_BUDGET_MS=60000` as the total budget across the initial request, retry delay, and one retry.
+
 The embedding model uses a pinned Hugging Face revision and is cached locally. `./scripts/demo.sh reset` loads and warms it before `/health` responds, so a first download happens during startup rather than on a teacher request. `/ready` reports PostgreSQL and model readiness without calling Gemini. Material vectors are rebuilt from persistent chunks after a process restart.
 
 Run the API and tests from `backend/`:

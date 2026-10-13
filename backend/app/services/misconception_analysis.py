@@ -1,7 +1,8 @@
+from collections import defaultdict
+from time import perf_counter
 import hashlib
 import json
 import math
-from collections import defaultdict
 
 from app.config import AnalysisSettings
 from app.providers.embeddings import EmbeddingService
@@ -15,6 +16,7 @@ from app.schemas.analysis import (
 )
 from app.schemas.assessment import NormalizedResponse
 from app.services.assessment_intake import ParsedAssessment
+from app.telemetry import log_error, log_stage
 
 REPRESENTATIVE_LIMIT = 3
 
@@ -67,16 +69,20 @@ def analyze_assessment(
             message="Too few eligible incorrect responses to identify a recurring pattern.",
         )
 
+    started = perf_counter()
     try:
         vectors = embedding_service.embed([response.answer for response in eligible])
     except Exception as error:
+        log_error("embedding", "embedding_failed", provider_error=type(error).__name__, item_count=len(eligible))
         raise AnalysisError(
             "embedding_failed",
             "Response embeddings could not be generated.",
             retryable=True,
             details={"provider_error": type(error).__name__},
         ) from error
+    log_stage("embedding", (perf_counter() - started) * 1000, item_count=len(eligible), model=embedding_service.model_id)
 
+    started = perf_counter()
     normalized_vectors = _validate_and_normalize_vectors(vectors, len(eligible))
     dimension = len(normalized_vectors[0])
     by_question: dict[str, list[int]] = defaultdict(list)
@@ -100,6 +106,7 @@ def analyze_assessment(
         _build_group(position + 1, cluster, coherence, eligible, normalized_vectors)
         for position, (cluster, coherence) in enumerate(group_candidates)
     ]
+    log_stage("grouping", (perf_counter() - started) * 1000, eligible_count=len(eligible), group_count=len(groups))
     message = None if groups else "No recurring misconception pattern met the configured evidence threshold."
     return _response(
         parsed=parsed,

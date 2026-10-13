@@ -66,6 +66,7 @@ def test_postgres_workflow_survives_new_repository_instances() -> None:
     ], "persistence-baseline.csv")
     baseline_result = analyze_assessment(baseline, Embeddings(), settings)
     analysis_store.save(baseline, baseline_result)
+    analysis_store.save(baseline, baseline_result)  # A retry must not duplicate response or group evidence.
     group = baseline_result.groups[0]
 
     material_settings = MaterialSettings(

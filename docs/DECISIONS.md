@@ -4,6 +4,20 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-027 — Bound and idempotently retry remediation generation
+
+- **Status:** Accepted and implemented on 2026-10-13
+- **Decision:** Limit Gemini remediation generation to 60 seconds total across the initial provider call, retry delay, and one retry, while retaining the 45-second per-attempt transport timeout. Abort the browser request after 70 seconds and reuse a session-scoped `generation_request_id` on manual retry. Derive the remediation ID from that identifier plus canonical analysis/group/material/chunk identifiers, check persistence, and serialize identical requests within the API process.
+- **Reason:** Two independent 45-second attempts could exceed the teacher's expected wait, while aborting only in the browser can leave a successful server-side save whose blind retry creates another draft. A stable request identity gives both layers a clear time bound and makes retries safe.
+- **Consequence:** Timed-out requests keep the selected evidence visible and offer manual retry. An identical retry returns the existing persisted draft and does not call Gemini again in the current process. The deterministic database ID prevents duplicate rows across processes, although separate processes could still perform the same provider work concurrently before one upsert wins.
+
+### D-026 — Bound CSV intake before pairwise grouping
+
+- **Status:** Accepted and implemented on 2026-10-13
+- **Decision:** Accept at most 500 response rows per CSV and at most 100 eligible answered-incorrect responses per question. Reject either overage atomically before embedding or persistence with a structured HTTP 413 error containing actual and configured counts; the per-question error also identifies the question.
+- **Reason:** Complete-link grouping compares response pairs within each question. A 100-response question has at most 4,950 pairs, giving the synchronous MVP an explicit workload ceiling while preserving the 45-row demo fixture unchanged.
+- **Consequence:** Correct and blank responses still contribute to assessment summaries but do not consume the grouping limit. Teachers must reduce or split larger uploads before analysis.
+
 ### D-023 — Pin and warm the existing embedding model
 
 - **Status:** Accepted and implemented locally on 2026-10-08; hosted warm-up deferred
@@ -150,6 +164,48 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 - **Decision:** Make at most one delayed retry for Gemini timeouts and HTTP 429/500/502/503/504 responses; fail immediately for permanent errors and never synthesize fallback output.
 - **Reason:** Live verification observed intermittent Gemini 503 responses while the same grounded request later succeeded. One bounded retry improves demo reliability without hiding prolonged provider failure or multiplying latency unpredictably.
 - **Consequence:** A continued failure remains a retryable structured API/UI error and stores no remediation. A regression test verifies that one transient failure is retried exactly once.
+
+### D-028 — Canonical server-side generation context
+
+- **Status:** Accepted and implemented on 2026-10-13
+- **Decision:** Keep the current typed browser generation request, but treat its class, group, material, and passage snapshots as assertions. Before calling Gemini, load the analysis/group and material/chunks from PostgreSQL, require all canonical-backed fields to match, and rebuild the prompt and saved source snapshots from those server records. Exclude the browser-provided retrieval similarity score from the prompt because retrieval-result scores are not persisted as canonical records.
+- **Reason:** Browser state is useful for workflow continuity but cannot be the authority for student evidence or teacher-provided source text. Reusing the existing analysis and material stores closes that trust boundary without adding a retrieval-results table, another embedding pass, or a schema migration.
+- **Consequence:** Missing canonical records return `404 remediation_context_not_found`; altered identifiers, evidence, metadata, chunk text, or offsets return `409 remediation_context_mismatch`. Both stop before Gemini and save nothing. Valid reload/retry requests keep the existing API shape and deterministic draft behavior.
+
+### D-029 — Dependency-free frontend contract guards
+
+- **Status:** Accepted and implemented on 2026-10-13
+- **Decision:** Validate every nested workflow API response with small TypeScript type guards before rendering or storing it. Parse the local workflow pointer without casts, require its ordered identifier dependencies, and verify fetched restoration records still match the saved analysis/group/material/remediation chain.
+- **Reason:** Static TypeScript types do not validate network JSON or local storage. The existing shallow checks could admit malformed nested evidence and stale cross-linked recovery state. The MVP contracts are small enough to validate without adding a schema library and its browser bundle/runtime surface.
+- **Consequence:** Malformed success payloads become actionable `invalid_response` errors. Invalid saved pointers show a recovery panel, and stale downstream identifiers are trimmed to the last verified stage. Contract tests must change when an intentional API shape changes.
+
+### D-030 — Secret-free PostgreSQL integration CI
+
+- **Status:** Accepted and implemented on 2026-10-13
+- **Decision:** Run frontend checks, backend unit tests, and PostgreSQL persistence integration as separate GitHub Actions jobs. The integration job starts an ephemeral PostgreSQL 17 service, applies the production migration, and uses disposable job-local credentials instead of Supabase secrets.
+- **Reason:** Pull requests need database coverage without access to hosted credentials or data. Separating the job keeps ordinary backend failures distinct from migration and persistence failures.
+- **Consequence:** Every push and pull request can verify the schema and persistence path without network access to production data. Failures appear under separate job names, and the ordinary backend job excludes the opt-in integration file to avoid duplicate coverage.
+
+### D-031 — Contract-fixture browser smoke
+
+- **Status:** Accepted and implemented on 2026-10-13
+- **Decision:** Run the complete React golden path in Playwright Chromium against intercepted, recursively valid API responses. Use the real versioned upload files and UI controls, return one controlled generation failure before retry success, and restore the completed workflow through the normal persisted browser pointer and API reads.
+- **Reason:** CI needs stable browser coverage of navigation and state transitions without consuming Gemini quota, loading the embedding model, or depending on Supabase and Render availability. Backend contracts and persistence retain their separate focused and PostgreSQL integration coverage.
+- **Consequence:** The smoke proves frontend orchestration, review authority, error recovery, result rendering, and reload restoration. It does not replace a live provider/database end-to-end run or the human demo rehearsal.
+
+### D-024 — Bounded process-local synchronous work
+
+- **Status:** Accepted, implemented, and locally verified (2026-10-08)
+- **Decision:** Run synchronous request work in a dedicated `ThreadPoolExecutor(max_workers=5)`, matching the configured PostgreSQL pool maximum. Serialize Sentence Transformer loading/encoding and lazy psycopg pool construction with process-local locks. Keep Gemini calls asynchronous.
+- **Reason:** Analysis and other synchronous work must not block the ASGI event loop. The existing five-connection bound gives a conservative worker cap without adding a queue or dependency.
+- **Consequence:** Each Uvicorn process owns its own executor, model lock, and pool lock. A local Uvicorn analysis completed in 19.3 seconds while `/health` responded in 1.3 ms. Backend verification passed with 65 tests and one opt-in database test skipped; the database integration had passed separately against Supabase. In-process ASGI tests keep a short event-loop heartbeat so executor completion callbacks are serviced in this environment.
+
+### D-025 — Batch analysis response and group-member inserts
+
+- **Status:** Accepted and implemented; measured against Supabase on 2026-10-09
+- **Decision:** Use Psycopg `executemany()` for student-response and misconception-member rows within the existing analysis transaction. Keep statement order, response conflict handling, and the analysis-run retry guard unchanged.
+- **Reason:** A 45-response, 4-group, 18-member analysis save took 22.4 seconds with per-row calls. Three rollback-only batched trials had a 3.77-second median.
+- **Consequence:** The measured workload improved by about 83% versus the single pre-change trial. Three identical saves in one transaction yielded exactly one assessment, question set, response set, analysis, group set, and member set; rollback left zero assessment rows. This does not change the five-worker cap or database schema. The opt-in isolated-database integration remains skipped unless configured.
 
 ### D-007 — Focused MVP, not a full LMS
 

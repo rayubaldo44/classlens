@@ -1,4 +1,5 @@
 import asyncio
+from time import perf_counter
 
 from pydantic import ValidationError
 
@@ -6,6 +7,7 @@ from app.config import get_llm_settings
 from app.schemas.remediations import GeneratedRemediationDraft
 
 from .base import LLMProviderError
+from app.telemetry import log_error, log_stage
 
 
 MAX_PROVIDER_ATTEMPTS = 2
@@ -16,10 +18,18 @@ TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 class GeminiLLMService:
     provider_name = "google-gemini"
 
-    def __init__(self, *, api_key: str, model_id: str, timeout_ms: int) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model_id: str,
+        timeout_ms: int,
+        total_budget_ms: int = 60_000,
+    ) -> None:
         self._api_key = api_key
         self._model_id = model_id
         self._timeout_ms = timeout_ms
+        self._total_budget_ms = total_budget_ms
         self._types = None
         self._client = None
 
@@ -43,8 +53,21 @@ class GeminiLLMService:
                 api_key=self._api_key,
                 http_options=types.HttpOptions(timeout=self._timeout_ms),
             )
+
+        try:
+            async with asyncio.timeout(self._total_budget_ms / 1000):
+                return await self._generate_with_retries(prompt)
+        except TimeoutError as error:
+            raise LLMProviderError(
+                "llm_timeout",
+                "Gemini did not respond within the total generation time budget. Try again.",
+                retryable=True,
+            ) from error
+
+    async def _generate_with_retries(self, prompt: str) -> GeneratedRemediationDraft:
         response = None
         for attempt in range(MAX_PROVIDER_ATTEMPTS):
+            started = perf_counter()
             try:
                 response = await self._client.aio.models.generate_content(
                     model=self._model_id,
@@ -56,8 +79,20 @@ class GeminiLLMService:
                         max_output_tokens=2200,
                     ),
                 )
+                usage = getattr(response, "usage_metadata", None)
+                log_stage(
+                    "gemini_call",
+                    (perf_counter() - started) * 1000,
+                    model=self._model_id,
+                    attempt=attempt + 1,
+                    prompt_tokens=getattr(usage, "prompt_token_count", None),
+                    output_tokens=getattr(usage, "candidates_token_count", None),
+                    total_tokens=getattr(usage, "total_token_count", None),
+                )
                 break
             except Exception as error:
+                log_error("gemini_call", "llm_provider_error", model=self._model_id, attempt=attempt + 1, error_type=type(error).__name__)
+                log_stage("gemini_call", (perf_counter() - started) * 1000, model=self._model_id, attempt=attempt + 1, status="error")
                 retryable = _is_retryable_provider_error(error)
                 if retryable and attempt + 1 < MAX_PROVIDER_ATTEMPTS:
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
@@ -101,6 +136,7 @@ async def get_llm_service() -> GeminiLLMService:
         api_key=settings.api_key,
         model_id=settings.model,
         timeout_ms=settings.timeout_ms,
+        total_budget_ms=settings.total_budget_ms,
     )
 
 

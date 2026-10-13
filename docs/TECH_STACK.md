@@ -23,6 +23,8 @@ This document is the authority for selected technologies, proposed dependencies,
 | Retrieval corpus | Teacher-provided materials | Confirmed requirement | Keeps intervention grounding within teacher-selected sources. |
 | Frontend deployment | Vercel | Confirmed; service provisioned, API wiring pending verification | Direct fit for the Vite frontend. |
 | Backend deployment | Render Web Service | Confirmed; `/health` live, full workflow pending verification | Supports the verified Python 3.11 runtime and a persistent FastAPI process for the local embedding model. |
+| Continuous integration | GitHub Actions | Confirmed; workflow implemented and locally mirrored | Runs frontend and backend checks with a separate ephemeral PostgreSQL integration job. |
+| Browser testing | Playwright + Chromium | Confirmed; deterministic golden-path smoke implemented | Exercises the connected React workflow in CI with contract-valid local API fixtures and no hosted-service or provider dependency. |
 
 ## Dependencies verified in the repository
 
@@ -33,6 +35,7 @@ This document is the authority for selected technologies, proposed dependencies,
 - Vite `^8.3.0` with `@vitejs/plugin-react`
 - TypeScript `~6.0.2`
 - ESLint 10 with TypeScript and React Hooks/Refresh plugins
+- Playwright for the deterministic Chromium golden-path smoke
 
 `backend/requirements.txt` and `backend/requirements-dev.txt` declare the maintained dependency ranges; `backend/requirements.lock` records the exact verified Python 3.11 development/test resolution:
 

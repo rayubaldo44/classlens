@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import Sequence
 
 import httpx
+from conftest import run_test_async
 import pytest
 
 from app.api.routes.analysis import get_embedding_service
@@ -262,7 +263,7 @@ def test_demo_material_api_returns_typed_ingestion_response() -> None:
             return ingestion_response, retrieval_response
 
     try:
-        response, retrieval_response = asyncio.run(send())
+        response, retrieval_response = run_test_async(send())
     finally:
         app.dependency_overrides.clear()
 
@@ -291,7 +292,7 @@ def test_material_api_rejects_pdf_and_returns_structured_empty_file_error() -> N
             )
             return unsupported, empty
 
-    unsupported, empty = asyncio.run(send())
+    unsupported, empty = run_test_async(send())
     assert unsupported.status_code == 415
     assert unsupported.json()["error"]["code"] == "unsupported_material_type"
     assert empty.status_code == 400
@@ -320,7 +321,7 @@ def test_teacher_material_upload_api_ingests_text_file() -> None:
             )
 
     try:
-        response = asyncio.run(send())
+        response = run_test_async(send())
     finally:
         app.dependency_overrides.clear()
 

@@ -1,0 +1,619 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "ClassLens \u2014 Assessment-to-Results Data Flow",
+    "output": ".archify/dataflow-classlens-20261006-095348/classlens-dataflow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/rayubaldo44/classlens.git",
+      "revision": "5fb327fd05973018c5dc3debb5c5dc826ccddd82",
+      "provider": "github",
+      "link_mode": "web"
+    },
+    "viewBox": [
+      1080,
+      690
+    ]
+  },
+  "stages": [
+    {
+      "label": "Teacher inputs"
+    },
+    {
+      "label": "Validation / intake"
+    },
+    {
+      "label": "Evidence / retrieval"
+    },
+    {
+      "label": "Persisted outputs"
+    },
+    {
+      "label": "Teacher decisions"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "baseline",
+      "type": "frontend",
+      "label": "Baseline CSV",
+      "sublabel": "Answers + is_correct",
+      "stage": 0,
+      "row": 0,
+      "width": 152,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/api/routes/analysis.py",
+          "line": 20,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "parse",
+      "type": "backend",
+      "label": "Parse + preview",
+      "sublabel": "UTF-8 \u2022 schema \u2022 counts",
+      "stage": 1,
+      "row": 0,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/assessment_intake.py",
+          "line": 44,
+          "end_line": 188
+        },
+        {
+          "path": "backend/app/api/routes/assessments.py",
+          "line": 13,
+          "end_line": 36
+        }
+      ]
+    },
+    {
+      "id": "groups",
+      "type": "backend",
+      "label": "Embed + group",
+      "sublabel": "Incorrect, answered only",
+      "stage": 2,
+      "row": 0,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/misconception_analysis.py",
+          "line": 38,
+          "end_line": 153
+        },
+        {
+          "path": "backend/app/services/misconception_analysis.py",
+          "line": 240,
+          "end_line": 291
+        }
+      ],
+      "tag": "Question-specific"
+    },
+    {
+      "id": "assessment",
+      "type": "database",
+      "label": "Analysis records",
+      "sublabel": "Responses + groups",
+      "stage": 3,
+      "row": 0,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/api/routes/analysis.py",
+          "line": 36,
+          "end_line": 40
+        },
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 24,
+          "end_line": 175
+        }
+      ],
+      "tag": "PostgreSQL"
+    },
+    {
+      "id": "inspect",
+      "type": "frontend",
+      "label": "Inspect evidence",
+      "sublabel": "Select provisional group",
+      "stage": 4,
+      "row": 0,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "frontend/src/App.tsx",
+          "line": 180,
+          "end_line": 265
+        }
+      ]
+    },
+    {
+      "id": "text",
+      "type": "frontend",
+      "label": "Teacher material",
+      "sublabel": "UTF-8 .txt notes",
+      "stage": 0,
+      "row": 2,
+      "width": 152,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/api/routes/materials.py",
+          "line": 29,
+          "end_line": 58
+        }
+      ]
+    },
+    {
+      "id": "chunks",
+      "type": "backend",
+      "label": "Chunk + index",
+      "sublabel": "Text durable; vectors cached",
+      "stage": 1,
+      "row": 2,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/material_ingestion.py",
+          "line": 31,
+          "end_line": 87
+        },
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 178,
+          "end_line": 246
+        }
+      ],
+      "tag": "900 / 120 defaults"
+    },
+    {
+      "id": "retrieve",
+      "type": "backend",
+      "label": "Cosine retrieval",
+      "sublabel": "Group evidence + answer key",
+      "stage": 2,
+      "row": 2,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/material_retrieval.py",
+          "line": 16,
+          "end_line": 114
+        }
+      ],
+      "tag": "Top 3 \u2022 score \u2265 0.42"
+    },
+    {
+      "id": "draft",
+      "type": "database",
+      "label": "Grounded draft",
+      "sublabel": "Gemini JSON + citations",
+      "stage": 3,
+      "row": 2,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/remediation.py",
+          "line": 36,
+          "end_line": 97
+        },
+        {
+          "path": "backend/app/providers/llm/gemini.py",
+          "line": 30,
+          "end_line": 95
+        },
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 263,
+          "end_line": 294
+        }
+      ],
+      "tag": "Relevant context required"
+    },
+    {
+      "id": "review",
+      "type": "frontend",
+      "label": "Teacher review",
+      "sublabel": "Edit \u2022 approve \u2022 reject",
+      "stage": 4,
+      "row": 2,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/remediation.py",
+          "line": 107,
+          "end_line": 137
+        },
+        {
+          "path": "frontend/src/api/client.ts",
+          "line": 387,
+          "end_line": 394
+        }
+      ],
+      "tag": "Never auto-approved"
+    },
+    {
+      "id": "followup",
+      "type": "frontend",
+      "label": "Follow-up CSV",
+      "sublabel": "Baseline/group/draft IDs",
+      "stage": 0,
+      "row": 4,
+      "width": 152,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/api/routes/results.py",
+          "line": 26,
+          "end_line": 75
+        },
+        {
+          "path": "frontend/src/api/client.ts",
+          "line": 404,
+          "end_line": 419
+        }
+      ],
+      "yOffset": -46
+    },
+    {
+      "id": "link",
+      "type": "security",
+      "label": "Validate linkage",
+      "sublabel": "Same class/question/students",
+      "stage": 1,
+      "row": 4,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/results.py",
+          "line": 50,
+          "end_line": 81
+        },
+        {
+          "path": "backend/app/services/results.py",
+          "line": 166,
+          "end_line": 215
+        }
+      ],
+      "tag": "Approved draft only",
+      "yOffset": -46
+    },
+    {
+      "id": "repeat",
+      "type": "backend",
+      "label": "Re-analyze",
+      "sublabel": "Same parser + detector",
+      "stage": 2,
+      "row": 4,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/api/routes/results.py",
+          "line": 47,
+          "end_line": 75
+        },
+        {
+          "path": "backend/app/services/results.py",
+          "line": 81,
+          "end_line": 88
+        }
+      ],
+      "yOffset": -46
+    },
+    {
+      "id": "compare",
+      "type": "database",
+      "label": "Match + compare",
+      "sublabel": "Persist counts + full trace",
+      "stage": 3,
+      "row": 4,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "backend/app/services/results.py",
+          "line": 90,
+          "end_line": 153
+        },
+        {
+          "path": "backend/app/services/results.py",
+          "line": 218,
+          "end_line": 236
+        },
+        {
+          "path": "backend/app/providers/postgres.py",
+          "line": 302,
+          "end_line": 332
+        }
+      ],
+      "tag": "Overlap \u2265 2",
+      "yOffset": -46
+    },
+    {
+      "id": "results",
+      "type": "frontend",
+      "label": "Results screen",
+      "sublabel": "Before/after + transitions",
+      "stage": 4,
+      "row": 4,
+      "width": 160,
+      "height": 78,
+      "sources": [
+        {
+          "path": "frontend/src/App.tsx",
+          "line": 356,
+          "end_line": 409
+        },
+        {
+          "path": "frontend/src/api/client.ts",
+          "line": 436,
+          "end_line": 445
+        }
+      ],
+      "tag": "Observed change only",
+      "yOffset": -46
+    }
+  ],
+  "flows": [
+    {
+      "id": "baseline-to-parse",
+      "from": "baseline",
+      "to": "parse",
+      "label": "CSV",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        207.5,
+        118
+      ]
+    },
+    {
+      "id": "parse-to-groups",
+      "from": "parse",
+      "to": "groups",
+      "label": "Normalized rows",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        422.5,
+        118
+      ]
+    },
+    {
+      "id": "groups-to-assessment",
+      "from": "groups",
+      "to": "assessment",
+      "label": "Groups + evidence",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        637.5,
+        118
+      ]
+    },
+    {
+      "id": "assessment-to-inspect",
+      "from": "assessment",
+      "to": "inspect",
+      "label": "Analysis JSON",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        852.5,
+        118
+      ]
+    },
+    {
+      "id": "text-to-chunks",
+      "from": "text",
+      "to": "chunks",
+      "label": "Source text",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        207.5,
+        346
+      ]
+    },
+    {
+      "id": "chunks-to-retrieve",
+      "from": "chunks",
+      "to": "retrieve",
+      "label": "Chunks + vectors",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        422.5,
+        346
+      ]
+    },
+    {
+      "id": "groups-to-retrieve",
+      "from": "groups",
+      "to": "retrieve",
+      "label": "Selected group",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        530,
+        275
+      ]
+    },
+    {
+      "id": "retrieve-to-draft",
+      "from": "retrieve",
+      "to": "draft",
+      "label": "Relevant passages",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        637.5,
+        346
+      ]
+    },
+    {
+      "id": "draft-to-review",
+      "from": "draft",
+      "to": "review",
+      "label": "Validated draft",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        852.5,
+        346
+      ]
+    },
+    {
+      "id": "followup-to-link",
+      "from": "followup",
+      "to": "link",
+      "label": "CSV + linkage IDs",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        207.5,
+        528
+      ]
+    },
+    {
+      "id": "link-to-repeat",
+      "from": "link",
+      "to": "repeat",
+      "label": "Approved + valid",
+      "variant": "security",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        422.5,
+        528
+      ]
+    },
+    {
+      "id": "repeat-to-compare",
+      "from": "repeat",
+      "to": "compare",
+      "label": "Follow-up groups",
+      "variant": "default",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        637.5,
+        528
+      ]
+    },
+    {
+      "id": "compare-to-results",
+      "from": "compare",
+      "to": "results",
+      "label": "Metrics or no match",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        852.5,
+        528
+      ]
+    },
+    {
+      "id": "review-to-link",
+      "from": "review",
+      "to": "link",
+      "label": "Approved intervention",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [
+        [
+          960,
+          510
+        ],
+        [
+          315,
+          510
+        ]
+      ],
+      "labelAt": [
+        760,
+        498
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "How to read",
+      "items": [
+        "Top row: baseline assessment to teacher-verifiable group evidence. Middle row: teacher material to source-backed draft and explicit review. Bottom row: follow-up assessment to persisted comparison.",
+        "Arrows name the data carried. All browser inputs travel through FastAPI; PostgreSQL persists workflow records via backend adapters.",
+        "Synthetic demo endpoints read versioned files from data/demo and use these same parsers, embedding, retrieval and comparison services. No seeded AI-output fallback exists."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Preserve evidence",
+      "items": [
+        "Preview validates and returns counts plus five sample responses; it does not persist. Analyze reparses the CSV, filters only grouping eligibility, and saves all normalized rows and detected groups.",
+        "Group evidence preserves exact uploaded answers, student IDs, support and coherence. Correct and blank rows remain available in counts and persistence; outliers are not forced into groups.",
+        "Material chunks retain exact normalized text and offsets in PostgreSQL. Retrieval returns text, chunk IDs and similarity; vectors are rebuilt from durable chunks after a restart."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Gates and controlled failures",
+      "items": [
+        "Invalid files fail with structured errors. Too few eligible answers or no supported cluster returns insufficient_data.",
+        "No passage meeting 0.42 returns insufficient_relevant_context; generation returns insufficient_context and saves no draft. Gemini failure or unknown citation also saves no draft.",
+        "Generation validates the client-supplied retrieval packet and chunk IDs; it does not independently re-read and compare each passage before the provider call.",
+        "Review saves edits while generated, or explicitly enters terminal approved/rejected state. Rejected or unreviewed intervention blocks results."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Comparison and recovery",
+      "items": [
+        "Follow-up repeats validation and grouping; matching requires the same question and at least two baseline members in the chosen recurring follow-up group.",
+        "No reliable follow-up match stores insufficient_data and omits improvement percentages. A match calculates prevalence, correctness and student transitions using transparent denominators.",
+        "App localStorage saves workflow IDs; reload calls analysis/remediation/results GETs and reruns material retrieval. Durable records remain authoritative.",
+        "Source evidence uses committed revision 5fb327f. Existing workspace UI, environment example and documentation changes are excluded from the pinned source claims."
+      ]
+    }
+  ]
+}

@@ -54,12 +54,10 @@ class PostgresAnalysisStore:
                 _json(parsed.preview.model_dump(mode="json")),
             ),
         )
-        question_order: list[str] = []
+        first_response_by_question = {}
         for response in parsed.responses:
-            if response.question_id not in question_order:
-                question_order.append(response.question_id)
-        for position, external_key in enumerate(question_order):
-            response = next(item for item in parsed.responses if item.question_id == external_key)
+            first_response_by_question.setdefault(response.question_id, response)
+        for position, (external_key, response) in enumerate(first_response_by_question.items()):
             connection.execute(
                 """
                 insert into questions (assessment_id, external_key, position, prompt, correct_answer)
@@ -71,17 +69,20 @@ class PostgresAnalysisStore:
             "select id, external_key from questions where assessment_id=%s", (result.assessment_id,)
         ).fetchall()
         question_ids = {row[1]: row[0] for row in question_rows}
-        for response in parsed.responses:
-            connection.execute(
+        with connection.cursor() as cursor:
+            cursor.executemany(
                 """
                 insert into student_responses
                   (question_id, student_key, row_number, response_text, answer_status, is_correct)
                 values (%s,%s,%s,%s,%s,%s) on conflict (question_id, student_key) do nothing
                 """,
-                (
-                    question_ids[response.question_id], response.student_id, response.row_number,
-                    response.answer, response.answer_status, response.is_correct,
-                ),
+                [
+                    (
+                        question_ids[response.question_id], response.student_id, response.row_number,
+                        response.answer, response.answer_status, response.is_correct,
+                    )
+                    for response in parsed.responses
+                ],
             )
         inserted = connection.execute(
             """
@@ -109,6 +110,7 @@ class PostgresAnalysisStore:
             (result.assessment_id,),
         ).fetchall()
         response_ids = {(row[1], row[2]): row[0] for row in response_rows}
+        member_values = []
         for group in result.groups:
             group_row = connection.execute(
                 """
@@ -129,16 +131,23 @@ class PostgresAnalysisStore:
             }
             for student_id in group.member_student_ids:
                 rep = representative.get(student_id)
-                connection.execute(
+                member_values.append(
+                    (
+                        group_row,
+                        response_ids[(group.question_id, student_id)],
+                        rep is not None,
+                        rep[0] if rep else None, rep[1] if rep else None,
+                    )
+                )
+        if member_values:
+            with connection.cursor() as cursor:
+                cursor.executemany(
                     """
                     insert into misconception_members
                       (group_id, response_id, is_representative, representative_rank, similarity_to_medoid)
                     values (%s,%s,%s,%s,%s)
                     """,
-                    (
-                        group_row, response_ids[(group.question_id, student_id)], rep is not None,
-                        rep[0] if rep else None, rep[1] if rep else None,
-                    ),
+                    member_values,
                 )
 
     def get(self, analysis_id: str) -> AnalysisSnapshot | None:

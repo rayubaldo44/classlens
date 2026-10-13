@@ -1,4 +1,5 @@
 import math
+from time import perf_counter
 
 from app.config import MaterialSettings
 from app.providers.embeddings import EmbeddingService
@@ -11,6 +12,7 @@ from app.schemas.materials import (
 )
 from app.services.material_ingestion import MaterialError
 from app.services.material_ingestion import _normalize_embeddings
+from app.telemetry import log_error, log_stage
 
 
 def retrieve_for_misconception(
@@ -31,6 +33,7 @@ def retrieve_for_misconception(
         )
 
     if not record.embeddings:
+        started = perf_counter()
         try:
             vectors = _normalize_embeddings(
                 embedding_service.embed([chunk.text for chunk in record.chunks]),
@@ -44,14 +47,17 @@ def retrieve_for_misconception(
         except MaterialError:
             raise
         except Exception as error:
+            log_error("material_reindex", "material_embedding_failed", provider_error=type(error).__name__, chunk_count=len(record.chunks))
             raise MaterialError(
                 "material_embedding_failed",
                 "The persisted learning material could not be re-indexed.",
                 retryable=True,
                 details={"provider_error": type(error).__name__},
             ) from error
+        log_stage("material_reindex", (perf_counter() - started) * 1000, chunk_count=len(record.chunks), model=embedding_service.model_id)
 
     query = _build_query(context)
+    started = perf_counter()
     try:
         embeddings = embedding_service.embed([query])
         query_vector = _normalize_query_embedding(embeddings)
@@ -65,12 +71,14 @@ def retrieve_for_misconception(
     except MaterialError:
         raise
     except Exception as error:
+        log_error("retrieval", "material_retrieval_failed", retrieval_error=type(error).__name__)
         raise MaterialError(
             "material_retrieval_failed",
             "Relevant material could not be retrieved.",
             retryable=True,
             details={"retrieval_error": type(error).__name__},
         ) from error
+    log_stage("retrieval", (perf_counter() - started) * 1000, hit_count=len(hits), material_id=material_id)
 
     results = [
         RetrievedChunk(

@@ -2,6 +2,19 @@
 
 This document defines system boundaries and data flow. The detailed AI algorithms belong in [AI_PIPELINE.md](AI_PIPELINE.md), database fields in [DATABASE.md](DATABASE.md), and endpoint payloads in [API.md](API.md). The React/FastAPI boundary, Supabase PostgreSQL repositories, and restart recovery were live-verified on 2026-10-02.
 
+## Interactive repository diagrams
+
+Generated with Archify on 2026-10-06 from committed revision `5fb327fd05973018c5dc3debb5c5dc826ccddd82`:
+
+- [System architecture](../backend/.archify/architecture-classlens-20261006-095348/classlens-architecture.html) — browser, API, workflow services, local embeddings, Gemini, PostgreSQL adapters, durable records and ephemeral material vectors.
+- [Assessment-to-results data flow](../backend/.archify/dataflow-classlens-20261006-095348/classlens-dataflow.html) — baseline intake, evidence, teacher-material retrieval, draft review and approval-gated follow-up comparison.
+
+Both standalone HTML artifacts contain source links, explanatory notes, light/dark themes and export controls. Their finalization receipts passed showcase validation, strict artifact/provenance checks and real Chromium browser checks with no diagnostics. Light/dark screenshots were captured at 1440×900 and 2048×1320; manual inspection covered architecture at 1440 light/2048 dark and data flow at 1440 light/dark. The architecture uses vertical page scrolling at the smaller viewport.
+
+Evidence is pinned to committed bytes. Existing uncommitted workspace UI, environment-example and documentation edits are noted in the artifacts, not represented as committed source. Reported Vercel/Render hosting remains documentation context; no live deployment verification was performed in this diagram task.
+
+Implementation details that qualify the conceptual sections below: preview does not persist; analysis persists after successful grouping; correctness comes from validated CSV `is_correct`; document extraction currently accepts UTF-8 `.txt` only. Before Gemini generation, grounding reloads and compares canonical analysis/group/material/chunk evidence with the browser snapshot. In-memory stores are test doubles; runtime dependencies choose PostgreSQL adapters, and only material vectors remain ephemeral.
+
 ## High-level design
 
 ```mermaid
@@ -70,12 +83,13 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 6. The frontend displays groups and representative responses to the teacher.
 7. A teacher uploads a `.txt` material or selects the synthetic demo notes; the backend cleans, chunks, embeds, and indexes it through `MaterialIndex`.
 8. Retrieval queries only that material, ranks chunks by cosine similarity, filters by the configured threshold, and returns exact source text or an explicit insufficient-context result.
-9. The Gemini adapter drafts schema-validated remediation and follow-up questions constrained by the passages; unknown passage references reject the complete draft.
-10. PostgreSQL preserves both original generation and teacher-edited content; the teacher explicitly saves, approves, or rejects it.
-11. Each completed analysis is already persisted with its normalized input and detected evidence groups; stable IDs make fixture reruns safe.
-12. The teacher submits a follow-up CSV through the same validation pipeline and links it to the selected group and approved remediation.
-13. The existing analysis pipeline re-evaluates follow-up responses. A dedicated comparison service validates the linkage, matches recurring group membership for the same question, and calculates deterministic counts and percentages.
-14. The Results screen shows before/after values, transition counts, missing follow-up data, and the assessment → misconception → intervention → follow-up trace without claiming causation.
+9. Before generation, the remediation service reloads the analysis/group and material/chunks from PostgreSQL, rejects browser snapshots that do not match, and rebuilds the prompt from canonical evidence.
+10. The Gemini adapter drafts schema-validated remediation and follow-up questions constrained by those passages; unknown passage references reject the complete draft.
+11. PostgreSQL preserves both original generation and teacher-edited content; the teacher explicitly saves, approves, or rejects it.
+12. Each completed analysis is already persisted with its normalized input and detected evidence groups; stable IDs make fixture reruns safe.
+13. The teacher submits a follow-up CSV through the same validation pipeline and links it to the selected group and approved remediation.
+14. The existing analysis pipeline re-evaluates follow-up responses. A dedicated comparison service validates the linkage, matches recurring group membership for the same question, and calculates deterministic counts and percentages.
+15. The Results screen shows before/after values, transition counts, missing follow-up data, and the assessment → misconception → intervention → follow-up trace without claiming causation.
 
 Long provider operations currently use a simple synchronous request/response path. Gemini retries one transient timeout/429/5xx response; continued failure remains explicit. If latency later requires job polling, add a small persisted job state within the FastAPI application rather than a new service.
 

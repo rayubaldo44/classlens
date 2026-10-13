@@ -86,13 +86,33 @@ classlens/
 
 ## Verification
 
+GitHub Actions runs these checks on pushes and pull requests. PostgreSQL integration runs in a separate job against an ephemeral database after applying the repository migration.
+
 ~~~bash
 cd backend
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q --ignore=tests/test_postgres_integration.py
 
 cd ../frontend
+npm test
 npm run lint
 npm run build
 ~~~
+
+The opt-in local PostgreSQL test remains available with `CLASSLENS_TEST_DATABASE_URL` configured:
+
+~~~bash
+cd backend
+CLASSLENS_TEST_DATABASE_URL=postgresql://... .venv/bin/python -m pytest -q tests/test_postgres_integration.py
+~~~
+
+Run the deterministic browser smoke after installing Playwright Chromium once:
+
+~~~bash
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+~~~
+
+The browser smoke intercepts API calls with contract-valid fixtures. It exercises the complete UI workflow and recovery behavior without contacting Gemini, Supabase, or Render.
 
 For exact current readiness and limitations, read [STATUS.md](STATUS.md). The authoritative product and technical documents are linked from [AGENTS.md](AGENTS.md).
