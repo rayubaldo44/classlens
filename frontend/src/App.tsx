@@ -41,7 +41,7 @@ import {
   type FollowUpComparisonRecord,
   type RemediationRecord,
 } from './api/client'
-import { ArrowIcon, Badge, Metric, PageHeader, StatePanel } from './components'
+import { ArrowIcon, Badge, LongTaskProgress, Metric, PageHeader, StatePanel } from './components'
 import { demoScenario, demoSteps } from './mockData'
 import type { RouteKey } from './types'
 
@@ -62,6 +62,8 @@ const restoreErrorMessage = (fallback: string, error: unknown) => error instance
 function App() {
   const [route, setRoute] = useState<RouteKey>(routeFromPath)
   const didRestore = useRef(false)
+  const mainRef = useRef<HTMLElement>(null)
+  const previousRoute = useRef(route)
   const [analysisSource, setAnalysisSource] = useState<AnalysisSource | null>(null)
   const [selectedGroup, setSelectedGroup] = useState<MisconceptionGroup | null>(null)
   const [selectedAssessment, setSelectedAssessment] = useState<AssessmentPreview['assessment'] | null>(null)
@@ -148,18 +150,23 @@ function App() {
     })()
   }, [route])
   useEffect(() => { const onPopState = () => setRoute(routeFromPath()); window.addEventListener('popstate', onPopState); return () => window.removeEventListener('popstate', onPopState) }, [])
-  const navigate = (next: RouteKey) => { const path = next === 'landing' ? '/' : demoSteps.find((item) => item.key === next)?.path; if (!path) return; window.history.pushState({}, '', path); setRoute(next); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  useEffect(() => {
+    if (previousRoute.current === route) return
+    previousRoute.current = route
+    window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }))
+  }, [route])
+  const navigate = (next: RouteKey) => { const path = next === 'landing' ? '/' : demoSteps.find((item) => item.key === next)?.path; if (!path) return; window.history.pushState({}, '', path); setRoute(next); window.scrollTo({ top: 0, behavior: 'auto' }) }
   if (route === 'landing') return <LandingPage onWorkspace={() => navigate('dashboard')} onDemo={() => navigate('upload')} />
-  return <div className="app-shell"><aside className="sidebar">
+  return <><a className="skip-link" href="#main-content">Skip to main content</a><div className="app-shell"><aside className="sidebar">
     <button className="brand" onClick={() => navigate('landing')} aria-label="ClassLens home"><img className="brand-image" src="/classlens-mascot.png" alt="" width="56" height="56" /><span>ClassLens<small>Teacher workspace</small></span></button>
     <div className="demo-label"><Badge tone="amber">Synthetic demo</Badge><p>Photosynthesis scenario</p></div>
     <nav aria-label="Golden path"><p className="nav-heading">Demo sequence</p>{demoSteps.map((step, index) => <button key={step.key} className={route === step.key ? 'nav-item active' : 'nav-item'} onClick={() => navigate(step.key)} aria-current={route === step.key ? 'page' : undefined}><span>{String(index + 1).padStart(2, '0')}</span>{step.label}</button>)}</nav>
     <label className="mobile-step-picker"><span>Workflow step</span><select value={route} onChange={(event) => { const next = demoSteps.find((step) => step.key === event.target.value); if (next) navigate(next.key) }}>{demoSteps.map((step, index) => <option key={step.key} value={step.key}>{String(index + 1).padStart(2, '0')} · {step.label}</option>)}</select></label>
     <ApiStatus />
-  </aside><main className="main-content">
+  </aside><main className="main-content" id="main-content" ref={mainRef} tabIndex={-1}>
     {restoreMessage && <StatePanel kind="error" title="Saved workflow not fully restored" description={restoreMessage} action={<button className="text-button" onClick={() => { localStorage.removeItem(WORKFLOW_KEY); setRestoreMessage(''); navigate('upload') }}>Start a new workflow →</button>} />}
     {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? selectedAnalysis?.analysis_id ?? 'none'} source={analysisSource} initialAnalysis={selectedAnalysis} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception key={`${selectedGroup?.group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}`} group={selectedGroup} initialRetrieval={retrievedSources} onBack={() => navigate('analysis')} onRetrieved={(sources) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: sources?.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}-${approvedRemediation?.remediation_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} assessment={selectedAssessment} sources={retrievedSources} initialRemediation={approvedRemediation} onBack={() => navigate('misconception')} onNext={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: retrievedSources?.material.material_id, remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: retrievedSources?.material.material_id, remediation_id: approvedRemediation?.remediation_id, comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
-  </main></div>
+  </main></div></>
 }
 
 function Dashboard({ onNext }: { onNext: () => void }) {
@@ -221,7 +228,7 @@ function Analysis({ source, initialAnalysis, onLoadDemo, onNext }: { source: Ana
 
   return <><PageHeader eyebrow="Step 3 of 6" title="Learning gaps" description="Review recurring semantic groups as evidence-backed proposals. Correct and blank responses are excluded, and the teacher remains the final authority." action={result && <Badge tone={result.data_label === 'synthetic_demo' ? 'amber' : 'green'}>{result.data_label === 'synthetic_demo' ? 'Synthetic demo data' : 'Teacher upload'}</Badge>} />
     {!source && !result && <StatePanel kind="empty" title="No assessment ready for analysis" description="Validate an assessment first, or analyze the deterministic synthetic photosynthesis fixture." action={<button className="text-button" onClick={onLoadDemo}>Analyze demo dataset →</button>} />}
-    {status === 'loading' && <StatePanel kind="loading" title="Finding recurring response patterns" description="The backend is embedding eligible answers and grouping them independently for each question." />}
+    {status === 'loading' && <LongTaskProgress task="analysis" />}
     {status === 'error' && <StatePanel kind="error" title="Analysis could not be completed" description={errorMessage} action={<button className="text-button" onClick={() => { setStatus('loading'); setResult(null); setErrorMessage(''); setAttempt((value) => value + 1) }}>Try again</button>} />}
     {status === 'ready' && result && <><section className="question-strip"><div><span>Assessment</span><strong>{result.assessment.title} · {result.assessment.topic}</strong></div><div><span>Analysis status</span><strong>{result.summary.group_count} gap{result.summary.group_count === 1 ? '' : 's'} detected</strong></div></section><div className="metric-grid compact"><Metric label="Eligible incorrect" value={String(result.summary.eligible_incorrect_count)} note="Correct and blank excluded" /><Metric label="Grouped evidence" value={String(result.summary.grouped_response_count)} note={`${result.summary.outlier_count} unmatched`} /><Metric label="Learning gaps" value={String(result.summary.group_count)} note={`Minimum support ${result.grouping.minimum_support}`} /></div>
       {result.groups.length === 0 ? <StatePanel kind="empty" title="No recurring misconception detected" description={result.message ?? 'No group met the configured evidence threshold.'} /> : <section className="section-block"><div className="section-title"><div><p className="eyebrow">Potential misconceptions</p><h2>{result.groups.length} recurring pattern{result.groups.length === 1 ? '' : 's'} to inspect</h2></div><Badge tone="amber">Teacher review needed</Badge></div><div className="gap-list">{result.groups.map((group) => <button className="gap-card" key={group.group_id} onClick={() => onNext(group, result)}><div><Badge tone="amber">Potential · not yet interpreted</Badge><h2>{group.provisional_label}</h2><p>{group.representative_responses.slice(0, 2).map((item) => `“${item.answer}”`).join(' · ')}</p></div><div className="gap-meta"><span>Affected responses</span><strong>{group.support_count} of {group.eligible_response_count}</strong><span>Open evidence →</span></div></button>)}</div></section>}
@@ -412,7 +419,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
 
     {!hasGrounding && <StatePanel kind="empty" title="Grounded generation is unavailable" description="Return to the misconception detail and retrieve relevant teacher-provided material. ClassLens will not generate an unsupported intervention." action={<button className="text-button" onClick={onBack}>Choose better teaching material →</button>} />}
     {hasGrounding && status === 'idle' && <section className="generation-start"><div><strong>Ready to prepare a grounded draft</strong><p>Gemini will receive this detected group and only the passages shown above. The result will remain pending until you approve or reject it.</p></div><button className="button primary" onClick={() => void generate()}>Generate remediation</button></section>}
-    {status === 'loading' && <StatePanel kind="loading" title="Generating grounded remediation" description="Gemini is preparing a concise intervention from the selected student evidence and teacher passages. The request is limited to about one minute." />}
+    {status === 'loading' && <LongTaskProgress task="generation" />}
     {status === 'insufficient' && <StatePanel kind="empty" title="Insufficient teacher-provided material" description={errorMessage} action={<button className="text-button" onClick={onBack}>Return to teaching material →</button>} />}
     {status === 'error' && <StatePanel kind="error" title="Remediation action failed" description={errorMessage} action={record ? <button className="text-button" onClick={() => setStatus('ready')}>Return to your draft →</button> : <button className="text-button" onClick={() => void generate()}>Try generation again →</button>} />}
 

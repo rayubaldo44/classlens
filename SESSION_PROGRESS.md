@@ -1103,3 +1103,66 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: add real-embedding regression evaluation across multiple teacher-reviewed examples, measuring group quality, outliers, retrieval relevance, and stability beyond the photosynthesis fixture.
 
 ---
+## Session / Milestone: Real-embedding evaluation scaffold and candidate review set
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** Evaluation tooling verified; task remains open pending educator review
+
+- Attempted and completed: added a dependency-free offline evaluator that runs the pinned real embedding model through production assessment parsing, grouping, material ingestion, and retrieval. Added two honestly labeled synthetic candidate cases beyond photosynthesis, pairwise group metrics, outlier metrics, retrieval checks, exact repeat-run stability, review-state enforcement, and accepted-quality gates.
+- Files created or significantly modified: `backend/evaluation/embedding_regression.py`, `backend/evaluation/embedding_regression_cases.json`, `backend/evaluation/README.md`, `backend/tests/test_embedding_regression.py`, `.gitignore`, `docs/AI_PIPELINE.md`, `STATUS.md`, and `TASKS.md`.
+- Verified/tested: metric unit tests passed (`2 passed`). The pinned `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` revision completed two runs per case. Both cases were exactly stable and both retrieval expectations passed. Fraction grouping pair F1 was `0.50`; rectangle grouping pair F1 was `0.00`; mean pair F1 was `0.25`. The evaluator intentionally exited `2` because zero cases have teacher approval.
+- Problems encountered: the production `0.70` threshold found only one of four candidate recurring patterns. The old virtual-environment `pytest` launcher retains the checkout's former space-containing path, so verification used `.venv/bin/python -m pytest`, which works.
+- Important decisions: preserve educator-authored expectations and expose poor recall rather than tuning labels to current model output. Keep generated reports untracked because run times are machine-specific. Do not count synthetic candidate expectations as teacher-reviewed until an educator records approval.
+- Remaining work: an educator must review the responses, expected groups, outliers, retrieval targets, and quality gates. After that review, rerun the evaluator and decide whether threshold/model changes are justified by the reviewed set.
+- Recommended next step: obtain educator review of `backend/evaluation/embedding_regression_cases.json`; then rerun the evaluator and record the accepted aggregate results and limitations.
+
+---
+
+## Session / Milestone: Grounded-generation evaluation completed
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** P1 grounded-generation evaluation complete and verified
+
+- Attempted and completed: added a live, non-persisting Gemini evaluation for ordinary grounding and prompt injection in untrusted student/source text. It captures latency and token telemetry, validates schemas and citation IDs, checks forbidden injection canaries, and exercises the no-key provider-unavailable path. Added a source-level review that explicitly separates valid citation IDs from supported claims.
+- Files created or significantly modified: `backend/evaluation/generation_evaluation.py`, `backend/evaluation/generation_evaluation_cases.json`, `backend/evaluation/README.md`, `backend/tests/test_generation_evaluation.py`, `docs/evaluations/2026-10-13-grounded-generation.md`, `docs/AI_PIPELINE.md`, `STATUS.md`, and `TASKS.md`.
+- Verified/tested: both network-enabled `gemini-3.1-flash-lite` cases generated valid structured drafts, cited only supplied IDs, and omitted the adversarial canaries. Latencies were 5.362 and 3.686 seconds; total token counts were 971 and 958. The controlled no-key check returned `llm_not_configured`. Evaluator lifecycle tests passed.
+- Problems encountered: sandboxed network calls returned controlled provider errors. The first standalone evaluator also stayed alive after the SDK response because its Google client resources were not closed; a failing lifecycle test reproduced this, and the evaluator now closes its owned async and sync clients. With network approval, both live cases passed. Claim review found one unsupported “water from the soil” detail in the adversarial draft despite its valid source ID.
+- Important decisions: keep citation membership and claim entailment as separate evaluation results. Do not add a heuristic claim checker or treat valid IDs as proof of support. Keep provider outputs and machine-specific timings in an ignored local report while committing cases and summarized evidence.
+- Remaining work: none for this task. The evaluation is deliberately small and does not prove general prompt-injection resistance or educational validity; teacher approval remains mandatory for generated interventions.
+- Recommended next step: complete the pending educator review of the real-embedding cases, or proceed to the first unchecked frontend/accessibility task while that external review is pending.
+
+---
+
+## Session / Milestone: Workspace responsive and keyboard accessibility verified
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** P1 responsive/accessibility task complete and verified
+
+- Attempted and completed: audited the existing teacher workspace, added a keyboard-visible skip link, moved focus to the main content region after client-side route changes, removed smooth route scrolling, and guaranteed 44px targets for workspace navigation, text actions, and disclosure summaries. Added browser checks for bypass navigation, route focus, target sizes, and 320px overflow.
+- Files significantly modified: `frontend/src/App.tsx`, `frontend/src/WorkspacePolish.css`, `frontend/tests/e2e/accessibility.spec.ts`, `STATUS.md`, and `TASKS.md`.
+- Verified/tested: the new tests failed before implementation because the bypass link did not exist, then passed after the fix. The complete Playwright suite passed with three Chromium tests, including the existing golden path. Frontend unit tests, ESLint, production build, `git diff --check`, and the Impeccable detector passed. Desktop 1440×1000 and mobile 320×844 captures were inspected with no visible overflow or layout regression.
+- Problems encountered: none after the focused implementation. Hidden native file inputs and checkboxes retain their larger associated label targets and were not incorrectly measured as standalone controls.
+- Important decisions: preserve the existing visual identity and mobile step selector; use native fragment navigation and focusable main content rather than adding a routing or accessibility dependency.
+- Remaining work: none for this task. The evaluation covered Chromium keyboard behavior and emulated responsive viewports, not a physical touch device or full assistive-technology matrix.
+- Recommended next step: add clearer progress indicators for long analysis and remediation-generation requests.
+
+---
+
+## Session / Milestone: Long-request progress indicators completed
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** P1 analysis/generation progress task complete and verified
+
+- Attempted and completed: replaced the generic analysis and remediation-generation loading panels with accessible live status panels that show elapsed seconds and adjust their guidance as the wait grows. The messages remain honest about observable request state, variable provider/model timing, and the existing browser limit without claiming server-side stages or percentages.
+- Files significantly modified: `frontend/src/components.tsx`, `frontend/src/App.tsx`, `frontend/src/WorkspacePolish.css`, `frontend/tests/e2e/golden-path.spec.ts`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified/tested: the browser test first failed against the prior loading panel, then passed after implementation. The complete Playwright suite passed with three Chromium tests; frontend unit tests, ESLint, production build, and the Impeccable detector also passed. The golden-path test delays both target operations, observes elapsed-time updates, and verifies that reduced-motion preference disables the pulse animation.
+- Problems encountered: the first elapsed-time check raced a response scheduled close to the one-second timer boundary. The controlled fixture delay was increased to 1.5 seconds so the check measures the intended UI behavior reliably.
+- Important decisions: report elapsed time instead of a fabricated completion percentage, and describe possible causes of delay without presenting them as observed backend stages. Reuse one small component for the two bounded operations while preserving the existing error, retry, evidence, and timeout behavior.
+- Remaining work: none for this task. Progress for material ingestion, retrieval, and follow-up analysis remains the existing generic loading state because this backlog item was scoped to baseline analysis and remediation generation.
+- Recommended next step: obtain educator review for the pending real-embedding regression cases, or proceed to the next unblocked backlog item while that external review is pending.
+
+---

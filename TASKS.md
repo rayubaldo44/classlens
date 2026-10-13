@@ -92,7 +92,9 @@ Depends on: reproducible runtime; use an isolated test database for database int
 - [x] Add CI for frontend tests/lint/build and backend tests, with a separately configured PostgreSQL integration job. (2026-10-13)
 - [x] Add an automated browser golden-path smoke covering upload, evidence, retrieval, review/approval, results, reload recovery, and a controlled failure state. (2026-10-13)
 - [ ] Add real-embedding regression evaluation across multiple teacher-reviewed examples; measure group quality, outliers, retrieval relevance, and stability beyond the photosynthesis fixture.
-- [ ] Evaluate grounded-generation faithfulness, invalid citations, prompt-injection examples, latency, token usage, and provider-unavailable behavior; distinguish valid citation IDs from supported educational claims.
+
+  In progress (2026-10-13): the production-path evaluator and two honestly labeled synthetic candidate cases are ready for educator review. Metrics remain diagnostic and this item stays open until a teacher approves the expected groups, outliers, and retrieval targets.
+- [x] Evaluate grounded-generation faithfulness, invalid citations, prompt-injection examples, latency, token usage, and provider-unavailable behavior; distinguish valid citation IDs from supported educational claims. (2026-10-13)
 
 **Acceptance:** automated checks protect the integrated workflow, and evaluations document limits rather than generalizing from one synthetic fixture. See [docs/AI_PIPELINE.md](docs/AI_PIPELINE.md#suggested-evaluation-checks).
 
@@ -100,8 +102,8 @@ Depends on: reproducible runtime; use an isolated test database for database int
 
 Depends on: P0 gates; preserve the implemented workflow.
 
-- [ ] Improve responsive layout and keyboard accessibility where testing identifies gaps.
-- [ ] Add richer progress indicators for long analysis and generation requests.
+- [x] Improve responsive layout and keyboard accessibility where testing identifies gaps. (2026-10-13)
+- [x] Add richer progress indicators for long analysis and generation requests. (2026-10-13)
 - [ ] Allow teachers to rename, merge, or dismiss proposed groups while preserving evidence and review history.
 - [ ] Export an approved intervention and evidence summary.
 - [x] Remove unused response/evidence examples from `frontend/src/mockData.ts`; retain scenario metadata and navigation definitions.

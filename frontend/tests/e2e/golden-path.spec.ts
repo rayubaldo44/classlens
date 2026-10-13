@@ -213,7 +213,10 @@ async function installApi(page: Page) {
 
     if (pathname === '/health') return json(route, { status: 'ok', service: 'classlens-api' })
     if (pathname === '/api/v1/assessments/preview') return json(route, preview)
-    if (pathname === '/api/v1/assessments/analyze') return json(route, analysis)
+    if (pathname === '/api/v1/assessments/analyze') {
+      await new Promise((resolve) => setTimeout(resolve, 1_500))
+      return json(route, analysis)
+    }
     if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}`) return json(route, analysis)
     if (pathname === '/api/v1/learning-materials/ingest') {
       return json(route, { status: 'ready', material, message: 'Teaching material is ready.' })
@@ -226,6 +229,7 @@ async function installApi(page: Page) {
           error: { code: 'llm_unavailable', message: 'The controlled test provider is temporarily unavailable.', retryable: true },
         }, 503)
       }
+      await new Promise((resolve) => setTimeout(resolve, 1_500))
       return json(route, { status: 'generated', remediation, message: null })
     }
     if (pathname === `/api/v1/remediations/${remediation.remediation_id}` && request.method() === 'PATCH') {
@@ -257,7 +261,11 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await expect(page.getByRole('heading', { name: assessment.title })).toBeVisible()
   await expect(page.getByText('45 accepted responses')).toBeVisible()
 
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.getByRole('button', { name: /Analyze learning gaps/ }).click()
+  await expect(page.locator('.long-task-progress')).toContainText('Analysis request sent')
+  await expect(page.locator('.long-task-progress__pulse')).toHaveCSS('animation-name', 'none')
+  await expect(page.locator('.long-task-progress')).toContainText('1s elapsed')
   await expect(page.getByRole('heading', { name: '1 recurring pattern to inspect' })).toBeVisible()
   await page.getByRole('button', { name: /Potential misconception pattern 1/ }).click()
   await expect(page.getByText('Student evidence · 9 affected responses')).toBeVisible()
@@ -275,6 +283,8 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await expect(page.getByRole('alert').getByText('Remediation action failed')).toBeVisible()
   await expect(page.getByText('controlled test provider is temporarily unavailable')).toBeVisible()
   await page.getByRole('button', { name: /Try generation again/ }).click()
+  await expect(page.locator('.long-task-progress')).toContainText('Generation request sent')
+  await expect(page.locator('.long-task-progress')).toContainText('1s elapsed')
 
   await page.getByLabel('Teacher explanation').fill(approvedExplanation)
   await page.getByLabel(/I reviewed the student evidence/).check()

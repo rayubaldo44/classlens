@@ -249,6 +249,8 @@ No provider failure may be replaced with fabricated analysis, passages, citation
 - Small samples return cautious or insufficient outcomes.
 - Representative response IDs always belong to the group and text matches source exactly.
 
+An offline production-path evaluator now lives in `backend/evaluation/`. Its two additional synthetic candidate cases remain pending educator review and therefore are not a validated benchmark. A 2026-10-13 diagnostic run with the pinned real model and production `0.70` threshold was exactly stable across two runs per case, and both expected retrieval passages were returned. Grouping pair F1 was `0.50` for fraction denominators and `0.00` for rectangle area/perimeter: only one of four candidate recurring patterns met the threshold. This is evidence that the photosynthesis calibration does not generalize reliably, not a reason to rewrite expected labels around model output. The task remains open until an educator reviews the cases and the accepted quality gates are evaluated.
+
 ### Interpretation
 
 - Every evidence reference exists in the supplied group.
@@ -262,6 +264,8 @@ No provider failure may be replaced with fabricated analysis, passages, citation
 - Every citation resolves to the exact stored passage.
 - Generated activities contain no unsupported source claims.
 - Provider timeouts and malformed output yield explicit failures.
+
+The 2026-10-13 [grounded-generation evaluation](evaluations/2026-10-13-grounded-generation.md) ran two live synthetic cases against `gemini-3.1-flash-lite`. Both passed schema, citation-ID, and injection-canary checks in 3.686–5.362 seconds using 958–971 total tokens. Claim-level review still found one unsupported detail (“from the soil”) in a draft with a valid citation. This confirms that citation membership is enforced but does not prove claim entailment; teacher review remains necessary.
 
 ### Outcomes
 
