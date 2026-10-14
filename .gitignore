@@ -9,3 +9,4 @@ backend/evaluation/latest-generation-report.json
 .env
 .env.*
 !.env.example
+.worktrees/
