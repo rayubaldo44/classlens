@@ -9,6 +9,7 @@ from app.concurrency import run_in_worker
 
 from app.prompts.remediation import PROMPT_VERSION, build_remediation_prompt
 from app.providers.analysis_store import AnalysisSnapshot, AnalysisStore
+from app.providers.group_review_store import GroupReviewStore
 from app.providers.llm import LLMProviderError, LLMService
 from app.providers.material_index import MaterialIndex, MaterialRecord
 from app.providers.remediation_store import RemediationStore
@@ -25,6 +26,7 @@ from app.schemas.remediations import (
     RemediationSource,
 )
 from app.telemetry import log_stage
+from app.services.group_reviews import GroupReviewError, resolve_reviewed_group
 
 
 _GENERATION_LOCKS: dict[str, asyncio.Lock] = {}
@@ -53,6 +55,7 @@ async def generate_grounded_remediation(
     store: RemediationStore,
     analysis_store: AnalysisStore,
     material_index: MaterialIndex,
+    review_store: GroupReviewStore | None = None,
 ) -> RemediationGenerationResponse:
     analysis = await run_in_worker(analysis_store.get, request.analysis_id)
     if analysis is None:
@@ -68,7 +71,9 @@ async def generate_grounded_remediation(
             "The selected teacher material is no longer available. Retrieve passages again before generating an intervention.",
             details={"resource": "material", "material_id": request.retrieval.material.material_id},
         )
-    request = _canonical_generation_request(request, analysis=analysis, material=material)
+    request = _canonical_generation_request(
+        request, analysis=analysis, material=material, review_store=review_store, analysis_store=analysis_store
+    )
 
     if request.retrieval.status != "retrieved" or not request.retrieval.results:
         return RemediationGenerationResponse(
@@ -104,6 +109,7 @@ async def generate_grounded_remediation(
             status="generated",
             analysis_id=request.analysis_id,
             group_id=request.misconception.group_id,
+            source_group_ids=request.misconception.source_group_ids,
             provider=llm_service.provider_name,
             model=llm_service.model_id,
             prompt_version=PROMPT_VERSION,
@@ -149,17 +155,28 @@ def _canonical_generation_request(
     *,
     analysis: AnalysisSnapshot,
     material: MaterialRecord,
+    review_store: GroupReviewStore | None,
+    analysis_store: AnalysisStore,
 ) -> RemediationGenerationRequest:
     result = analysis.result
     if result.analysis_id != request.analysis_id:
         _raise_context_mismatch("analysis_id")
 
-    group = next(
-        (item for item in result.groups if item.group_id == request.misconception.group_id),
-        None,
-    )
-    if group is None:
-        _raise_context_mismatch("misconception.group_id")
+    try:
+        if review_store is None:
+            detected = next(
+                (item for item in result.groups if item.group_id == request.misconception.group_id), None
+            )
+            if detected is None:
+                _raise_context_mismatch("misconception.group_id")
+            from app.services.group_reviews import _from_detected
+            group = _from_detected(detected)
+        else:
+            group = resolve_reviewed_group(
+                request.analysis_id, request.misconception.group_id, analysis_store, review_store
+            )
+    except GroupReviewError as error:
+        raise RemediationError(error.code, error.message, details=error.details) from error
 
     assessment = result.assessment
     class_context = {
@@ -176,8 +193,9 @@ def _canonical_generation_request(
         _raise_context_mismatch("class_context")
 
     canonical_misconception = RemediationMisconceptionContext(
-        group_id=group.group_id,
-        provisional_label=group.provisional_label,
+        group_id=group.reviewed_group_id,
+        source_group_ids=group.source_group_ids,
+        provisional_label=group.display_label,
         question_id=group.question_id,
         question=group.question,
         correct_answer=group.correct_answer,
@@ -187,8 +205,10 @@ def _canonical_generation_request(
     )
     if request.misconception != canonical_misconception:
         _raise_context_mismatch("misconception")
-    if request.retrieval.group_id != group.group_id:
+    if request.retrieval.group_id != group.reviewed_group_id:
         _raise_context_mismatch("retrieval.group_id")
+    if request.retrieval.source_group_ids != group.source_group_ids:
+        _raise_context_mismatch("retrieval.source_group_ids")
     if request.retrieval.material != material.material:
         _raise_context_mismatch("retrieval.material")
     if request.retrieval.retrieval.embedding_model != material.material.embedding_model:
@@ -232,7 +252,8 @@ def _canonical_generation_request(
 
     canonical_retrieval = MaterialRetrievalResponse(
         status=request.retrieval.status,
-        group_id=group.group_id,
+        group_id=group.reviewed_group_id,
+        source_group_ids=group.source_group_ids,
         material=material.material.model_copy(deep=True),
         retrieval=request.retrieval.retrieval.model_copy(deep=True),
         results=canonical_results,

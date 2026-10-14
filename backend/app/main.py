@@ -184,7 +184,9 @@ async def handle_remediation_error(_request: Request, error: RemediationError) -
     log_error("request", error.code)
     status_code = (
         404 if error.code in {"remediation_not_found", "remediation_context_not_found"}
-        else 409 if error.code in {"remediation_invalid_transition", "remediation_context_mismatch"}
+        else 409 if error.code in {
+            "remediation_invalid_transition", "remediation_context_mismatch", "reviewed_group_not_available"
+        }
         else 502 if error.code in {"llm_malformed_output", "llm_ungrounded_output"}
         else 503 if error.retryable or error.code == "llm_not_configured"
         else 400

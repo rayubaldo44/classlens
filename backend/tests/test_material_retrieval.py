@@ -9,6 +9,8 @@ from app.api.routes.analysis import get_embedding_service
 from app.config import MaterialSettings
 from app.main import app
 from app.providers.material_index import InMemoryMaterialIndex, get_material_index
+from app.providers.analysis_store import InMemoryAnalysisStore, get_analysis_store
+from app.providers.group_review_store import InMemoryGroupReviewStore, get_group_review_store
 from app.schemas.materials import MisconceptionRetrievalContext
 from app.services.material_ingestion import MaterialError, _chunk_text, ingest_learning_material
 from app.services.material_retrieval import retrieve_for_misconception
@@ -250,6 +252,8 @@ def test_demo_material_api_returns_typed_ingestion_response() -> None:
 
     app.dependency_overrides[get_embedding_service] = override_embedding_service
     app.dependency_overrides[get_material_index] = override_material_index
+    app.dependency_overrides[get_analysis_store] = lambda: InMemoryAnalysisStore()
+    app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
 
     async def send() -> tuple[httpx.Response, httpx.Response]:
         transport = httpx.ASGITransport(app=app)

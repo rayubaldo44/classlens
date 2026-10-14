@@ -47,6 +47,7 @@ class ResultsTrace(BaseModel):
     baseline_analysis_id: str
     follow_up_analysis_id: str
     baseline_group_id: str
+    baseline_source_group_ids: list[str] = Field(default_factory=list)
     follow_up_group_id: str | None
     remediation_id: str
     remediation_status: Literal["approved"]

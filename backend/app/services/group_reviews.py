@@ -114,7 +114,6 @@ def apply_group_review(
     review_store: GroupReviewStore,
     remediation_store: RemediationStore | None,
 ) -> GroupReviewResponse:
-    del remediation_store  # Downstream locking is added with remediation provenance in Task 4.
     _validate_shape(request)
     with _lock_for(analysis_id):
         initial = _initial_state(analysis_id, analysis_store)
@@ -131,6 +130,20 @@ def apply_group_review(
                     details={"group_id": group_id},
                 )
             selected.append(group)
+
+        if remediation_store is not None:
+            affected_reviewed_ids = {group.reviewed_group_id for group in selected}
+            affected_source_ids = {source for group in selected for source in group.source_group_ids}
+            for remediation in remediation_store.list_for_analysis(analysis_id):
+                if (
+                    remediation.group_id in affected_reviewed_ids
+                    or bool(set(remediation.source_group_ids).intersection(affected_source_ids))
+                ):
+                    raise GroupReviewError(
+                        "group_review_locked",
+                        "This evidence is locked because a remediation already exists for it.",
+                        details={"remediation_id": remediation.remediation_id},
+                    )
 
         if request.action == "restore":
             if selected[0].status != "dismissed":

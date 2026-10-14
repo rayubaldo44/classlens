@@ -9,6 +9,8 @@ class RemediationStore(Protocol):
 
     def get(self, remediation_id: str) -> RemediationRecord | None: ...
 
+    def list_for_analysis(self, analysis_id: str) -> list[RemediationRecord]: ...
+
 
 class InMemoryRemediationStore:
     """Process-local demo store. Records are copied to prevent accidental mutation."""
@@ -25,6 +27,14 @@ class InMemoryRemediationStore:
         with self._lock:
             record = self._records.get(remediation_id)
             return record.model_copy(deep=True) if record else None
+
+    def list_for_analysis(self, analysis_id: str) -> list[RemediationRecord]:
+        with self._lock:
+            return [
+                record.model_copy(deep=True)
+                for record in self._records.values()
+                if record.analysis_id == analysis_id
+            ]
 
 
 _STORE = InMemoryRemediationStore()

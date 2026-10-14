@@ -4,6 +4,8 @@ from time import perf_counter
 from app.config import MaterialSettings
 from app.providers.embeddings import EmbeddingService
 from app.providers.material_index import MaterialIndex
+from app.providers.analysis_store import AnalysisStore
+from app.providers.group_review_store import GroupReviewStore
 from app.schemas.materials import (
     MaterialRetrievalResponse,
     MisconceptionRetrievalContext,
@@ -12,6 +14,7 @@ from app.schemas.materials import (
 )
 from app.services.material_ingestion import MaterialError
 from app.services.material_ingestion import _normalize_embeddings
+from app.services.group_reviews import GroupReviewError, resolve_reviewed_group
 from app.telemetry import log_error, log_stage
 
 
@@ -22,7 +25,30 @@ def retrieve_for_misconception(
     embedding_service: EmbeddingService,
     material_index: MaterialIndex,
     settings: MaterialSettings,
+    analysis_store: AnalysisStore | None = None,
+    review_store: GroupReviewStore | None = None,
 ) -> MaterialRetrievalResponse:
+    source_group_ids = [context.group_id]
+    if context.analysis_id is not None:
+        if analysis_store is None or review_store is None:
+            raise MaterialError("review_context_unavailable", "Reviewed evidence could not be resolved.")
+        try:
+            reviewed = resolve_reviewed_group(context.analysis_id, context.group_id, analysis_store, review_store)
+        except GroupReviewError as error:
+            raise MaterialError(error.code, error.message, details=error.details) from error
+        supplied = (
+            context.question_id, context.question, context.correct_answer, context.representative_answers
+        )
+        canonical = (
+            reviewed.question_id, reviewed.question, reviewed.correct_answer,
+            [item.answer for item in reviewed.representative_responses],
+        )
+        if supplied != canonical:
+            raise MaterialError(
+                "group_review_context_mismatch",
+                "The selected reviewed group no longer matches the stored evidence. Reload the analysis.",
+            )
+        source_group_ids = reviewed.source_group_ids
     record = material_index.get(material_id)
     if record is None:
         raise MaterialError("material_not_found", "This learning material is not in the current backend index.", details={"material_id": material_id})
@@ -101,6 +127,7 @@ def retrieve_for_misconception(
     return MaterialRetrievalResponse(
         status=status,
         group_id=context.group_id,
+        source_group_ids=source_group_ids,
         material=record.material,
         retrieval=RetrievalMetadata(
             algorithm="cosine_similarity_v1",

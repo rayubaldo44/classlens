@@ -6,6 +6,7 @@ from app.concurrency import run_in_worker
 from app.providers.analysis_store import AnalysisStore, get_analysis_store
 from app.providers.llm import LLMService, get_llm_service
 from app.providers.material_index import MaterialIndex, get_material_index
+from app.providers.group_review_store import GroupReviewStore, get_group_review_store
 from app.providers.remediation_store import RemediationStore, get_remediation_store
 from app.schemas.assessment import ErrorResponse
 from app.schemas.remediations import (
@@ -36,6 +37,7 @@ async def generate_remediation(
     store: Annotated[RemediationStore, Depends(get_remediation_store)],
     analysis_store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     material_index: Annotated[MaterialIndex, Depends(get_material_index)],
+    review_store: Annotated[GroupReviewStore, Depends(get_group_review_store)],
 ) -> RemediationGenerationResponse:
     return await generate_grounded_remediation(
         request,
@@ -43,6 +45,7 @@ async def generate_remediation(
         store=store,
         analysis_store=analysis_store,
         material_index=material_index,
+        review_store=review_store,
     )
 
 

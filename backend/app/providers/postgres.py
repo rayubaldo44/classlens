@@ -356,6 +356,12 @@ class PostgresRemediationStore:
         self.database = database
 
     def save(self, record: RemediationRecord) -> None:
+        if not record.source_group_ids:
+            raise DatabaseError(
+                "database_invalid_relationship",
+                "A persisted remediation requires original source group provenance.",
+                retryable=False,
+            )
         with self.database.connection() as connection, connection.transaction():
             existing = connection.execute("select status from interventions where id=%s for update", (record.remediation_id,)).fetchone()
             if existing is not None and existing[0] != "generated":
@@ -363,14 +369,16 @@ class PostgresRemediationStore:
             connection.execute(
                 """
                 insert into interventions
-                  (id,analysis_id,group_public_id,status,provider,model,prompt_version,generated_content,
+                  (id,analysis_id,group_public_id,reviewed_group_public_id,source_group_public_ids,
+                   status,provider,model,prompt_version,generated_content,
                    edited_content,review_notes,record_json,created_at,updated_at)
-                values (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s::jsonb,%s,%s)
+                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s::jsonb,%s,%s)
                 on conflict (id) do update set status=excluded.status, edited_content=excluded.edited_content,
                   review_notes=excluded.review_notes, record_json=excluded.record_json, updated_at=excluded.updated_at
                 """,
                 (
-                    record.remediation_id, record.analysis_id, record.group_id, record.status, record.provider,
+                    record.remediation_id, record.analysis_id, record.source_group_ids[0], record.group_id,
+                    record.source_group_ids, record.status, record.provider,
                     record.model, record.prompt_version, _json(record.generated_content.model_dump(mode="json")),
                     _json(record.content.model_dump(mode="json")), record.review_notes,
                     _json(record.model_dump(mode="json")), record.created_at, record.updated_at,
@@ -393,6 +401,14 @@ class PostgresRemediationStore:
             row = connection.execute("select record_json from interventions where id=%s", (remediation_id,)).fetchone()
         return RemediationRecord.model_validate(row[0]) if row else None
 
+    def list_for_analysis(self, analysis_id: str) -> list[RemediationRecord]:
+        with self.database.connection() as connection:
+            rows = connection.execute(
+                "select record_json from interventions where analysis_id=%s order by created_at",
+                (analysis_id,),
+            ).fetchall()
+        return [RemediationRecord.model_validate(row[0]) for row in rows]
+
 
 class PostgresResultsStore:
     def __init__(self, database: Database) -> None:
@@ -407,12 +423,14 @@ class PostgresResultsStore:
                 """
                 insert into assessment_comparisons
                   (id,baseline_analysis_id,follow_up_analysis_id,baseline_group_public_id,
+                   baseline_reviewed_group_public_id,baseline_source_group_public_ids,
                    follow_up_group_public_id,intervention_id,status,matching_method,record_json,created_at)
-                values (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
                 on conflict (id) do update set record_json=excluded.record_json
                 """,
                 (record.comparison_id, trace.baseline_analysis_id, trace.follow_up_analysis_id,
-                 trace.baseline_group_id, trace.follow_up_group_id, trace.remediation_id,
+                 trace.baseline_source_group_ids[0], trace.baseline_group_id, trace.baseline_source_group_ids,
+                 trace.follow_up_group_id, trace.remediation_id,
                  record.status, trace.comparison_method, _json(record.model_dump(mode="json")), record.created_at),
             )
 

@@ -291,7 +291,7 @@ def test_action_shape_validation_happens_before_write() -> None:
     assert review_store.get(analysis_id) is None
 
 
-def _api_request(analysis_store, review_store, method: str, path: str, json=None) -> httpx.Response:
+def _api_request(analysis_store, review_store, method: str, path: str, json=None, remediation_store=None) -> httpx.Response:
     async def override_analysis_store():
         return analysis_store
 
@@ -299,7 +299,7 @@ def _api_request(analysis_store, review_store, method: str, path: str, json=None
         return review_store
 
     async def override_remediation_store():
-        return InMemoryRemediationStore()
+        return remediation_store or InMemoryRemediationStore()
 
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_group_review_store] = override_review_store
@@ -387,3 +387,36 @@ def test_group_review_api_maps_stale_store_conflict_without_recording_history() 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "group_review_stale"
     assert store.get(analysis_id) is None
+
+
+def test_review_actions_lock_after_remediation_exists_for_source_evidence() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    group = get_group_reviews(analysis_id, analysis_store, review_store).active_groups[0]
+
+    class ExistingRemediations:
+        def list_for_analysis(self, requested_analysis_id):
+            assert requested_analysis_id == analysis_id
+            return [type("Record", (), {
+                "group_id": group.reviewed_group_id,
+                "source_group_ids": group.source_group_ids,
+                "remediation_id": "rem_existing",
+            })()]
+
+    with pytest.raises(GroupReviewError) as caught:
+        apply_group_review(
+            analysis_id,
+            GroupReviewActionRequest(action="rename", group_ids=[group.reviewed_group_id], label="Locked"),
+            analysis_store, review_store, ExistingRemediations(),
+        )
+    assert caught.value.code == "group_review_locked"
+    assert review_store.get(analysis_id) is None
+
+    response = _api_request(
+        analysis_store, review_store, "POST",
+        f"/api/v1/assessments/analyses/{analysis_id}/group-reviews",
+        {"action": "rename", "group_ids": [group.reviewed_group_id], "label": "Locked"},
+        remediation_store=ExistingRemediations(),
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "group_review_locked"

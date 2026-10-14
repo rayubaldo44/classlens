@@ -29,4 +29,33 @@ create index if not exists group_review_events_analysis_idx
 alter table analysis_group_review_states enable row level security;
 alter table analysis_group_review_events enable row level security;
 
+alter table interventions
+  add column if not exists reviewed_group_public_id text,
+  add column if not exists source_group_public_ids text[];
+
+update interventions
+set reviewed_group_public_id = group_public_id,
+    source_group_public_ids = array[group_public_id]
+where reviewed_group_public_id is null or source_group_public_ids is null;
+
+alter table interventions
+  alter column reviewed_group_public_id set not null,
+  alter column source_group_public_ids set not null;
+
+alter table assessment_comparisons
+  add column if not exists baseline_reviewed_group_public_id text,
+  add column if not exists baseline_source_group_public_ids text[];
+
+update assessment_comparisons
+set baseline_reviewed_group_public_id = baseline_group_public_id,
+    baseline_source_group_public_ids = array[baseline_group_public_id]
+where baseline_reviewed_group_public_id is null or baseline_source_group_public_ids is null;
+
+alter table assessment_comparisons
+  alter column baseline_reviewed_group_public_id set not null,
+  alter column baseline_source_group_public_ids set not null;
+
+create index if not exists interventions_reviewed_group_idx
+  on interventions(analysis_id, reviewed_group_public_id);
+
 commit;

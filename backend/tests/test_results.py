@@ -12,9 +12,12 @@ from app.main import app
 from app.providers.analysis_store import InMemoryAnalysisStore, get_analysis_store
 from app.providers.embeddings import get_embedding_service
 from app.providers.remediation_store import InMemoryRemediationStore, get_remediation_store
+from app.providers.group_review_store import InMemoryGroupReviewStore, get_group_review_store
 from app.providers.results_store import InMemoryResultsStore, get_results_store
 from app.schemas.remediations import FollowUpQuestion, RemediationContent, RemediationRecord
 from app.schemas.results import FollowUpComparisonLink
+from app.schemas.group_reviews import GroupReviewActionRequest
+from app.services.group_reviews import apply_group_review, get_group_reviews
 from app.services.assessment_intake import parse_assessment_csv_full
 from app.services.misconception_analysis import AnalysisError, analyze_assessment
 from app.services.results import ResultsError, create_follow_up_comparison, get_follow_up_comparison
@@ -173,6 +176,61 @@ def test_comparison_calculates_prevalence_and_student_transitions_from_data() ->
     assert result.trace is not None
     assert result.trace.remediation_status == "approved"
     assert results_store.get(result.comparison_id) is not None
+
+
+def test_merged_review_uses_union_members_and_preserves_source_ids_in_trace() -> None:
+    embedding = KeywordEmbeddingService()
+    settings = analysis_settings()
+    baseline = parsed([
+        row("S1", "sun-food one", False), row("S2", "sun-food two", False),
+        row("S3", "sun-food three", False), row("S4", "soil-food one", False),
+        row("S5", "soil-food two", False), row("S6", "soil-food three", False),
+        row("S7", "correct response", True),
+    ], filename="merged-baseline.csv")
+    analysis = analyze_assessment(baseline, embedding, settings)
+    assert len(analysis.groups) == 2
+    original_json = analysis.model_dump_json()
+    analysis_store = InMemoryAnalysisStore()
+    analysis_store.save(baseline, analysis)
+    review_store = InMemoryGroupReviewStore()
+    initial = get_group_reviews(analysis.analysis_id, analysis_store, review_store)
+    merged_response = apply_group_review(
+        analysis.analysis_id,
+        GroupReviewActionRequest(
+            action="merge", group_ids=[group.reviewed_group_id for group in initial.active_groups],
+            label="Food source confusion",
+        ),
+        analysis_store, review_store, None,
+    )
+    merged = merged_response.active_groups[0]
+    remediation_store = InMemoryRemediationStore()
+    record = remediation(merged.reviewed_group_id, analysis_id=analysis.analysis_id)
+    record.source_group_ids = merged.source_group_ids
+    remediation_store.save(record)
+    link = FollowUpComparisonLink(
+        baseline_analysis_id=analysis.analysis_id,
+        group_id=merged.reviewed_group_id,
+        remediation_id=record.remediation_id,
+    )
+
+    result = create_follow_up_comparison(
+        link,
+        parsed([
+            row("S1", "sun-food still", False), row("S2", "sun-food again", False),
+            row("S3", "correct response", True), row("S4", "correct response", True),
+            row("S5", "correct response", True), row("S6", "correct response", True),
+            row("S7", "sun-food new", False),
+        ], filename="merged-follow-up.csv"),
+        embedding_service=embedding, settings=settings, analysis_store=analysis_store,
+        remediation_store=remediation_store, results_store=InMemoryResultsStore(), review_store=review_store,
+    )
+
+    assert result.metrics is not None
+    assert result.metrics.before.affected_students == 6
+    assert result.trace is not None
+    assert result.trace.baseline_group_id == merged.reviewed_group_id
+    assert result.trace.baseline_source_group_ids == merged.source_group_ids
+    assert analysis_store.get(analysis.analysis_id).result.model_dump_json() == original_json
 
 
 def test_demo_follow_up_fixture_uses_existing_parser_and_expected_counts() -> None:
@@ -334,6 +392,7 @@ def test_results_api_is_typed_reuses_csv_validation_and_supports_get() -> None:
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_remediation_store] = override_remediation_store
     app.dependency_overrides[get_results_store] = override_results_store
+    app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
 
     async def send() -> tuple[httpx.Response, httpx.Response, httpx.Response]:
         transport = httpx.ASGITransport(app=app)
