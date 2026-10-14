@@ -2,10 +2,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import httpx
 from pydantic import ValidationError
+from conftest import run_test_async
 
 from app.providers.group_review_store import InMemoryGroupReviewStore
-from app.providers.analysis_store import InMemoryAnalysisStore
+from app.providers.group_review_store import get_group_review_store
+from app.providers.analysis_store import InMemoryAnalysisStore, get_analysis_store
+from app.providers.remediation_store import InMemoryRemediationStore, get_remediation_store
+from app.main import app
 from app.services.assessment_intake import parse_assessment_csv_full
 from app.services.group_reviews import (
     GroupReviewError,
@@ -284,3 +289,101 @@ def test_action_shape_validation_happens_before_write() -> None:
         with pytest.raises(GroupReviewError):
             apply_group_review(analysis_id, request, analysis_store, review_store, None)
     assert review_store.get(analysis_id) is None
+
+
+def _api_request(analysis_store, review_store, method: str, path: str, json=None) -> httpx.Response:
+    async def override_analysis_store():
+        return analysis_store
+
+    async def override_review_store():
+        return review_store
+
+    async def override_remediation_store():
+        return InMemoryRemediationStore()
+
+    app.dependency_overrides[get_analysis_store] = override_analysis_store
+    app.dependency_overrides[get_group_review_store] = override_review_store
+    app.dependency_overrides[get_remediation_store] = override_remediation_store
+
+    async def send() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.request(method, path, json=json)
+
+    try:
+        return run_test_async(send())
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_group_review_api_supports_all_actions_and_ordered_history() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    path = f"/api/v1/assessments/analyses/{analysis_id}/group-reviews"
+
+    initial = _api_request(analysis_store, review_store, "GET", path)
+    assert initial.status_code == 200
+    q1 = [group for group in initial.json()["active_groups"] if group["question_id"] == "Q1"]
+
+    renamed = _api_request(analysis_store, review_store, "POST", path, {
+        "action": "rename", "group_ids": [q1[0]["reviewed_group_id"]], "label": "Teacher label"
+    })
+    assert renamed.status_code == 200
+    dismissed = _api_request(analysis_store, review_store, "POST", path, {
+        "action": "dismiss", "group_ids": [q1[0]["reviewed_group_id"]], "review_note": "Duplicate"
+    })
+    assert dismissed.status_code == 200
+    restored = _api_request(analysis_store, review_store, "POST", path, {
+        "action": "restore", "group_ids": [q1[0]["reviewed_group_id"]]
+    })
+    assert restored.status_code == 200
+    merged = _api_request(analysis_store, review_store, "POST", path, {
+        "action": "merge", "group_ids": [group["reviewed_group_id"] for group in q1], "label": "Combined"
+    })
+    assert merged.status_code == 200
+    assert [event["action"] for event in merged.json()["events"]] == ["rename", "dismiss", "restore", "merge"]
+
+
+def test_group_review_api_returns_structured_not_found_conflict_and_validation_errors() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    missing = _api_request(
+        analysis_store, review_store, "GET", "/api/v1/assessments/analyses/missing/group-reviews"
+    )
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "analysis_not_found"
+
+    path = f"/api/v1/assessments/analyses/{analysis_id}/group-reviews"
+    unknown = _api_request(analysis_store, review_store, "POST", path, {
+        "action": "rename", "group_ids": ["grp_missing"], "label": "No"
+    })
+    assert unknown.status_code == 409
+    assert unknown.json()["error"]["code"] == "group_review_stale_group"
+    assert unknown.json()["error"]["retryable"] is False
+    assert unknown.json()["error"]["request_id"].startswith("req_")
+
+    invalid = _api_request(analysis_store, review_store, "POST", path, {
+        "action": "merge", "group_ids": []
+    })
+    assert invalid.status_code == 422
+    assert invalid.json()["detail"]
+
+
+def test_group_review_api_maps_stale_store_conflict_without_recording_history() -> None:
+    analysis_store, analysis_id = _analysis_store()
+
+    class StaleStore(InMemoryGroupReviewStore):
+        def save(self, *args, **kwargs):
+            raise ValueError("stale")
+
+    store = StaleStore()
+    initial = get_group_reviews(analysis_id, analysis_store, store)
+    group_id = initial.active_groups[0].reviewed_group_id
+    response = _api_request(
+        analysis_store, store, "POST",
+        f"/api/v1/assessments/analyses/{analysis_id}/group-reviews",
+        {"action": "rename", "group_ids": [group_id], "label": "Teacher label"},
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "group_review_stale"
+    assert store.get(analysis_id) is None
