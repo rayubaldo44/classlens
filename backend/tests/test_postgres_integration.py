@@ -5,8 +5,15 @@ from uuid import uuid4
 import pytest
 
 from app.config import AnalysisSettings, MaterialSettings
-from app.database import Database
-from app.providers.postgres import PostgresAnalysisStore, PostgresMaterialIndex, PostgresRemediationStore, PostgresResultsStore
+from app.database import Database, DatabaseError
+from app.providers.postgres import (
+    PostgresAnalysisStore,
+    PostgresGroupReviewStore,
+    PostgresMaterialIndex,
+    PostgresRemediationStore,
+    PostgresResultsStore,
+)
+from app.schemas.group_reviews import GroupReviewEvent, GroupReviewState, ReviewedMisconceptionGroup
 from app.schemas.materials import MisconceptionRetrievalContext
 from app.schemas.remediations import FollowUpQuestion, RemediationContent, RemediationRecord, RemediationSource
 from app.schemas.results import FollowUpComparisonLink
@@ -68,6 +75,31 @@ def test_postgres_workflow_survives_new_repository_instances() -> None:
     analysis_store.save(baseline, baseline_result)
     analysis_store.save(baseline, baseline_result)  # A retry must not duplicate response or group evidence.
     group = baseline_result.groups[0]
+
+    reviewed_group = ReviewedMisconceptionGroup(
+        reviewed_group_id=group.group_id, display_label=group.provisional_label, status="active",
+        source_group_ids=[group.group_id], question_id=group.question_id, question=group.question,
+        correct_answer=group.correct_answer, support_count=group.support_count,
+        eligible_response_count=group.eligible_response_count, member_student_ids=group.member_student_ids,
+        representative_responses=group.representative_responses, coherence=group.coherence,
+    )
+    review_state = GroupReviewState(
+        analysis_id=baseline_result.analysis_id, revision=1, groups=[reviewed_group]
+    )
+    review_event = GroupReviewEvent(
+        event_id=f"grev_{baseline_result.analysis_id}", analysis_id=baseline_result.analysis_id,
+        sequence=1, action="rename", source_group_ids=[group.group_id],
+        resulting_reviewed_group_id=group.group_id, previous_state=None, next_state=review_state,
+        review_note="Teacher wording", created_at=datetime.now(UTC),
+    )
+    review_store = PostgresGroupReviewStore(database)
+    review_store.save(baseline_result.analysis_id, None, review_state, review_event)
+    with pytest.raises(DatabaseError, match="changed before this action"):
+        review_store.save(baseline_result.analysis_id, None, review_state, review_event)
+    reloaded_reviews = PostgresGroupReviewStore(Database(DATABASE_URL)).get(baseline_result.analysis_id)
+    assert reloaded_reviews is not None
+    assert reloaded_reviews.state == review_state
+    assert [event.event_id for event in reloaded_reviews.events] == [review_event.event_id]
 
     material_settings = MaterialSettings(
         chunk_size_chars=900, chunk_overlap_chars=120, retrieval_top_k=3, minimum_relevance_score=0.42
