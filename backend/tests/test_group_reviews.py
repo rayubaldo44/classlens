@@ -5,6 +5,16 @@ import pytest
 from pydantic import ValidationError
 
 from app.providers.group_review_store import InMemoryGroupReviewStore
+from app.providers.analysis_store import InMemoryAnalysisStore
+from app.services.assessment_intake import parse_assessment_csv_full
+from app.services.group_reviews import (
+    GroupReviewError,
+    apply_group_review,
+    get_group_reviews,
+    resolve_reviewed_group,
+)
+from app.services.misconception_analysis import analyze_assessment
+from app.config import AnalysisSettings
 from app.schemas.group_reviews import (
     GroupReviewActionRequest,
     GroupReviewEvent,
@@ -110,3 +120,167 @@ def test_additive_migration_defines_review_state_and_append_only_history() -> No
         assert f"alter table {table} enable row level security" in migration
     assert "references analysis_runs(id) on delete restrict" in migration
     assert "action in ('rename', 'merge', 'dismiss', 'restore')" in migration
+
+
+class ReviewEmbeddings:
+    model_id = "test/reviews"
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        vectors = {
+            "light one": [1.0, 0.0, 0.0], "light two": [0.99, 0.01, 0.0],
+            "soil one": [0.0, 1.0, 0.0], "soil two": [0.0, 0.99, 0.01],
+            "root one": [0.0, 0.0, 1.0], "root two": [0.01, 0.0, 0.99],
+        }
+        return [vectors[text] for text in texts]
+
+
+def _analysis_store() -> tuple[InMemoryAnalysisStore, str]:
+    header = (
+        "assessment_title,subject,grade_level,topic,student_id,question_id,question,answer,"
+        "correct_answer,is_correct\n"
+    )
+    rows = [
+        'Review,Science,7,Plants,S1,Q1,"How food?","light one","Glucose",false\n',
+        'Review,Science,7,Plants,S2,Q1,"How food?","light two","Glucose",false\n',
+        'Review,Science,7,Plants,S3,Q1,"How food?","soil one","Glucose",false\n',
+        'Review,Science,7,Plants,S4,Q1,"How food?","soil two","Glucose",false\n',
+        'Review,Science,7,Plants,S5,Q2,"What enters roots?","root one","Water",false\n',
+        'Review,Science,7,Plants,S6,Q2,"What enters roots?","root two","Water",false\n',
+    ]
+    parsed = parse_assessment_csv_full(
+        (header + "".join(rows)).encode(), filename="review.csv", data_label="teacher_upload"
+    )
+    result = analyze_assessment(
+        parsed, ReviewEmbeddings(),
+        AnalysisSettings(embedding_model=ReviewEmbeddings.model_id, similarity_threshold=0.8, min_group_size=2),
+    )
+    assert len(result.groups) == 3
+    store = InMemoryAnalysisStore()
+    store.save(parsed, result)
+    return store, result.analysis_id
+
+
+def test_initial_overlay_preserves_detected_groups_without_persisting_state() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+
+    response = get_group_reviews(analysis_id, analysis_store, review_store)
+
+    assert response.revision == 0
+    assert len(response.active_groups) == 3
+    assert response.dismissed_groups == []
+    assert response.events == []
+    assert review_store.get(analysis_id) is None
+    for group in response.active_groups:
+        assert group.reviewed_group_id == group.source_group_ids[0]
+        assert group.coherence is not None
+
+
+def test_rename_dismiss_restore_and_history_are_deterministic() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    original = get_group_reviews(analysis_id, analysis_store, review_store).active_groups[0]
+
+    renamed = apply_group_review(
+        analysis_id,
+        GroupReviewActionRequest(action="rename", group_ids=[original.reviewed_group_id], label="  Energy confusion  "),
+        analysis_store, review_store, None,
+    )
+    assert renamed.active_groups[0].display_label == "Energy confusion"
+    dismissed = apply_group_review(
+        analysis_id,
+        GroupReviewActionRequest(action="dismiss", group_ids=[original.reviewed_group_id], review_note="Duplicate"),
+        analysis_store, review_store, None,
+    )
+    assert [group.reviewed_group_id for group in dismissed.dismissed_groups] == [original.reviewed_group_id]
+    restored = apply_group_review(
+        analysis_id,
+        GroupReviewActionRequest(action="restore", group_ids=[original.reviewed_group_id]),
+        analysis_store, review_store, None,
+    )
+    assert len(restored.active_groups) == 3
+    assert [event.action for event in restored.events] == ["rename", "dismiss", "restore"]
+    assert [event.sequence for event in restored.events] == [1, 2, 3]
+
+
+def test_merge_unions_exact_evidence_and_uses_label_independent_id() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    initial = get_group_reviews(analysis_id, analysis_store, InMemoryGroupReviewStore())
+    q1_groups = [group for group in initial.active_groups if group.question_id == "Q1"]
+
+    def merge(label: str):
+        store = InMemoryGroupReviewStore()
+        response = apply_group_review(
+            analysis_id,
+            GroupReviewActionRequest(
+                action="merge", group_ids=[group.reviewed_group_id for group in reversed(q1_groups)], label=label
+            ),
+            analysis_store, store, None,
+        )
+        return response, store
+
+    first, first_store = merge("Combined misconception")
+    second, _ = merge("Different teacher wording")
+    merged = next(group for group in first.active_groups if len(group.source_group_ids) == 2)
+    merged_again = next(group for group in second.active_groups if len(group.source_group_ids) == 2)
+    expected_members = sorted({student for group in q1_groups for student in group.member_student_ids})
+    expected_answers = {item.answer for group in q1_groups for item in group.representative_responses}
+
+    assert merged.reviewed_group_id == merged_again.reviewed_group_id
+    assert merged.source_group_ids == sorted(group.reviewed_group_id for group in q1_groups)
+    assert merged.member_student_ids == expected_members
+    assert {item.answer for item in merged.representative_responses} == expected_answers
+    assert merged.support_count == len(expected_members)
+    assert merged.coherence is None
+    assert resolve_reviewed_group(analysis_id, merged.reviewed_group_id, analysis_store, first_store) == merged
+
+
+@pytest.mark.parametrize("case", ["unknown", "cross_question", "already_dismissed", "already_merged"])
+def test_invalid_or_stale_actions_leave_state_and_history_unchanged(case: str) -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    initial = get_group_reviews(analysis_id, analysis_store, review_store)
+    q1 = [group for group in initial.active_groups if group.question_id == "Q1"]
+    q2 = next(group for group in initial.active_groups if group.question_id == "Q2")
+
+    if case == "unknown":
+        request = GroupReviewActionRequest(action="rename", group_ids=["grp_unknown"], label="No")
+    elif case == "cross_question":
+        request = GroupReviewActionRequest(
+            action="merge", group_ids=[q1[0].reviewed_group_id, q2.reviewed_group_id], label="No"
+        )
+    elif case == "already_dismissed":
+        apply_group_review(
+            analysis_id, GroupReviewActionRequest(action="dismiss", group_ids=[q1[0].reviewed_group_id]),
+            analysis_store, review_store, None,
+        )
+        request = GroupReviewActionRequest(action="dismiss", group_ids=[q1[0].reviewed_group_id])
+    else:
+        merged = apply_group_review(
+            analysis_id,
+            GroupReviewActionRequest(
+                action="merge", group_ids=[group.reviewed_group_id for group in q1], label="Merged"
+            ),
+            analysis_store, review_store, None,
+        )
+        request = GroupReviewActionRequest(action="rename", group_ids=[q1[0].reviewed_group_id], label="Stale")
+        assert len(merged.events) == 1
+
+    before = review_store.get(analysis_id)
+    with pytest.raises(GroupReviewError):
+        apply_group_review(analysis_id, request, analysis_store, review_store, None)
+    assert review_store.get(analysis_id) == before
+
+
+def test_action_shape_validation_happens_before_write() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    group_id = get_group_reviews(analysis_id, analysis_store, review_store).active_groups[0].reviewed_group_id
+
+    for request in (
+        GroupReviewActionRequest(action="rename", group_ids=[group_id]),
+        GroupReviewActionRequest(action="dismiss", group_ids=[group_id], label="Not allowed"),
+    ):
+        with pytest.raises(GroupReviewError):
+            apply_group_review(analysis_id, request, analysis_store, review_store, None)
+    assert review_store.get(analysis_id) is None
