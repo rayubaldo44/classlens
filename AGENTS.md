@@ -33,7 +33,7 @@ Do not expand the MVP into a full LMS. The explicit exclusions are in [TASKS.md]
 ## Coding conventions
 
 - Frontend code is React and TypeScript under `frontend/`; keep TypeScript strict and components focused.
-- The planned backend is Python with FastAPI; add it only when the active task authorizes backend implementation.
+- The implemented backend is Python with FastAPI under `backend/`; keep provider calls, persistence, and secrets behind that boundary.
 - Validate data at system boundaries and return actionable, structured errors.
 - Keep secrets server-side and out of source, fixtures, logs, and client bundles.
 - Never fabricate student responses, evidence, analysis, retrieved passages, citations, or provider results.

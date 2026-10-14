@@ -2,7 +2,7 @@
 
 **Implementation status:** The complete golden-path AI pipeline and its PostgreSQL adapters were live-verified against Supabase on 2026-10-02, including restart recovery and real Gemini generation. Standalone LLM misconception-label interpretation remains unimplemented.
 
-This document is the authority for the proposed AI workflow and its failure behavior. Product requirements and safeguards are in [PRODUCT.md](PRODUCT.md); selected and pending technologies are in [TECH_STACK.md](TECH_STACK.md).
+This document is the authority for the implemented AI workflow, its failure behavior, and the separately labeled interpretation step that remains proposed. Product requirements and safeguards are in [PRODUCT.md](PRODUCT.md); selected and pending technologies are in [TECH_STACK.md](TECH_STACK.md).
 
 ## Pipeline contract
 
@@ -119,7 +119,7 @@ For each proposed group, return evidence before interpretation:
 
 The implementation returns every member student identifier plus up to three exact responses nearest the group medoid, their similarity to the medoid, and mean pairwise coherence. Representation must not become cherry-picking; the UI shows the full member list alongside the representative responses.
 
-## 7. LLM misconception interpretation
+## 7. LLM misconception interpretation — proposed, not implemented
 
 Provide the LLM only the question context, expected concept, aggregate evidence, and selected exact responses. Request structured output with:
 

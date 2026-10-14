@@ -12,17 +12,17 @@ This document is the authority for selected technologies, proposed dependencies,
 
 | Layer | Choice | Status | Reason |
 |---|---|---|---|
-| Frontend | React + TypeScript + Vite | Confirmed; scaffold present | Fast iteration, typed UI, and an existing scaffold. |
-| Styling | CSS; Tailwind only if needed | Confirmed constraint; library choice open | Avoid adding a styling dependency without a concrete need. |
+| Frontend | React + TypeScript + Vite | Confirmed; golden path implemented | Fast iteration and a strict typed UI. |
+| Styling | Plain CSS | Confirmed and implemented | The current interface needs no styling framework. |
 | Frontend motion | Motion for React (`motion`) | Confirmed; landing page implemented | Short entrance and interaction animations with reduced-motion support. |
-| Backend | Python + FastAPI | Confirmed; health foundation implemented | Fits AI/data tooling and provides typed HTTP contracts with OpenAPI. |
+| Backend | Python + FastAPI | Confirmed; golden path implemented | Fits AI/data tooling and provides typed HTTP contracts with OpenAPI. |
 | Database | Supabase PostgreSQL via psycopg | Confirmed; live workflow and restart recovery verified | Direct transactions keep golden-path writes atomic and server-side. |
 | Vector extension | None for MVP | Confirmed | Exact chunks persist; the tiny corpus is re-embedded into a process cache after restart. |
 | Response embeddings | Local Sentence Transformers using `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Confirmed and verified | Lightweight 384-dimensional multilingual embeddings, no hosted inference secret, and adequate semantic separation on the demo fixture. |
 | LLM | Google Gemini API using `gemini-3.1-flash-lite` | Confirmed; remediation adapter and live demo path verified | Stable free-tier model with structured JSON output, suitable demo latency, and an official Python SDK. |
 | Retrieval corpus | Teacher-provided materials | Confirmed requirement | Keeps intervention grounding within teacher-selected sources. |
-| Frontend deployment | Vercel | Confirmed; service provisioned, API wiring pending verification | Direct fit for the Vite frontend. |
-| Backend deployment | Render Web Service | Confirmed; `/health` live, full workflow pending verification | Supports the verified Python 3.11 runtime and a persistent FastAPI process for the local embedding model. |
+| Frontend deployment | Vercel | Confirmed; deployed with direct-route rewrites | Direct fit for the Vite frontend. |
+| Backend deployment | Render Web Service | Confirmed; liveness/preview verified, analysis blocked by 512 MB RAM | Supports Python 3.11, but the current plan cannot hold the measured embedding runtime. |
 | Continuous integration | GitHub Actions | Confirmed; workflow implemented and locally mirrored | Runs frontend and backend checks with a separate ephemeral PostgreSQL integration job. |
 | Browser testing | Playwright + Chromium | Confirmed; deterministic golden-path smoke implemented | Exercises the connected React workflow in CI with contract-valid local API fixtures and no hosted-service or provider dependency. |
 
@@ -51,19 +51,9 @@ The frontend declares Node `>=22.12 <23` in `package.json`; `.nvmrc` records the
 
 The AI runtime was verified with Python `3.11.16` and CPU-only PyTorch `2.7.1`; `backend/.python-version` records that Python patch release. Install `requirements.lock`, which pins `torch==2.7.1+cpu` and includes PyTorch's CPU wheel index; otherwise a default Linux resolver may download unnecessary CUDA packages. The selected embedding model is pinned to Hugging Face commit `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`; the local runner warms it before health responds. No Supabase browser client, document-extraction, external clustering, or pgvector dependency is present.
 
-## Proposed dependency categories
+## Dependency boundary
 
-Select the smallest set after the related decisions are made:
-
-- FastAPI server and ASGI runtime
-- Request/settings validation compatible with the selected FastAPI version
-- CSV parsing from the Python standard library or a data library, based on schema complexity
-- Hugging Face-compatible embedding inference client or local inference package
-- Numerical/grouping library for the chosen algorithm
-- Extractors for only the teacher-material formats supported in the demo
-- Backend testing and HTTP contract testing
-
-These are categories, not approved packages. Record an accepted selection in [DECISIONS.md](DECISIONS.md) before treating it as fixed.
+The implemented MVP uses the dependencies listed above plus Python's standard-library CSV parser and in-repository cosine/grouping code. Additional document extractors remain unselected; do not add them until an actual PDF/DOCX requirement is accepted and source-location preservation is designed.
 
 ## Unresolved decisions
 

@@ -27,7 +27,7 @@ flowchart LR
     I --> D
     I --> IM[(Process-local vector cache)]
     A --> L[Gemini API]
-    A --> X[Document extraction]
+    A --> X[UTF-8 text ingestion]
     X --> A
 ```
 
@@ -60,11 +60,11 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 - Apply the checked-in SQL migration with `psql` and keep future schema changes additive and reproducible.
 - Disable psycopg automatic prepared statements for compatibility with the configured Supabase transaction pooler.
 
-### AI and extraction adapters
+### AI and material adapters
 
 - Embedding adapter: batch text inputs and return model/version metadata or an explicit failure.
 - LLM adapter: accept constrained structured prompts and validate structured output.
-- Document extractor: produce source text plus page/section metadata when the input format supports it.
+- Text ingestion: validate and normalize UTF-8 `.txt` material while preserving exact chunk offsets. Rich document extraction remains unimplemented.
 - Retrieval module: rank teacher-provided chunks and apply a relevance threshold.
 
 ### Teacher
@@ -93,26 +93,24 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 
 Long provider operations currently use a simple synchronous request/response path. Gemini retries one transient timeout/429/5xx response; continued failure remains explicit. If latency later requires job polling, add a small persisted job state within the FastAPI application rather than a new service.
 
-## Proposed folder structure
-
-This is a target, not a request to create empty files or directories.
+## Implemented repository layout
 
 ```text
 classlens/
 ├── frontend/
 │   └── src/
-│       ├── api/           # Typed HTTP client and contracts
-│       ├── components/    # Shared presentational controls
-│       ├── features/      # Intake, analysis, materials, review, results
-│       └── pages/         # Golden-path screens
+│       ├── api/           # Typed HTTP client, guards, and request reliability
+│       ├── App.tsx        # Implemented golden-path screens and workflow state
+│       └── components.tsx # Shared presentational controls
 ├── backend/               # Implemented modular FastAPI application
 │   ├── app/
-│   │   ├── api/           # FastAPI routes and request/response models
+│   │   ├── api/           # FastAPI routes
 │   │   ├── services/      # Analysis, retrieval, remediation orchestration
-│   │   ├── providers/     # Database, embedding, LLM, extraction adapters
+│   │   ├── providers/     # Database, embedding, LLM, and material adapters
 │   │   ├── schemas/       # Pydantic API/domain boundary models
 │   │   ├── config.py      # Environment configuration
 │   │   └── main.py
+│   ├── evaluation/        # Offline/live AI evaluation harnesses and cases
 │   └── tests/
 ├── data/
 │   └── demo/              # Deterministic assessment and synthetic teaching material
@@ -122,7 +120,7 @@ classlens/
 └── docs/
 ```
 
-Create only the folders needed by an authorized implementation milestone.
+This describes the current high-level layout; source code remains authoritative for individual files.
 
 ## Security and privacy
 

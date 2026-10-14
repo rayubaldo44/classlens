@@ -2,21 +2,21 @@
 
 **Implementation status:** The complete API path has PostgreSQL-backed runtime repositories and was live-verified against Supabase on 2026-10-02, including FastAPI restart and frontend resource recovery.
 
-Implemented endpoints are marked and describe the current frontend/backend contract. Other sections remain proposed until implemented. Base path for implemented versioned routes: `/api/v1`.
+The endpoint sections below describe the implemented frontend/backend contract unless explicitly labeled proposed. The versioned base path is `/api/v1`.
 
 ## Conventions
 
-- JSON uses `snake_case` to align with proposed Python models; the frontend should map through typed API contracts.
+- JSON uses `snake_case` to align with implemented Pydantic models; the frontend validates and maps responses through typed API contracts.
 - Resource IDs are opaque strings. Assessment, analysis, group, material, and comparison public IDs use deterministic content-derived prefixes; internal relational rows may use UUIDs. Imported `question_id`/`student_id` values remain validated external identifiers.
 - Timestamps are UTC ISO 8601 strings.
 - File endpoints use `multipart/form-data`; other endpoints use JSON.
-- Long analysis/generation operations may return `202 Accepted` and a pollable resource.
-- Retried mutation requests that can duplicate work should accept an `Idempotency-Key` header.
+- Analysis and generation currently use synchronous request/response endpoints. A future polling contract would require a separately documented API change.
+- Remediation generation requires a body-level `generation_request_id`; browser retries reuse it and the backend derives a deterministic remediation identity from it plus canonical context.
 - Provider/model internals and secrets never appear in client errors.
 
 ## Error contract
 
-Every non-2xx response should use one envelope:
+Domain/service failures handled by the application use this envelope. FastAPI request-schema validation errors (HTTP 422) retain the framework's validation body and are the one current exception:
 
 ```json
 {
@@ -32,7 +32,7 @@ Every non-2xx response should use one envelope:
 }
 ```
 
-Proposed mappings:
+Status mappings used by implemented application handlers:
 
 | Status | Use |
 |---|---|
@@ -41,8 +41,6 @@ Proposed mappings:
 | `409` | Duplicate/idempotency conflict or stale state. |
 | `413` | File or row limit exceeded. |
 | `415` | Unsupported media/document type. |
-| `422` | Structurally valid request with field/row validation errors. |
-| `429` | Rate limit; retry guidance may be supplied. |
 | `502` | Upstream embedding/LLM/extraction provider failure. |
 | `503` | Backend dependency unavailable or timed out. |
 
@@ -225,33 +223,7 @@ The member list above is abbreviated only in this documentation example. Runtime
 
 ## Misconception details
 
-### `GET /misconception-groups/{group_id}`
-
-```json
-{
-  "group_id": "c5ccbe27-bbcd-455c-80f2-943979a12e9c",
-  "question": {
-    "question_id": "q1",
-    "prompt": "How do plants use sunlight to make food?",
-    "expected_answer": "Sunlight provides energy that plants use to make glucose from carbon dioxide and water."
-  },
-  "interpretation": {
-    "title": "Sunlight treated as plant food",
-    "description": "These responses may confuse the energy source for photosynthesis with the glucose produced.",
-    "caveat": "This is a potential shared pattern for teacher review.",
-    "evidence_response_ids": ["r-001", "r-007", "r-019"]
-  },
-  "support_count": 12,
-  "eligible_response_count": 28,
-  "representative_responses": [
-    {"response_id": "r-001", "student_id": "S001", "response_text": "Plants eat sunlight."},
-    {"response_id": "r-007", "student_id": "S007", "response_text": "Sunlight is the food of plants."},
-    {"response_id": "r-019", "student_id": "S019", "response_text": "Plants consume sunlight to grow."}
-  ]
-}
-```
-
-Pagination or explicit limits should be added before returning full membership for larger datasets.
+There is no standalone misconception-group endpoint in the MVP. The persisted analysis response contains every group, complete member identifiers, representative evidence, question context, support counts, and coherence. The frontend selects a group from that canonical response and carries its `analysis_id`/`group_id` linkage into retrieval and remediation. The 100-eligible-response-per-question intake limit bounds the returned membership list; a future larger-data contract would need pagination or an explicit group-detail resource.
 
 ## Learning-material ingestion and retrieval — implemented MVP contract
 

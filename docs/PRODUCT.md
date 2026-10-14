@@ -48,7 +48,7 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 - Identify eligible incorrect responses per question using an answer key, rubric, or explicit correctness field.
 - Use embeddings to represent response meaning and propose recurring semantic groups within the same question.
 - Permit outliers and an insufficient-data outcome; do not force every response into a group.
-- Use an LLM to draft concise, teacher-readable interpretations using only provided question context and group evidence.
+- **Planned after the current golden path:** use an LLM to draft concise, teacher-readable interpretations using only provided question context and group evidence. The implemented MVP uses generic provisional group labels.
 - Record enough model, prompt, and analysis metadata to explain and reproduce the demo result.
 
 ### Evidence review
@@ -84,7 +84,7 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 2. The backend validates and normalizes the input.
 3. An embedding model converts relevant student responses into semantic vectors.
 4. Similar incorrect responses are grouped into potential recurring misconceptions.
-5. An LLM produces concise, teacher-readable descriptions of those groups.
+5. The current MVP assigns generic provisional labels and displays exact group evidence. LLM-authored group descriptions remain a proposed post-demo step.
 6. The teacher opens a group and sees representative responses and supporting evidence.
 7. The teacher uploads or selects relevant instructional material.
 8. Retrieval finds relevant passages from that material.
@@ -126,7 +126,7 @@ Simple demo-safe access controls may be added if deployment requires them, but t
 | Network or backend failure | Show a retryable message, retain safe local state where possible, and avoid duplicate submissions. |
 | Missing follow-up results | Show `not available` and the number missing; never treat missing values as zero. |
 
-Detailed proposed handling is in [AI_PIPELINE.md](AI_PIPELINE.md) and the proposed API error contract is in [API.md](API.md).
+Implemented handling and explicitly proposed extensions are separated in [AI_PIPELINE.md](AI_PIPELINE.md); the current API error contract is in [API.md](API.md).
 
 ## Hackathon success criteria
 

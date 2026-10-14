@@ -55,14 +55,14 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ### D-001 — React, TypeScript, and Vite frontend
 
-- **Status:** Accepted; scaffold present
+- **Status:** Accepted and implemented
 - **Decision:** Build the frontend with React, TypeScript, and Vite.
-- **Reason:** The application is already scaffolded in `frontend/`, and the stack supports rapid typed UI development.
+- **Reason:** The implemented teacher workflow uses the existing `frontend/` application and benefits from strict typed UI development.
 - **Consequence:** Extend the existing app; do not recreate it.
 
 ### D-002 — Python and FastAPI backend
 
-- **Status:** Accepted; health foundation implemented
+- **Status:** Accepted and implemented
 - **Decision:** Use Python with FastAPI for the backend.
 - **Reason:** It fits the AI/data workload and provides explicit HTTP contracts.
 - **Consequence:** Keep provider calls and secrets behind FastAPI.

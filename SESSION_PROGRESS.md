@@ -1246,3 +1246,35 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: preserve the prepared local workspace for presentation and avoid unnecessary configuration changes before judging.
 
 ---
+
+## Session / Milestone: Authoritative documentation reconciled with implementation
+
+**Date:** 2026-10-14 (Asia/Manila)
+
+**Status:** P1 documentation reconciliation complete
+
+- Attempted and completed: audited repository guidance plus product, stack, architecture, AI, API, and decision documents against the implemented source tree, route definitions, schemas, persistence model, frontend contracts, and verified deployment state.
+- Files significantly modified: `AGENTS.md`, `docs/PRODUCT.md`, `docs/TECH_STACK.md`, `docs/ARCHITECTURE.md`, `docs/AI_PIPELINE.md`, `docs/API.md`, `docs/DECISIONS.md`, `STATUS.md`, `TASKS.md`, and this log.
+- Verified/tested: all relative Markdown links in `AGENTS.md` and `docs/**/*.md` resolve. `git diff --check` passed. API documentation headings were compared with FastAPI route decorators; the stale standalone misconception-group endpoint was removed, and synchronous generation/idempotency wording now matches the request schema and service implementation.
+- Problems encountered: the first repository-layout edit duplicated the `api/` row; diff review caught and removed it before completion. The error contract also needed an explicit exception for FastAPI's framework-level HTTP 422 validation body.
+- Important decisions: keep verified current behavior declarative and label only genuinely unimplemented work as proposed. Preserve LLM-authored misconception interpretation as a post-demo requirement; generic provisional labels remain the implemented behavior.
+- Remaining work: none for this task. Hosted Render verification and educator approval of embedding evaluation cases remain blocked by external capacity/review.
+- Recommended next step: avoid changing the rehearsed demo before judging; after the demo, obtain educator review of the embedding cases or start the next teacher workflow improvement.
+
+---
+
+## Session / Milestone: Teacher group review workflow planned
+
+**Date:** 2026-10-14 (Asia/Manila)
+
+**Status:** Design and implementation plan ready for the next session; no application behavior changed
+
+- Attempted and completed: mapped rename, merge, dismiss, and restore behavior across immutable analysis evidence, PostgreSQL persistence, API contracts, canonical remediation/results context, frontend recovery, and browser verification.
+- Files created or significantly modified: `docs/superpowers/specs/2026-10-14-teacher-group-review-design.md`, `docs/superpowers/plans/2026-10-14-teacher-group-review.md`, `TASKS.md`, and this log.
+- Verified/tested: the plan was checked against the current analysis schema, PostgreSQL tables, store protocols, frontend runtime guards, selected-group recovery, remediation integrity checks, and follow-up comparison linkage. No runtime code or database was changed.
+- Problems encountered: merge cannot honestly reuse a numeric coherence score because response vectors are not persisted and the original medoids belong to separate groups.
+- Important decisions: preserve original analysis rows; materialize reviewed state separately; append every action to history; permit merges only within one analysis/question; return null coherence for merges; and lock affected review actions once remediation exists.
+- Remaining work: execute Tasks 1–7 in the linked plan, starting with failing store/migration tests in an isolated implementation session.
+- Recommended next step: review the spec and choose native or subagent-driven execution for the next session. Native execution is recommended because downstream service and frontend tasks depend closely on the same reviewed-group contract.
+
+---

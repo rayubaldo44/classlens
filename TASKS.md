@@ -12,7 +12,7 @@ Tasks are grouped by priority, then category. Within each category, work from to
 | P1 | Reliability, testing, and optional product improvements | After the P0 demo gates pass |
 | P2 | Real-school pilot safeguards and later product work | After the demo; safeguards must pass before real student data |
 
-**Next action:** use the verified local runner for the unfunded demo, then run two timed rehearsals on the judging machine/network. Hosted analysis stays deferred until a 2 GB Render plan is affordable.
+**Next action:** preserve the verified local presentation setup. Hosted analysis stays deferred until a 2 GB Render plan is affordable; after the demo, obtain educator review of the embedding regression cases before tuning grouping behavior.
 
 ## P0 — demo critical
 
@@ -109,10 +109,13 @@ Depends on: P0 gates; preserve the implemented workflow.
 
 - [x] Improve responsive layout and keyboard accessibility where testing identifies gaps. (2026-10-13)
 - [x] Add richer progress indicators for long analysis and generation requests. (2026-10-13)
-- [ ] Allow teachers to rename, merge, or dismiss proposed groups while preserving evidence and review history.
+- [ ] Allow teachers to rename, merge, dismiss, or restore proposed groups while preserving evidence and review history.
+  - Planned 2026-10-14: immutable detected groups plus a persisted reviewed overlay and append-only events. Same-question merges union exact evidence, report no fabricated coherence, and lock affected review actions after remediation exists.
+  - Spec: [`docs/superpowers/specs/2026-10-14-teacher-group-review-design.md`](docs/superpowers/specs/2026-10-14-teacher-group-review-design.md)
+  - Next-session plan: [`docs/superpowers/plans/2026-10-14-teacher-group-review.md`](docs/superpowers/plans/2026-10-14-teacher-group-review.md). Start with Task 1 and use TDD; do not change the rehearsed golden path before the migration/store tests pass.
 - [ ] Export an approved intervention and evidence summary.
 - [x] Remove unused response/evidence examples from `frontend/src/mockData.ts`; retain scenario metadata and navigation definitions.
-- [ ] Reconcile stale implementation wording in authoritative documentation with verified code/state; keep proposed features visibly separate.
+- [x] Reconcile stale implementation wording in authoritative documentation with verified code/state; keep proposed features visibly separate. (2026-10-14)
 - [ ] Add more robust document format support only if required by the actual demo/pilot material; select extractors before implementation and preserve source locations.
 
 ## P2 — real-school pilot and later product work
