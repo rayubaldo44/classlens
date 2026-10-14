@@ -58,8 +58,13 @@ export const retrievalMatchesWorkflow = (pointer: WorkflowPointer, retrieval: un
 
 export const analysisMatchesWorkflow = (pointer: WorkflowPointer, analysis: unknown): boolean => isObject(analysis)
   && analysis.analysis_id === pointer.analysis_id
-  && Array.isArray(analysis.groups)
-  && (!pointer.group_id || analysis.groups.some((group) => isObject(group) && group.group_id === pointer.group_id))
+
+export const groupReviewMatchesWorkflow = (pointer: WorkflowPointer, reviews: unknown): boolean => isObject(reviews)
+  && reviews.analysis_id === pointer.analysis_id
+  && Array.isArray(reviews.active_groups)
+  && (!pointer.group_id || reviews.active_groups.some(
+    (group) => isObject(group) && group.reviewed_group_id === pointer.group_id,
+  ))
 
 export const remediationMatchesWorkflow = (pointer: WorkflowPointer, remediation: unknown): boolean => isObject(remediation)
   && remediation.remediation_id === pointer.remediation_id

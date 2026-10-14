@@ -6,6 +6,7 @@ import { ApiStatus } from './ApiStatus'
 import { clearPendingRequestId, getOrCreatePendingRequestId } from './api/requestReliability'
 import {
   analysisMatchesWorkflow,
+  groupReviewMatchesWorkflow,
   comparisonMatchesWorkflow,
   parseWorkflowPointer,
   remediationMatchesWorkflow,
@@ -17,6 +18,7 @@ import {
   analyzePhotosynthesisDemo,
   ApiError,
   getAnalysis,
+  getGroupReviews,
   getFollowUpComparison,
   getRemediation,
   getPhotosynthesisDemo,
@@ -35,7 +37,8 @@ import {
   type MaterialIngestionResponse,
   type MaterialRetrievalContext,
   type MaterialRetrievalResponse,
-  type MisconceptionGroup,
+  type ReviewedMisconceptionGroup,
+  type GroupReviewResponse,
   type EditableRemediationContent,
   type FollowUpComparisonLink,
   type FollowUpComparisonRecord,
@@ -65,7 +68,7 @@ function App() {
   const mainRef = useRef<HTMLElement>(null)
   const previousRoute = useRef(route)
   const [analysisSource, setAnalysisSource] = useState<AnalysisSource | null>(null)
-  const [selectedGroup, setSelectedGroup] = useState<MisconceptionGroup | null>(null)
+  const [selectedGroup, setSelectedGroup] = useState<ReviewedMisconceptionGroup | null>(null)
   const [selectedAssessment, setSelectedAssessment] = useState<AssessmentPreview['assessment'] | null>(null)
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResponse | null>(null)
   const [retrievedSources, setRetrievedSources] = useState<MaterialRetrievalResponse | null>(null)
@@ -86,8 +89,9 @@ function App() {
       if (!analysisId) return
       try {
         const analysis = await getAnalysis(analysisId)
-        const group = analysis.groups.find((item) => item.group_id === pointer.group_id) ?? null
-        if (!analysisMatchesWorkflow(pointer, analysis)) {
+        const reviews = await getGroupReviews(analysisId)
+        const group = reviews.active_groups.find((item) => item.reviewed_group_id === pointer.group_id) ?? null
+        if (!analysisMatchesWorkflow(pointer, analysis) || !groupReviewMatchesWorkflow(pointer, reviews)) {
           if (analysis.analysis_id === pointer.analysis_id) {
             setSelectedAnalysis(analysis); setSelectedAssessment(analysis.assessment)
             replaceWorkflow({ analysis_id: analysis.analysis_id })
@@ -99,18 +103,18 @@ function App() {
         if (group && pointer.material_id) {
           try {
             const retrieval = await retrieveMaterialForGroup(pointer.material_id, {
-              group_id: group.group_id, question_id: group.question_id, question: group.question,
+              analysis_id: analysis.analysis_id, group_id: group.reviewed_group_id, question_id: group.question_id, question: group.question,
               correct_answer: group.correct_answer,
               representative_answers: group.representative_responses.map((item) => item.answer),
             })
             if (!retrievalMatchesWorkflow(pointer, retrieval)) {
-              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id })
+              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.reviewed_group_id })
               setRestoreMessage('The saved teaching material no longer belongs to this misconception. Retrieve supporting passages again.')
               return
             }
             setRetrievedSources(retrieval)
           } catch (error: unknown) {
-            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id })
+            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.reviewed_group_id })
             setRestoreMessage(restoreErrorMessage('The saved teaching-material retrieval could not be restored.', error))
             return
           }
@@ -119,13 +123,13 @@ function App() {
           try {
             const remediation = await getRemediation(pointer.remediation_id)
             if (!remediationMatchesWorkflow(pointer, remediation)) {
-              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id })
+              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.reviewed_group_id, material_id: pointer.material_id })
               setRestoreMessage('The saved intervention no longer belongs to this analysis and misconception. Generate or select the intervention again.')
               return
             }
             setApprovedRemediation(remediation)
           } catch (error: unknown) {
-            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id })
+            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.reviewed_group_id, material_id: pointer.material_id })
             setRestoreMessage(restoreErrorMessage('The saved intervention could not be restored.', error))
             return
           }
@@ -134,13 +138,13 @@ function App() {
           try {
             const comparison = await getFollowUpComparison(pointer.comparison_id)
             if (!comparisonMatchesWorkflow(pointer, comparison)) {
-              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id, remediation_id: pointer.remediation_id })
+              replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.reviewed_group_id, material_id: pointer.material_id, remediation_id: pointer.remediation_id })
               setRestoreMessage('The saved comparison no longer belongs to this approved intervention. Rerun the follow-up comparison.')
               return
             }
             setSavedComparison(comparison)
           } catch (error: unknown) {
-            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.group_id, material_id: pointer.material_id, remediation_id: pointer.remediation_id })
+            replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group?.reviewed_group_id, material_id: pointer.material_id, remediation_id: pointer.remediation_id })
             setRestoreMessage(restoreErrorMessage('The saved comparison could not be restored.', error))
           }
         }
@@ -165,7 +169,7 @@ function App() {
     <ApiStatus />
   </aside><main className="main-content" id="main-content" ref={mainRef} tabIndex={-1}>
     {restoreMessage && <StatePanel kind="error" title="Saved workflow not fully restored" description={restoreMessage} action={<button className="text-button" onClick={() => { localStorage.removeItem(WORKFLOW_KEY); setRestoreMessage(''); navigate('upload') }}>Start a new workflow →</button>} />}
-    {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? selectedAnalysis?.analysis_id ?? 'none'} source={analysisSource} initialAnalysis={selectedAnalysis} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception key={`${selectedGroup?.group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}`} group={selectedGroup} initialRetrieval={retrievedSources} onBack={() => navigate('analysis')} onRetrieved={(sources) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: sources?.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}-${approvedRemediation?.remediation_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} assessment={selectedAssessment} sources={retrievedSources} initialRemediation={approvedRemediation} onBack={() => navigate('misconception')} onNext={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: retrievedSources?.material.material_id, remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.group_id, material_id: retrievedSources?.material.material_id, remediation_id: approvedRemediation?.remediation_id, comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
+    {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? selectedAnalysis?.analysis_id ?? 'none'} source={analysisSource} initialAnalysis={selectedAnalysis} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.reviewed_group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception key={`${selectedGroup?.reviewed_group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} initialRetrieval={retrievedSources} onBack={() => navigate('analysis')} onRetrieved={(sources) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: sources?.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.reviewed_group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}-${approvedRemediation?.remediation_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} assessment={selectedAssessment} sources={retrievedSources} initialRemediation={approvedRemediation} onBack={() => navigate('misconception')} onNext={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: retrievedSources?.material.material_id, remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: retrievedSources?.material.material_id, remediation_id: approvedRemediation?.remediation_id, comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
   </main></div></>
 }
 
@@ -206,11 +210,12 @@ function Upload({ onNext }: { onNext: (source: AnalysisSource) => void }) {
     {status === 'ready' && preview && <section className="card preview-card"><div className="section-title"><div><p className="eyebrow">Validated preview</p><h2>{preview.assessment.title}</h2></div><Badge tone={preview.data_label === 'synthetic_demo' ? 'amber' : 'green'}>{preview.data_label === 'synthetic_demo' ? 'Synthetic demo data' : 'Teacher upload'}</Badge></div><p className="notice">{preview.assessment.grade_level} · {preview.assessment.subject} · {preview.assessment.topic}. Blank and correct answers are retained for review but excluded from misconception grouping.</p><div className="metric-grid compact"><Metric label="Students" value={String(preview.summary.student_count)} note={`${preview.summary.response_count} accepted responses`} /><Metric label="Incorrect answers" value={String(preview.summary.incorrect_count)} note={`${preview.summary.correct_count} marked correct`} /><Metric label="Blank responses" value={String(preview.summary.blank_count)} note="Preserved explicitly" /></div><div className="response-preview"><div className="response-preview__heading"><strong>Normalized sample</strong><span>First {preview.sample_responses.length} accepted rows</span></div>{preview.sample_responses.map((response) => <div className="response-row" key={`${response.student_id}-${response.question_id}`}><span>{response.student_id}</span><p>{response.answer_status === 'blank' ? <em>Blank response</em> : response.answer}</p><Badge tone={response.is_correct ? 'green' : response.answer_status === 'blank' ? 'amber' : 'neutral'}>{response.answer_status === 'blank' ? 'blank' : response.is_correct ? 'correct' : 'incorrect'}</Badge></div>)}</div><div className="actions"><button className="button primary" disabled={!validatedSource} onClick={() => validatedSource && onNext(validatedSource)}>Analyze learning gaps <ArrowIcon /></button></div></section>}</>
 }
 
-function Analysis({ source, initialAnalysis, onLoadDemo, onNext }: { source: AnalysisSource | null; initialAnalysis: AnalysisResponse | null; onLoadDemo: () => void; onNext: (group: MisconceptionGroup, analysis: AnalysisResponse) => void }) {
+function Analysis({ source, initialAnalysis, onLoadDemo, onNext }: { source: AnalysisSource | null; initialAnalysis: AnalysisResponse | null; onLoadDemo: () => void; onNext: (group: ReviewedMisconceptionGroup, analysis: AnalysisResponse) => void }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(initialAnalysis ? 'ready' : source ? 'loading' : 'idle')
   const [result, setResult] = useState<AnalysisResponse | null>(initialAnalysis)
   const [errorMessage, setErrorMessage] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const [reviews, setReviews] = useState<GroupReviewResponse | null>(null)
 
   useEffect(() => {
     if (!source || initialAnalysis) return
@@ -226,17 +231,30 @@ function Analysis({ source, initialAnalysis, onLoadDemo, onNext }: { source: Ana
     return () => controller.abort()
   }, [source, initialAnalysis, attempt])
 
+  useEffect(() => {
+    if (!result) return
+    let cancelled = false
+    void getGroupReviews(result.analysis_id).then((value) => {
+      if (!cancelled) setReviews(value)
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      setErrorMessage(error instanceof ApiError ? error.message : `Teacher review state could not be loaded. ${NETWORK_FAILURE_HINT}`)
+      setStatus('error')
+    })
+    return () => { cancelled = true }
+  }, [result])
+
   return <><PageHeader eyebrow="Step 3 of 6" title="Learning gaps" description="Review recurring semantic groups as evidence-backed proposals. Correct and blank responses are excluded, and the teacher remains the final authority." action={result && <Badge tone={result.data_label === 'synthetic_demo' ? 'amber' : 'green'}>{result.data_label === 'synthetic_demo' ? 'Synthetic demo data' : 'Teacher upload'}</Badge>} />
     {!source && !result && <StatePanel kind="empty" title="No assessment ready for analysis" description="Validate an assessment first, or analyze the deterministic synthetic photosynthesis fixture." action={<button className="text-button" onClick={onLoadDemo}>Analyze demo dataset →</button>} />}
     {status === 'loading' && <LongTaskProgress task="analysis" />}
     {status === 'error' && <StatePanel kind="error" title="Analysis could not be completed" description={errorMessage} action={<button className="text-button" onClick={() => { setStatus('loading'); setResult(null); setErrorMessage(''); setAttempt((value) => value + 1) }}>Try again</button>} />}
     {status === 'ready' && result && <><section className="question-strip"><div><span>Assessment</span><strong>{result.assessment.title} · {result.assessment.topic}</strong></div><div><span>Analysis status</span><strong>{result.summary.group_count} gap{result.summary.group_count === 1 ? '' : 's'} detected</strong></div></section><div className="metric-grid compact"><Metric label="Eligible incorrect" value={String(result.summary.eligible_incorrect_count)} note="Correct and blank excluded" /><Metric label="Grouped evidence" value={String(result.summary.grouped_response_count)} note={`${result.summary.outlier_count} unmatched`} /><Metric label="Learning gaps" value={String(result.summary.group_count)} note={`Minimum support ${result.grouping.minimum_support}`} /></div>
-      {result.groups.length === 0 ? <StatePanel kind="empty" title="No recurring misconception detected" description={result.message ?? 'No group met the configured evidence threshold.'} /> : <section className="section-block"><div className="section-title"><div><p className="eyebrow">Potential misconceptions</p><h2>{result.groups.length} recurring pattern{result.groups.length === 1 ? '' : 's'} to inspect</h2></div><Badge tone="amber">Teacher review needed</Badge></div><div className="gap-list">{result.groups.map((group) => <button className="gap-card" key={group.group_id} onClick={() => onNext(group, result)}><div><Badge tone="amber">Potential · not yet interpreted</Badge><h2>{group.provisional_label}</h2><p>{group.representative_responses.slice(0, 2).map((item) => `“${item.answer}”`).join(' · ')}</p></div><div className="gap-meta"><span>Affected responses</span><strong>{group.support_count} of {group.eligible_response_count}</strong><span>Open evidence →</span></div></button>)}</div></section>}
+      {!reviews ? <StatePanel kind="loading" title="Loading teacher review state" description="ClassLens is resolving the current active evidence groups." /> : reviews.active_groups.length === 0 ? <StatePanel kind="empty" title="No active misconception groups" description={reviews.dismissed_groups.length ? 'All detected groups are currently dismissed. Open review mode to restore one.' : result.message ?? 'No group met the configured evidence threshold.'} /> : <section className="section-block"><div className="section-title"><div><p className="eyebrow">Potential misconceptions</p><h2>{reviews.active_groups.length} recurring pattern{reviews.active_groups.length === 1 ? '' : 's'} to inspect</h2></div><Badge tone="amber">Teacher review needed</Badge></div><div className="gap-list">{reviews.active_groups.map((group) => <button className="gap-card" key={group.reviewed_group_id} onClick={() => onNext(group, result)}><div><Badge tone="amber">Potential · not yet interpreted</Badge><h2>{group.display_label}</h2><p>{group.representative_responses.slice(0, 2).map((item) => `“${item.answer}”`).join(' · ')}</p></div><div className="gap-meta"><span>Affected responses</span><strong>{group.support_count} of {group.eligible_response_count}</strong><span>Open evidence →</span></div></button>)}</div></section>}
       <p className="analysis-method">Model: {result.embedding.model_id} · complete-link cosine threshold {result.grouping.similarity_threshold.toFixed(2)} · analysis {result.analysis_id}</p></>}
   </>
 }
 
-function Misconception({ group, initialRetrieval, onBack, onRetrieved, onNext }: { group: MisconceptionGroup | null; initialRetrieval: MaterialRetrievalResponse | null; onBack: () => void; onRetrieved: (result: MaterialRetrievalResponse | null) => void; onNext: () => void }) {
+function Misconception({ group, analysisId, initialRetrieval, onBack, onRetrieved, onNext }: { group: ReviewedMisconceptionGroup | null; analysisId: string | null; initialRetrieval: MaterialRetrievalResponse | null; onBack: () => void; onRetrieved: (result: MaterialRetrievalResponse | null) => void; onNext: () => void }) {
   const [material, setMaterial] = useState<LearningMaterial | null>(initialRetrieval?.material ?? null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [ingestStatus, setIngestStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(initialRetrieval ? 'ready' : 'idle')
@@ -255,7 +273,8 @@ function Misconception({ group, initialRetrieval, onBack, onRetrieved, onNext }:
     if (!group || !material) return
     setRetrievalStatus('loading'); setRetrievalError('')
     const context: MaterialRetrievalContext = {
-      group_id: group.group_id,
+      analysis_id: analysisId ?? '',
+      group_id: group.reviewed_group_id,
       question_id: group.question_id,
       question: group.question,
       correct_answer: group.correct_answer,
@@ -271,7 +290,7 @@ function Misconception({ group, initialRetrieval, onBack, onRetrieved, onNext }:
   }
 
   if (!group) return <><PageHeader eyebrow="Step 4 of 6" title="Misconception detail" description="Select a detected group before reviewing its evidence." /><StatePanel kind="empty" title="No learning gap selected" description="Return to analysis and choose a recurring response group." action={<button className="text-button" onClick={onBack}>Back to learning gaps →</button>} /></>
-  return <><PageHeader eyebrow="Step 4 of 6" title={group.provisional_label} description="Inspect student evidence and the teaching passages retrieved for this potential pattern. The group label remains provisional." action={<Badge tone="amber">Not a diagnosis</Badge>} />
+  return <><PageHeader eyebrow="Step 4 of 6" title={group.display_label} description="Inspect student evidence and the teaching passages retrieved for this potential pattern. The group label remains teacher-reviewable." action={<Badge tone="amber">Not a diagnosis</Badge>} />
     <section className="card"><p className="eyebrow">Question context · {group.question_id}</p><h2>{group.question}</h2><div className="concept-box"><span>Reference answer</span><p>{group.correct_answer}</p></div></section>
     <section className="section-block"><div className="section-title"><div><p className="eyebrow">Student evidence · {group.support_count} affected responses</p><h2>Representative responses</h2></div><Badge>Exact input evidence</Badge></div><div className="evidence-list">{group.representative_responses.map((item) => <blockquote key={item.student_id}><p>“{item.answer}”</p><cite>{item.student_id} · similarity to medoid {item.similarity_to_medoid.toFixed(2)}</cite></blockquote>)}</div></section>
     <section className="section-block material-grounding"><div className="section-title"><div><p className="eyebrow">Teaching material</p><h2>Find supporting passages</h2></div><Badge tone="green">Separate from student evidence</Badge></div><p className="material-help">Choose the synthetic photosynthesis notes or ingest a UTF-8 plain text file. Retrieved passages come only from this selected material.</p>
@@ -285,7 +304,7 @@ function Misconception({ group, initialRetrieval, onBack, onRetrieved, onNext }:
       {retrieval?.status === 'insufficient_relevant_context' && <StatePanel kind="empty" title="No sufficiently relevant teaching passage found" description={`${retrieval.message} Choose more relevant material before any grounded intervention can be prepared.`} />}
       {retrieval?.status === 'retrieved' && <div className="source-results"><div className="source-results__heading"><strong>Teaching material · retrieved sources</strong><span>Top {retrieval.retrieval.top_k} · minimum score {retrieval.retrieval.minimum_relevance_score.toFixed(2)}</span></div>{retrieval.results.map((source) => <article className="source-result" key={source.chunk_id}><div className="source-result__meta"><strong>{retrieval.material.filename}</strong><span>Chunk {source.chunk_index + 1} · relevance {source.similarity.toFixed(2)}</span></div><p>{source.text}</p><small>Characters {source.start_char}–{source.end_char} · {source.chunk_id}</small></article>)}</div>}
     </section>
-    <p className="analysis-method">Group coherence {group.coherence.toFixed(2)} · members {group.member_student_ids.join(', ')}</p><div className="callout"><div><strong>Teacher checkpoint</strong><p>Does this grouping match the student evidence, and do the selected passages support later instruction? No intervention has been generated.</p></div><button className="button primary" onClick={onNext}>Continue to intervention review <ArrowIcon /></button></div></>
+    <p className="analysis-method">{group.coherence === null ? 'Coherence not recalculated after teacher review' : `Group coherence ${group.coherence.toFixed(2)}`} · members {group.member_student_ids.join(', ')}</p><div className="callout"><div><strong>Teacher checkpoint</strong><p>Does this grouping match the student evidence, and do the selected passages support later instruction? No intervention has been generated.</p></div><button className="button primary" onClick={onNext}>Continue to intervention review <ArrowIcon /></button></div></>
 }
 
 function editableFromRecord(record: RemediationRecord): EditableRemediationContent {
@@ -309,7 +328,7 @@ function getSessionStorage(): Storage | null {
 }
 
 function Intervention({ group, analysisId, assessment, sources, initialRemediation, onBack, onNext }: {
-  group: MisconceptionGroup | null
+  group: ReviewedMisconceptionGroup | null
   analysisId: string | null
   assessment: AssessmentPreview['assessment'] | null
   sources: MaterialRetrievalResponse | null
@@ -325,7 +344,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
   const [errorMessage, setErrorMessage] = useState('')
   const pendingGenerationId = useRef<string | null>(null)
   const generationStorageKey = group && sources
-    ? `classlens:remediation-generation:${analysisId ?? 'unknown'}:${group.group_id}:${sources.material.material_id}:${sources.material.content_hash}`
+    ? `classlens:remediation-generation:${analysisId ?? 'unknown'}:${group.reviewed_group_id}:${sources.material.material_id}:${sources.material.content_hash}`
     : null
 
   const getGenerationRequestId = () => {
@@ -354,8 +373,9 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
         subject: assessment.subject,
         topic: assessment.topic,
         misconception: {
-          group_id: group.group_id,
-          provisional_label: group.provisional_label,
+          group_id: group.reviewed_group_id,
+          source_group_ids: group.source_group_ids,
+          provisional_label: group.display_label,
           question_id: group.question_id,
           question: group.question,
           correct_answer: group.correct_answer,
@@ -413,7 +433,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
   const isTerminal = record?.status === 'approved' || record?.status === 'rejected'
   return <><PageHeader eyebrow="Step 5 of 6" title="Review intervention" description="Follow the evidence chain, edit the generated draft, then make an explicit teacher decision." action={record && <Badge tone={record.status === 'approved' ? 'green' : 'amber'}>{record.status === 'generated' ? 'Pending teacher review' : record.status}</Badge>} />
     <div className="reasoning-chain" aria-label="Grounded intervention reasoning chain">
-      <section className="review-stage"><div className="review-stage__marker">1</div><div><strong>Detected misconception</strong><p>{group.provisional_label} · {group.support_count} of {group.eligible_response_count} eligible responses</p><div className="review-evidence">{group.representative_responses.map((item) => <blockquote key={item.student_id}>“{item.answer}” <cite>{item.student_id}</cite></blockquote>)}</div></div><Badge tone="amber">Student evidence</Badge></section>
+      <section className="review-stage"><div className="review-stage__marker">1</div><div><strong>Detected misconception</strong><p>{group.display_label} · {group.support_count} of {group.eligible_response_count} eligible responses</p><div className="review-evidence">{group.representative_responses.map((item) => <blockquote key={item.student_id}>“{item.answer}” <cite>{item.student_id}</cite></blockquote>)}</div></div><Badge tone="amber">Student evidence</Badge></section>
       <section className="review-stage"><div className="review-stage__marker">2</div><div><strong>Retrieved teacher material</strong><p>{hasGrounding ? `${sources.results.length} passage${sources.results.length === 1 ? '' : 's'} from ${sources.material.title}` : 'No sufficiently relevant passage is available.'}</p>{hasGrounding && <div className="review-sources">{sources.results.map((source) => <details key={source.chunk_id}><summary>{source.chunk_id} · relevance {source.similarity.toFixed(2)}</summary><p>{source.text}</p></details>)}</div>}</div><Badge tone={hasGrounding ? 'green' : 'amber'}>{hasGrounding ? 'Teacher-provided sources' : 'Grounding unavailable'}</Badge></section>
     </div>
 
@@ -445,7 +465,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
 
 function Results({ baseline, group, remediation, initialResult, onResult, onNext }: {
   baseline: AnalysisResponse | null
-  group: MisconceptionGroup | null
+  group: ReviewedMisconceptionGroup | null
   remediation: RemediationRecord | null
   initialResult: FollowUpComparisonRecord | null
   onResult: (record: FollowUpComparisonRecord) => void
@@ -458,7 +478,7 @@ function Results({ baseline, group, remediation, initialResult, onResult, onNext
   const hasApprovedContext = Boolean(baseline && group && remediation?.status === 'approved')
   const link: FollowUpComparisonLink | null = baseline && group && remediation ? {
     baseline_analysis_id: baseline.analysis_id,
-    group_id: group.group_id,
+    group_id: group.reviewed_group_id,
     remediation_id: remediation.remediation_id,
   } : null
 

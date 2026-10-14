@@ -7,6 +7,7 @@ import {
   isMaterialRetrievalResponse,
   isRemediationGenerationResponse,
   isRemediationRecord,
+  isGroupReviewResponse,
 } from './contracts'
 
 export type HealthResponse = { status: 'ok'; service: 'classlens-api' }
@@ -56,6 +57,37 @@ export type AnalysisResponse = {
   groups: MisconceptionGroup[]
   message: string | null
 }
+export type ReviewedMisconceptionGroup = {
+  reviewed_group_id: string
+  display_label: string
+  status: 'active' | 'dismissed'
+  source_group_ids: string[]
+  question_id: string
+  question: string
+  correct_answer: string
+  support_count: number
+  eligible_response_count: number
+  member_student_ids: string[]
+  representative_responses: RepresentativeResponse[]
+  coherence: number | null
+}
+export type GroupReviewState = { analysis_id: string; revision: number; groups: ReviewedMisconceptionGroup[] }
+export type GroupReviewEvent = {
+  event_id: string; analysis_id: string; sequence: number
+  action: 'rename' | 'merge' | 'dismiss' | 'restore'
+  source_group_ids: string[]; resulting_reviewed_group_id: string
+  previous_state: GroupReviewState | null; next_state: GroupReviewState
+  review_note: string | null; created_at: string
+}
+export type GroupReviewResponse = {
+  analysis_id: string; revision: number
+  active_groups: ReviewedMisconceptionGroup[]; dismissed_groups: ReviewedMisconceptionGroup[]
+  events: GroupReviewEvent[]
+}
+export type GroupReviewActionRequest = {
+  action: 'rename' | 'merge' | 'dismiss' | 'restore'; group_ids: string[]
+  label?: string; review_note?: string
+}
 export type LearningMaterial = {
   material_id: string
   title: string
@@ -74,6 +106,7 @@ export type MaterialIngestionResponse = {
   message: string
 }
 export type MaterialRetrievalContext = {
+  analysis_id: string
   group_id: string
   question_id: string
   question: string
@@ -83,6 +116,7 @@ export type MaterialRetrievalContext = {
 export type MaterialRetrievalResponse = {
   status: 'retrieved' | 'insufficient_relevant_context'
   group_id: string
+  source_group_ids: string[]
   material: LearningMaterial
   retrieval: {
     algorithm: 'cosine_similarity_v1'
@@ -109,6 +143,7 @@ export type RemediationRecord = {
   status: 'generated' | 'approved' | 'rejected'
   analysis_id: string
   group_id: string
+  source_group_ids: string[]
   provider: string
   model: string
   prompt_version: 'grounded_remediation_v1'
@@ -137,6 +172,7 @@ export type RemediationGenerationRequest = {
   topic: string
   misconception: {
     group_id: string
+    source_group_ids: string[]
     provisional_label: string
     question_id: string
     question: string
@@ -187,6 +223,7 @@ export type FollowUpComparisonRecord = {
     baseline_analysis_id: string
     follow_up_analysis_id: string
     baseline_group_id: string
+    baseline_source_group_ids: string[]
     follow_up_group_id: string | null
     remediation_id: string
     remediation_status: 'approved'
@@ -291,6 +328,30 @@ export async function getAnalysis(analysisId: string): Promise<AnalysisResponse>
     headers: { Accept: 'application/json' },
   })
   return readAnalysisResponse(response)
+}
+
+export async function getGroupReviews(analysisId: string): Promise<GroupReviewResponse> {
+  const response = await fetch(`${apiUrl}/api/v1/assessments/analyses/${encodeURIComponent(analysisId)}/group-reviews`, {
+    headers: { Accept: 'application/json' },
+  })
+  return readApiResponse<GroupReviewResponse>(
+    response, isGroupReviewResponse, `Group review retrieval failed with status ${response.status}.`,
+    'The API returned invalid teacher group-review data.',
+  )
+}
+
+export async function applyGroupReview(
+  analysisId: string,
+  request: GroupReviewActionRequest,
+): Promise<GroupReviewResponse> {
+  const response = await fetch(`${apiUrl}/api/v1/assessments/analyses/${encodeURIComponent(analysisId)}/group-reviews`, {
+    method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  return readApiResponse<GroupReviewResponse>(
+    response, isGroupReviewResponse, `Group review failed with status ${response.status}.`,
+    'The API returned invalid teacher group-review data.',
+  )
 }
 
 async function readMaterialResponse(response: Response): Promise<MaterialIngestionResponse> {

@@ -9,6 +9,7 @@ import {
   isMaterialRetrievalResponse,
   isRemediationGenerationResponse,
   isRemediationRecord,
+  isGroupReviewResponse,
 } from '../src/api/contracts.ts'
 
 const representative = { student_id: 'S001', answer: 'Plants eat sunlight.', similarity_to_medoid: 0.96 }
@@ -33,7 +34,7 @@ const material = {
   embedding_model: 'embedding-model', embedding_dimension: 384,
 }
 const retrieval = {
-  status: 'retrieved', group_id: 'grp_demo', material,
+  status: 'retrieved', group_id: 'grp_demo', source_group_ids: ['grp_demo'], material,
   retrieval: { algorithm: 'cosine_similarity_v1', top_k: 3, minimum_relevance_score: 0.42, embedding_model: 'embedding-model' },
   results: [{ chunk_id: 'chunk_001', chunk_index: 0, text: 'Plants use light energy.', similarity: 0.83, start_char: 0, end_char: 24 }],
   message: null,
@@ -45,7 +46,7 @@ const content = {
   source_references: ['chunk_001'],
 }
 const remediation = {
-  remediation_id: 'rem_demo', status: 'approved', analysis_id: 'analysis_demo', group_id: 'grp_demo',
+  remediation_id: 'rem_demo', status: 'approved', analysis_id: 'analysis_demo', group_id: 'grp_demo', source_group_ids: ['grp_demo'],
   provider: 'google-gemini', model: 'gemini-test', prompt_version: 'grounded_remediation_v1',
   generated_content: content, content,
   sources: [{ material_id: 'mat_demo', material_title: 'Lesson notes', filename: 'lesson.txt', chunk_id: 'chunk_001', chunk_index: 0, text: 'Plants use light energy.', similarity: 0.83, start_char: 0, end_char: 24 }],
@@ -59,9 +60,24 @@ const comparison = {
   comparison_id: 'comparison_demo', status: 'completed', data_label: 'synthetic_demo', subject: 'Science',
   grade_level: '7', topic: 'Photosynthesis', question_id: 'Q1', question: 'How do plants make food?',
   misconception_label: 'Potential misconception pattern 1',
-  trace: { baseline_assessment_id: 'assessment_demo', follow_up_assessment_id: 'assessment_followup', baseline_analysis_id: 'analysis_demo', follow_up_analysis_id: 'analysis_followup', baseline_group_id: 'grp_demo', follow_up_group_id: 'grp_followup', remediation_id: 'rem_demo', remediation_status: 'approved', comparison_method: 'same_question_member_overlap_v1' },
+  trace: { baseline_assessment_id: 'assessment_demo', follow_up_assessment_id: 'assessment_followup', baseline_analysis_id: 'analysis_demo', follow_up_analysis_id: 'analysis_followup', baseline_group_id: 'grp_demo', baseline_source_group_ids: ['grp_demo'], follow_up_group_id: 'grp_followup', remediation_id: 'rem_demo', remediation_status: 'approved', comparison_method: 'same_question_member_overlap_v1' },
   metrics: { before: snapshot, after: { ...snapshot, analysis_id: 'analysis_followup' }, matched_answered_students: 8, missing_follow_up_students: 1, percentage_point_reduction: 20, correct_percentage_point_change: 30, transitions: { baseline_affected_students: 3, resolved_correct: 2, changed_but_still_incorrect: 0, still_struggling: 1, missing_from_baseline_group: 0, new_affected_students: 0 } },
   message: null, created_at: '2026-10-13T00:00:00Z',
+}
+const reviewedGroup = {
+  reviewed_group_id: 'grp_demo', display_label: 'Teacher label', status: 'active', source_group_ids: ['grp_demo'],
+  question_id: 'Q1', question: 'How do plants make food?', correct_answer: 'Plants make glucose.',
+  support_count: 3, eligible_response_count: 8, member_student_ids: ['S001', 'S002', 'S003'],
+  representative_responses: [representative], coherence: null,
+}
+const reviewState = {
+  analysis_id: 'analysis_demo', revision: 1, active_groups: [reviewedGroup], dismissed_groups: [],
+  events: [{
+    event_id: 'grev_1', analysis_id: 'analysis_demo', sequence: 1, action: 'merge',
+    source_group_ids: ['grp_demo'], resulting_reviewed_group_id: 'grp_demo', previous_state: null,
+    next_state: { analysis_id: 'analysis_demo', revision: 1, groups: [reviewedGroup] },
+    review_note: null, created_at: '2026-10-14T00:00:00Z',
+  }],
 }
 
 test('assessment preview rejects malformed nested summary values', () => {
@@ -104,4 +120,14 @@ test('completed comparison rejects malformed nested metrics', () => {
   const malformed = structuredClone(comparison)
   malformed.metrics.transitions.resolved_correct = '2' as unknown as number
   assert.equal(isFollowUpComparison(malformed), false)
+})
+
+test('group review accepts nullable coherence and rejects malformed provenance or history', () => {
+  assert.equal(isGroupReviewResponse(reviewState), true)
+  const malformedSource = structuredClone(reviewState)
+  malformedSource.active_groups[0].source_group_ids = ['']
+  assert.equal(isGroupReviewResponse(malformedSource), false)
+  const malformedHistory = structuredClone(reviewState)
+  malformedHistory.events[0].sequence = 2
+  assert.equal(isGroupReviewResponse(malformedHistory), false)
 })
