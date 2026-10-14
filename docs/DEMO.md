@@ -163,6 +163,9 @@ The measured change is observational and comes from synthetic follow-up input; d
 - Follow-up: 44 rows, 43 answered, 1 blank, 1 baseline student absent, 33 correct, 10 incorrect.
 - Results: 9/43 (20.9%) to 3/43 (7.0%), 13.9-point reduction; remaining students remain visible.
 - Ordinary-upload browser run: results in 79.2 seconds and analysis/evidence/intervention/results reload checks complete in 98.1 seconds on the verification machine. Allow roughly three minutes for narration and clicks.
+- Automated local rehearsal, 2026-10-13: two independent runs after `./scripts/demo.sh reset` completed preview through live Gemini approval, follow-up results, and reload recovery in 40.0 and 38.3 seconds. These runs confirm system repeatability; complete the two required human-operated rehearsals separately to validate narration, file selection, and presenter timing.
+- Human rehearsal, 2026-10-14: the first intended pattern-1 walkthrough passed in 1:31. A second 1:20 attempt selected pattern 2 and reached the correct insufficient-evidence result because the follow-up fixture does not re-identify that smaller group. Repeat the intended path once more, selecting pattern 1 with 9 of 29 affected responses.
+- Final human rehearsal, 2026-10-14: the second intended pattern-1 walkthrough passed in 1:22.4. The captured Results screen showed API connected, 9/43 affected before (20.9%), and 3/43 after (7.0%). The two successful presenter runs were therefore 1:31 and 1:22.4.
 
 ## Recovery when a dependency fails
 
@@ -183,9 +186,9 @@ The measured change is observational and comes from synthetic follow-up input; d
 - [x] FastAPI restart and frontend resource reload passed.
 - [x] Empty/missing-column CSV, blank answers, backend unavailable, database failure, embedding/RAG/LLM failures, malformed LLM output, insufficient context, and follow-up mismatch have controlled handling through live checks and/or focused automated tests.
 - [x] Desktop and mobile golden-path screens were checked for obvious overflow and stale restore state.
-- [ ] Run two timed human-operated rehearsals on the actual presentation machine/network.
-- [ ] Confirm Gemini quota and Supabase reachability immediately before presenting.
-- [ ] Prearrange files/tabs, mute notifications, check projector zoom, and keep a clearly labeled backup recording available.
+- [x] Run two timed human-operated rehearsals on the actual presentation machine/network. Passed in 1:31 and 1:22.4 on 2026-10-14.
+- [x] Confirm Gemini quota and Supabase reachability immediately before presenting. Refreshed 2026-10-14: `/ready` reported database and embedding model ready; two live Gemini evaluation calls passed in 5.145s and 8.700s.
+- [x] Prearrange files/tabs, mute notifications, check projector zoom, and keep a clearly labeled backup recording available. Completed 2026-10-14: upload screen, demo-file folder, and labeled fallback opened; GNOME banners disabled; projector readability confirmed by the presenter.
 
 ## Stop local services
 

@@ -1166,3 +1166,83 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: obtain educator review for the pending real-embedding regression cases, or proceed to the next unblocked backlog item while that external review is pending.
 
 ---
+
+## Session / Milestone: Live local demo path rehearsed twice by browser automation
+
+**Date:** 2026-10-13 (Asia/Manila)
+
+**Status:** Live system path repeatability verified; human presenter rehearsals remain open
+
+- Attempted and completed: ran the readiness check, reset and warmed the local runner, then drove two independent ordinary-upload browser sessions through preview, analysis, exact evidence, teacher-material ingestion/retrieval, live Gemini generation, explicit teacher approval, follow-up analysis/results, and reload recovery against configured Supabase persistence.
+- Files significantly modified: `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this log. The temporary rehearsal harness and failure capture remained outside the repository.
+- Verified/tested: both corrected runs passed after independent browser contexts and a service reset. Run 1 completed in 40.0 seconds (analysis 3.4s, retrieval 8.9s, generation 24.3s, results 33.6s, reload 40.0s). Run 2 completed in 38.3 seconds (analysis 8.1s, retrieval 13.6s, generation 23.0s, results 32.3s, reload 38.3s).
+- Problems encountered: the initial harness waited 180 seconds for a case-sensitive passage fragment even though the retrieval endpoint returned HTTP 200 and the three correct passages were visible. The screenshot and backend logs localized the failure to the temporary locator; changing it to a case-insensitive match produced two passing runs. No application change was needed.
+- Important decisions: count these runs as live integration and repeatability evidence, not as the required human-operated judging-machine rehearsals. Keep the P0 rehearsal task unchecked until a presenter completes the documented path twice with narration and manual file selection.
+- Remaining work: complete two human-operated three-minute rehearsals on the actual judging machine/network and run the final pre-demo checklist.
+- Recommended next step: have the presenter perform the documented walkthrough twice while recording total time, narration issues, and any visible dependency failure.
+
+---
+
+## Session / Milestone: First human-operated rehearsal passed
+
+**Date:** 2026-10-14 (Asia/Manila)
+
+**Status:** One of two required successful human rehearsals complete
+
+- Attempted and completed: the presenter manually ran the ordinary-upload walkthrough twice. The first intended pattern-1 run reached the expected comparison in 1:31. The second took 1:20 but selected pattern 2 and ended in the product's valid insufficient-evidence state.
+- Files significantly modified: `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this log.
+- Verified/tested: the screenshot from run 2 preserved the initial analysis, follow-up analysis, and intervention trace. Reading the persisted records confirmed the intervention used `grp_b4405fb2f8a6`, pattern 2 with three affected students, rather than pattern 1 with nine. The observed insufficient comparison therefore matches the selected evidence and is not an application failure.
+- Problems encountered: the second run followed the soil-food misconception, which the provided follow-up fixture does not re-identify with enough overlapping students.
+- Important decisions: count run 1 as successful; retain run 2 as useful empty-state evidence but do not count it toward the two successful golden-path rehearsals.
+- Remaining work: repeat one human-operated run while selecting pattern 1, the card showing 9 of 29 affected responses, and confirm the 9/43 to 3/43 comparison.
+- Recommended next step: complete that final intended-path rehearsal and capture its total time and results screen.
+
+---
+
+## Session / Milestone: Two human-operated demo rehearsals passed
+
+**Date:** 2026-10-14 (Asia/Manila)
+
+**Status:** P0 timed human-rehearsal requirement complete
+
+- Attempted and completed: the presenter repeated the intended ordinary-upload walkthrough, selected pattern 1, and reached the expected Results screen in 1:22.4. Combined with the earlier successful 1:31 run, two human-operated rehearsals now pass within the three-minute target.
+- Files significantly modified: `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this log.
+- Verified/tested: the submitted screenshot shows the local Results route, API connected status, the sunlight-as-food misconception, 9/43 affected before (20.9%), 3/43 after (7.0%), and a stopped stopwatch reading 1:22.4.
+- Problems encountered: none in the final run. The earlier pattern-2 attempt remains documented as valid insufficient-evidence behavior and was not counted as a successful golden-path rehearsal.
+- Important decisions: close only the timed rehearsal task. The separate final pre-demo checklist and unfunded hosted deployment tasks remain open.
+- Remaining work: run the final pre-demo checklist immediately before presenting; continue using the verified local runner while Render remains below the required memory capacity.
+- Recommended next step: complete and record the final pre-demo checklist, then commit the rehearsal documentation.
+
+---
+
+## Session / Milestone: Final dependency readiness refreshed
+
+**Date:** 2026-10-14 (Asia/Manila)
+
+**Status:** Machine-verifiable pre-demo checks complete; physical presenter setup remains
+
+- Attempted and completed: confirmed the three versioned demo files are present, reran the local configuration check, reset the runner to warm the pinned embedding model, queried application readiness, and ran the two-case live Gemini evaluation without persisting demo records.
+- Files significantly modified: `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this log.
+- Verified/tested: `./scripts/demo.sh check` passed with server-side Gemini and Supabase configuration present. `/ready` returned `ready` for the database and embedding model. Both live `gemini-3.1-flash-lite` cases generated schema-valid drafts with valid supplied citation IDs and absent injection canaries in 5.145 and 8.700 seconds.
+- Problems encountered: none in the refreshed dependency checks.
+- Important decisions: close the dependency-readiness checklist item, but keep the overall pre-demo checklist task open because notification muting, projector zoom, arranged presentation windows, and fallback accessibility require the presenter at the physical setup.
+- Remaining work: arrange the three demo files and relevant tabs, mute notifications, verify projector zoom, and confirm the labeled fallback document or recording is immediately accessible.
+- Recommended next step: complete those four physical checks, then mark the final checklist task complete and commit the accumulated rehearsal documentation.
+
+---
+
+## Session / Milestone: Local pre-demo checklist completed
+
+**Date:** 2026-10-14 (Asia/Manila)
+
+**Status:** Local presentation setup ready
+
+- Attempted and completed: opened the local upload route, demo-file folder, and clearly labeled fallback document; confirmed GNOME notification banners were disabled; rechecked local service health; and obtained presenter confirmation that projector zoom and readability were suitable.
+- Files significantly modified: `STATUS.md`, `TASKS.md`, `docs/DEMO.md`, and this log.
+- Verified/tested: backend and frontend health checks passed while the prepared windows were open. The presenter explicitly confirmed the physical projector view was ready.
+- Problems encountered: the Wayland session did not expose projector layout through `xrandr`, so the physical readability check correctly required presenter confirmation.
+- Important decisions: close the local pre-demo checklist. Keep the hosted Render workflow tasks open because the 512 MB service remains below the measured embedding-runtime memory requirement.
+- Remaining work: none for local demo readiness. Hosted verification remains deferred until adequate Render memory is affordable; the educator-reviewed embedding evaluation remains a separate external-review task.
+- Recommended next step: preserve the prepared local workspace for presentation and avoid unnecessary configuration changes before judging.
+
+---

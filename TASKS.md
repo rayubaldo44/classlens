@@ -36,9 +36,14 @@ Funding decision (2026-10-08): the paid Render upgrade is deferred. Keep the hos
 Depends on: hosted verification for the hosted rehearsal; the existing local runner remains available for local rehearsal.
 
 - [ ] Warm the embedding model and teacher-material retrieval on the judging machine and hosted service; verify Gemini configuration/quota and database reachability before presenting.
-- [ ] Complete the documented three-minute click path twice on the judging machine/network, including loading and meaningful empty/error states; record timings and any failures.
+  - Local readiness refreshed 2026-10-14: `/ready` reported database and embedding model ready; two live Gemini evaluation calls passed in 5.145s and 8.700s. Hosted warming remains deferred with the unfunded Render upgrade.
+- [x] Complete the documented three-minute click path twice on the judging machine/network, including loading and meaningful empty/error states; record timings and any failures. (2026-10-14)
+  - Automated live-path evidence (2026-10-13): two independent local Chromium runs after runner resets completed in 40.0 and 38.3 seconds against Supabase and Gemini, including reload recovery. Human-operated rehearsals with narration remain required.
+  - Human rehearsal evidence (2026-10-14): run 1 passed the intended pattern-1 path in 1:31. A separate 1:20 attempt selected pattern 2 and correctly ended with insufficient follow-up evidence.
+  - Final human rehearsal evidence (2026-10-14): a second intended pattern-1 run passed in 1:22.4; the captured Results screen showed 9/43 before and 3/43 after with the API connected.
 - [x] Prepare an explicit, honestly labeled recording or previously generated artifact for live Gemini unavailability. Keep live provider failure visible and never switch silently to fabricated output. See [the verified local-run fallback](docs/DEMO_FALLBACK.md).
-- [ ] Run the [pre-demo checklist](docs/DEMO.md#pre-demo-checklist) after the final deployment and rehearsal.
+- [x] Run the [pre-demo checklist](docs/DEMO.md#pre-demo-checklist) after the final deployment and rehearsal. (2026-10-14)
+  - Dependencies and rehearsals passed. The upload screen, demo-file folder, and labeled fallback were opened; notification banners were disabled; and the presenter confirmed projector readability.
 
 **Acceptance:** two repeatable timed rehearsals, an accessible labeled fallback, and a completed checklist. Preserve the existing safe, non-destructive reset procedure.
 

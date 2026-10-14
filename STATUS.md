@@ -1,6 +1,6 @@
 # ClassLens Status
 
-**Last updated:** 2026-10-13
+**Last updated:** 2026-10-14
 
 **Current phase:** Final P0 golden path verified locally; local demo selected while the paid Render upgrade is deferred
 
@@ -40,6 +40,11 @@
 - Earlier Render probes rejected the Vercel production origin; the latest live responses now allow it. No application code change was needed. A production browser reload and complete hosted golden-path smoke remain unverified; preview deployment origins were not checked in this verification.
 - Vercel commit `593e475` added the documented SPA rewrite and deployed successfully on 2026-10-08. Direct production loads of `/dashboard`, `/upload`, and `/analysis` now return the application shell with HTTP 200; frontend lint and production build passed before deployment.
 - A fresh local ordinary-upload browser run on 2026-10-08 completed upload through calculated results in 79.2 seconds. Direct reloads then recovered the analysis groups, retrieved teacher passages, approved intervention, and results; the full run and reload checks finished in 98.1 seconds. `Analysis` and `Misconception` now initialize from restored persisted records rather than showing empty state after the parent restore succeeds.
+- Two independent automated local rehearsals on 2026-10-13 completed the ordinary-upload path against live Supabase and Gemini after runner resets. Preview → analysis → teacher-material retrieval → generation → approval → follow-up results → reload recovery took 40.0 and 38.3 seconds. The first harness attempt exposed only a case-sensitive text-locator mismatch; backend logs and the captured UI confirmed successful retrieval before the corrected runs passed. These timings verify the live system path, but do not replace the required human-operated judging-machine rehearsals with narration.
+- The presenter completed one successful human-operated ordinary-upload rehearsal on 2026-10-14 in 1:31, reaching the expected pattern-1 follow-up comparison. A second 1:20 run selected pattern 2 (the three-student soil-food group) and correctly returned insufficient overlapping follow-up evidence; it does not count as the second successful golden-path rehearsal. One successful narrated run remains.
+- The presenter completed the second successful human-operated pattern-1 rehearsal on 2026-10-14 in 1:22.4. The captured Results screen showed API connected, 9/43 affected before (20.9%), and 3/43 after (7.0%). Together with the 1:31 run, the two required human rehearsals now pass under three minutes.
+- Final dependency readiness was refreshed on 2026-10-14: `./scripts/demo.sh check` passed, `/ready` reported PostgreSQL and the warmed embedding model ready, and two live `gemini-3.1-flash-lite` evaluation calls generated schema-valid drafts with valid citation IDs in 5.145 and 8.700 seconds.
+- Final physical setup passed on 2026-10-14: the upload screen, demo-file folder, and labeled fallback were opened; GNOME notification banners were disabled; local frontend/backend health passed; and the presenter confirmed the projector view and zoom were readable. The local pre-demo checklist is complete.
 - [`docs/DEMO_FALLBACK.md`](docs/DEMO_FALLBACK.md) preserves an explicitly labeled, previously generated artifact from that verified local run for Gemini downtime. It includes real evidence, provider/model provenance, teacher-approved content, and calculated synthetic follow-up results, and instructs the presenter to keep the live provider failure visible.
 - Commit `5115e5d` deployed the reload recovery and workspace polish to Vercel on 2026-10-08. The live bundle contains the new workflow-step selector/styles, and `/dashboard`, `/upload`, `/analysis`, `/misconception`, `/intervention`, and `/results` each return HTTP 200. Hosted state recovery remains unverified end to end because Render analysis still exits before creating the required persisted workflow.
 
@@ -70,7 +75,7 @@
 - The paid Render upgrade is deferred for budget reasons. Use the verified local runner for the demo. Hosted analysis and reload verification remain open until a 2 GB plan is affordable.
 - LLM-authored misconception labels are not implemented; labels remain deliberately generic and provisional.
 - No seeded remediation is substituted into the application when Gemini fails. The separate, clearly labeled verified-run artifact is available for presentation continuity while the real provider failure remains visible.
-- A timed human-operated three-minute stage rehearsal on the judging machine is still required. Browser automation verified the important screens/states but its full click-through was interrupted by brittle text synchronization and was not counted as a pass.
+- Two timed human-operated stage rehearsals passed on the judging machine in 1:31 and 1:22.4. A separate 1:20 exploration of pattern 2 correctly exercised the insufficient-evidence comparison state.
 
 ## Known issues and constraints
 
@@ -105,4 +110,4 @@
 | Frontend lint/build and backend suite | Pass |
 | Deployment | Partial: Vercel direct routes, production health, preview, and CORS pass; Render analysis repeatedly exits with 502/503 before the hosted browser golden path can continue |
 
-**Overall:** the local ClassLens golden path is a verified PASS with real embeddings, Supabase persistence, source-backed retrieval, live Gemini generation, and direct-route recovery. Vercel routing and CORS are verified, but the hosted workflow cannot pass until Render has enough memory to load the embedding runtime. External-service capacity and two human-operated rehearsals on the presentation machine remain the principal operational risks.
+**Overall:** the local ClassLens golden path and pre-demo checklist are verified PASS with real embeddings, Supabase persistence, source-backed retrieval, live Gemini generation, direct-route recovery, two successful human rehearsals, and prepared presentation setup. Vercel routing and CORS are verified, but the hosted workflow cannot pass until Render has enough memory to load the embedding runtime.
