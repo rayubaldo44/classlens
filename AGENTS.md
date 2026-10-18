@@ -115,3 +115,7 @@ During development:
 ## Definition of done
 
 A task is done when its acceptance criteria are met, relevant error states are handled, appropriate checks pass, no secrets or invented evidence are introduced, and STATUS/TASKS plus any affected authoritative document reflect the verified result.
+
+## Graphify
+
+After the required start-of-task document reads, use `./scripts/graphify.sh query "<question>"` first for codebase questions when `graphify-out/graph.json` exists, unless the graph is stale, the task concerns graph correctness, or the user asks to skip it. Confirm graph results against source code before making changes. The project skill is at `.agents/skills/graphify/SKILL.md`; use the pinned wrapper for ClassLens builds, updates, and exports.
