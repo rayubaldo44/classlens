@@ -1,5 +1,13 @@
 # Golden Path Reliability Findings
 
+## Graphify planning findings — 2026-10-18
+
+- The official package is `graphifyy`; the executable is `graphify`. The latest GitHub release found during planning is `0.9.77`.
+- `graphify extract . --code-only` performs local structural extraction without a semantic-model key. `graphify export obsidian --dir <path>` writes an Obsidian-compatible export and is designed to preserve user-owned notes and vault configuration.
+- The existing ClassLens vault already contains hand-maintained project, Kanban, and Context notes. Generated Graphify output must remain under the isolated `ClassLens/Graphify/` subtree.
+- The repository has no Graphify installation, output, wrapper, or test harness yet. `scripts/demo.sh` establishes the local Bash style: strict mode, repository-root resolution, explicit failure messages, and command dispatch.
+- The wrapper needs a fake `graphify` executable in tests so destination validation and command composition can be proven before the real CLI writes to the external vault.
+
 ## Current P0 Findings — 2026-10-08
 
 - Vercel SPA routing is deployed from commit `593e475`; production `/dashboard`, `/upload`, and `/analysis` return HTTP 200.

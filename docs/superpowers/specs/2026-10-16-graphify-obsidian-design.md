@@ -1,6 +1,6 @@
 # Graphify and Obsidian Integration Design
 
-**Status:** Approved direction; awaiting written-spec review
+**Status:** Approved on 2026-10-18; implementation planned
 
 ## Goal
 

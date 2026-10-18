@@ -1,5 +1,14 @@
 # P0 Demo Completion Plan
 
+## Active planning session — Graphify + Obsidian
+
+- [complete] Approve and commit the local-first integration design.
+- [complete] Write and self-review the implementation plan.
+- [in_progress] Obtain execution-method approval.
+- [pending] Implement, verify, document, and sync the generated graph to Obsidian.
+
+The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`. This session is plan-only; implementation begins after plan review.
+
 ## Goal
 Complete the unchecked P0 tasks in `TASKS.md` in dependency order, preserving the verified local golden path and recording any external blocker honestly.
 
