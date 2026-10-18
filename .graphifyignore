@@ -1,0 +1,33 @@
+# Repository metadata and generated knowledge graphs
+.git/
+.worktrees/
+.superpowers/
+graphify-out/
+.graphify-obsidian-dir
+
+# Frontend dependencies and generated build/test artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.vite/
+*.tsbuildinfo
+
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# Credentials and student/demo/evaluation content (including .env examples)
+.env*
+data/demo/
+backend/evaluation/

@@ -10,3 +10,5 @@ backend/evaluation/latest-generation-report.json
 .env.*
 !.env.example
 .worktrees/
+graphify-out/
+.graphify-obsidian-dir
