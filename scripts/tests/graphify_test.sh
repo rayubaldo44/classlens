@@ -27,7 +27,8 @@ failed=0
 
 fixture() {
   CASE_ROOT="${TEST_ROOT}/$1"
-  mkdir -p "${CASE_ROOT}/scripts" "${CASE_ROOT}/graphify-out" "${CASE_ROOT}/vault with spaces"
+  mkdir -p "${CASE_ROOT}/scripts" "${CASE_ROOT}/graphify-out" "${CASE_ROOT}/vault with spaces" "${CASE_ROOT}/.agents/skills/graphify"
+  printf '0.9.77\n' > "${CASE_ROOT}/.agents/skills/graphify/.graphify_version"
   cp "${BASH_SOURCE[0]}" "${CASE_ROOT}/fake-graphify"
   chmod +x "${CASE_ROOT}/fake-graphify"
   if [[ -f "${PROJECT_ROOT}/scripts/graphify.sh" ]]; then
@@ -52,6 +53,7 @@ assert_success() { [[ "$RESULT" == 0 ]] || { cat "${CASE_ROOT}/output.log"; retu
 assert_failure() { [[ "$RESULT" != 0 ]]; }
 assert_calls() { [[ "$(< "$FAKE_LOG")" == "$1" ]]; }
 assert_no_cli() { [[ ! -s "$FAKE_ALL_CALLS" ]]; }
+assert_diagnostic() { grep -Fq -- "$1" "${CASE_ROOT}/output.log"; }
 
 run_case() {
   fixture "$1"
@@ -73,7 +75,7 @@ run_case() {
 build_default() {
   run_wrapper build
   assert_success
-  assert_calls $'extract<.><--code-only>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/graphify-out/obsidian>"
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/graphify-out/obsidian>"
   [[ "$(sort -u "$FAKE_ALL_CALLS")" == "$CASE_ROOT" ]]
 }
 
@@ -82,15 +84,29 @@ env_precedence() {
   export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/Graphify"
   run_wrapper build
   assert_success
-  assert_calls $'extract<.><--code-only>\nexport<html>\nexport<obsidian><--dir><'"${CLASSLENS_OBSIDIAN_GRAPH_DIR}>"
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CLASSLENS_OBSIDIAN_GRAPH_DIR}>"
 }
 
 config_precedence() {
   printf '%s\n' "${CASE_ROOT}/vault with spaces/Graphify" > "${CASE_ROOT}/.graphify-obsidian-dir"
   run_wrapper build
   assert_success
-  assert_calls $'extract<.><--code-only>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/vault with spaces/Graphify>"
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/vault with spaces/Graphify>"
 }
+
+config_first_nonempty() {
+  printf '\n   \n%s\n%s\n' "${CASE_ROOT}/vault with spaces/Graphify" "${CASE_ROOT}/ignored/Graphify" > "${CASE_ROOT}/.graphify-obsidian-dir"
+  run_wrapper build
+  assert_success
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/vault with spaces/Graphify>"
+}
+config_without_final_newline() {
+  printf '\n%s' "${CASE_ROOT}/vault with spaces/Graphify" > "${CASE_ROOT}/.graphify-obsidian-dir"
+  run_wrapper build
+  assert_success
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/vault with spaces/Graphify>"
+}
+blank_config() { printf '\n \t\n\n' > "${CASE_ROOT}/.graphify-obsidian-dir"; reject_destination; }
 
 reject_destination() {
   run_wrapper build
@@ -111,7 +127,7 @@ missing_parent() {
   export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/missing/Graphify"
   run_wrapper build
   assert_failure
-  assert_calls $'extract<.><--code-only>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/graphify-out/obsidian>"
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/graphify-out/obsidian>"
   grep -Fiq 'parent' "${CASE_ROOT}/output.log"
   grep -Fq "${CASE_ROOT}/missing" "${CASE_ROOT}/output.log"
   [[ ! -e "${CASE_ROOT}/missing" ]]
@@ -126,28 +142,57 @@ failed_extract() {
   [[ "$(< "${CASE_ROOT}/graphify-out/marker")" == keep ]]
 }
 failed_update() {
-  export FAKE_FAIL=update
+  export FAKE_FAIL=extract
   printf 'keep\n' > "${CASE_ROOT}/graphify-out/marker"
   run_wrapper update
   assert_failure
-  assert_calls 'update<.>'
+  assert_calls 'extract<.><--code-only><--force>'
   [[ "$(< "${CASE_ROOT}/graphify-out/marker")" == keep ]]
 }
 successful_update() {
   run_wrapper update
   assert_success
-  assert_calls $'update<.>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/graphify-out/obsidian>"
+  assert_calls $'extract<.><--code-only><--force>\ncluster-only<.><--no-label>\nexport<html>\nexport<obsidian><--dir><'"${CASE_ROOT}/graphify-out/obsidian>"
+}
+
+failed_build_clustering() {
+  export FAKE_FAIL=cluster-only
+  printf 'keep\n' > "${CASE_ROOT}/graphify-out/marker"
+  run_wrapper build
+  assert_failure
+  assert_calls $'extract<.><--code-only>\ncluster-only<.><--no-label>'
+  [[ "$(< "${CASE_ROOT}/graphify-out/marker")" == keep ]]
+}
+failed_update_clustering() {
+  export FAKE_FAIL=cluster-only
+  run_wrapper update
+  assert_failure
+  assert_calls $'extract<.><--code-only><--force>\ncluster-only<.><--no-label>'
 }
 
 graph_fixture() { printf '%s\n' "$1" > "${CASE_ROOT}/graphify-out/graph.json"; }
-valid_graph() { graph_fixture '{"graph":{"schema_version":"1","graphify_version":"0.9.77"}}'; }
+valid_graph() { graph_fixture '{"directed":false,"multigraph":false,"graph":{},"nodes":[{"id":"example"}],"links":[],"built_at_commit":"abc123"}'; }
 wrong_version() { valid_graph; export FAKE_VERSION=0.9.76; run_wrapper check; assert_failure; assert_calls ''; }
 missing_graph() { run_wrapper check; assert_failure; assert_calls ''; }
 invalid_json() { graph_fixture '{broken'; run_wrapper check; assert_failure; }
-missing_schema() { graph_fixture '{"graph":{"graphify_version":"0.9.77"}}'; run_wrapper check; assert_failure; }
-missing_graphify_version() { graph_fixture '{"graph":{"schema_version":"1"}}'; run_wrapper check; assert_failure; }
-empty_metadata() { graph_fixture '{"graph":{"schema_version":"","graphify_version":""}}'; run_wrapper check; assert_failure; }
-valid_check() { valid_graph; run_wrapper check; assert_success; assert_calls ''; }
+wrong_skill_version() { valid_graph; printf '0.9.76\n' > "${CASE_ROOT}/.agents/skills/graphify/.graphify_version"; run_wrapper check; assert_failure; assert_diagnostic 'Graphify skill version'; }
+missing_skill_version() { valid_graph; mv "${CASE_ROOT}/.agents/skills/graphify/.graphify_version" "${CASE_ROOT}/version.backup"; run_wrapper check; assert_failure; assert_diagnostic 'Graphify skill version'; }
+blank_skill_version() { valid_graph; printf ' \n' > "${CASE_ROOT}/.agents/skills/graphify/.graphify_version"; run_wrapper check; assert_failure; assert_diagnostic 'Graphify skill version'; }
+graph_not_object() { graph_fixture '{"graph":[],"nodes":[{"id":"example"}],"links":[],"built_at_commit":"abc123"}'; run_wrapper check; assert_failure; assert_diagnostic 'graph must be an object'; }
+missing_graph_object() { graph_fixture '{"nodes":[{"id":"example"}],"links":[],"built_at_commit":"abc123"}'; run_wrapper check; assert_failure; assert_diagnostic 'graph must be an object'; }
+nodes_not_array() { graph_fixture '{"graph":{},"nodes":{},"links":[],"built_at_commit":"abc123"}'; run_wrapper check; assert_failure; assert_diagnostic 'nodes must be a non-empty array'; }
+empty_nodes() { graph_fixture '{"graph":{},"nodes":[],"links":[],"built_at_commit":"abc123"}'; run_wrapper check; assert_failure; assert_diagnostic 'nodes must be a non-empty array'; }
+links_not_array() { graph_fixture '{"graph":{},"nodes":[{"id":"example"}],"links":{},"built_at_commit":"abc123"}'; run_wrapper check; assert_failure; assert_diagnostic 'links must be an array'; }
+missing_commit() { graph_fixture '{"graph":{},"nodes":[{"id":"example"}],"links":[]}'; run_wrapper check; assert_failure; assert_diagnostic 'built_at_commit must be a non-empty string'; }
+empty_commit() { graph_fixture '{"graph":{},"nodes":[{"id":"example"}],"links":[],"built_at_commit":"  "}'; run_wrapper check; assert_failure; assert_diagnostic 'built_at_commit must be a non-empty string'; }
+nonstring_commit() { graph_fixture '{"graph":{},"nodes":[{"id":"example"}],"links":[],"built_at_commit":123}'; run_wrapper check; assert_failure; assert_diagnostic 'built_at_commit must be a non-empty string'; }
+reject_old_metadata_only() { graph_fixture '{"graph":{"schema_version":"1","graphify_version":"0.9.77"}}'; run_wrapper check; assert_failure; }
+valid_check() { valid_graph; local before; before="$(< "${CASE_ROOT}/graphify-out/graph.json")"; run_wrapper check; assert_success; assert_calls ''; [[ "$(< "${CASE_ROOT}/graphify-out/graph.json")" == "$before" ]]; }
+archify_excluded() {
+  mkdir -p "${CASE_ROOT}/ignore-test"
+  git init -q "${CASE_ROOT}/ignore-test"
+  git -C "${CASE_ROOT}/ignore-test" -c core.excludesFile="${PROJECT_ROOT}/.graphifyignore" check-ignore --no-index .archify/index.html docs/.archify/generated.svg >/dev/null
+}
 query_without_question() { run_wrapper query; assert_failure; assert_no_cli; }
 query_blank_question() { run_wrapper query '   '; assert_failure; assert_no_cli; }
 query_intact() { run_wrapper query what connects analysis to 'remediation?'; assert_success; assert_calls 'query<what connects analysis to remediation?>'; }
@@ -155,6 +200,9 @@ query_intact() { run_wrapper query what connects analysis to 'remediation?'; ass
 run_case build_default_order_and_root build_default
 run_case environment_overrides_config env_precedence
 run_case config_overrides_local_default config_precedence
+run_case config_uses_first_nonempty_line config_first_nonempty
+run_case config_accepts_line_without_final_newline config_without_final_newline
+run_case config_rejects_blank_lines_only blank_config
 run_case reject_explicit_empty_environment empty_env
 run_case reject_relative_destination relative_dir
 run_case reject_filesystem_root filesystem_root
@@ -168,13 +216,25 @@ run_case missing_parent_falls_back_and_fails missing_parent
 run_case failed_extract_preserves_outputs failed_extract
 run_case failed_update_preserves_outputs failed_update
 run_case update_exports_after_success successful_update
+run_case failed_build_clustering_prevents_exports failed_build_clustering
+run_case failed_update_clustering_prevents_exports failed_update_clustering
 run_case check_rejects_wrong_cli_version wrong_version
 run_case check_rejects_missing_graph missing_graph
 run_case check_rejects_invalid_json invalid_json
-run_case check_rejects_missing_schema_version missing_schema
-run_case check_rejects_missing_graphify_version missing_graphify_version
-run_case check_rejects_empty_metadata empty_metadata
-run_case check_accepts_valid_metadata valid_check
+run_case check_rejects_wrong_skill_version wrong_skill_version
+run_case check_rejects_missing_skill_version missing_skill_version
+run_case check_rejects_blank_skill_version blank_skill_version
+run_case check_rejects_nonobject_graph graph_not_object
+run_case check_rejects_missing_graph_object missing_graph_object
+run_case check_rejects_nonarray_nodes nodes_not_array
+run_case check_rejects_empty_nodes empty_nodes
+run_case check_rejects_nonarray_links links_not_array
+run_case check_rejects_missing_commit missing_commit
+run_case check_rejects_empty_commit empty_commit
+run_case check_rejects_nonstring_commit nonstring_commit
+run_case check_rejects_old_metadata_only reject_old_metadata_only
+run_case check_accepts_vendor_graph_without_inventing_metadata valid_check
+run_case archify_generated_directories_excluded archify_excluded
 run_case query_rejects_missing_question query_without_question
 run_case query_rejects_blank_question query_blank_question
 run_case query_passes_one_intact_argument query_intact

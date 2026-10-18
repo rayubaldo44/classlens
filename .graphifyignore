@@ -2,6 +2,7 @@
 .git/
 .worktrees/
 .superpowers/
+.archify/
 graphify-out/
 .graphify-obsidian-dir
 

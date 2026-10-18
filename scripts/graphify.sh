@@ -12,9 +12,9 @@ usage() {
   printf '%s\n' \
     'Usage: ./scripts/graphify.sh <build|update|check|query QUESTION>' \
     '' \
-    '  build   Extract code only, then export HTML and Obsidian notes.' \
-    '  update  Update the existing graph, then export HTML and Obsidian notes.' \
-    '  check   Verify the pinned CLI and graph metadata.' \
+    '  build   Extract code only, cluster without AI labels, and export.' \
+    '  update  Refresh code only with --force, cluster without AI labels, and export.' \
+    '  check   Verify the pinned CLI/skill and generated graph structure.' \
     '  query   Ask one question of the existing graph.'
 }
 
@@ -50,11 +50,19 @@ validate_obsidian_dir() {
 
 resolve_obsidian_dir() {
   local path="$LOCAL_OBSIDIAN_DIR"
+  local line
   if [[ "${CLASSLENS_OBSIDIAN_GRAPH_DIR+x}" == x ]]; then
     [[ -n "$CLASSLENS_OBSIDIAN_GRAPH_DIR" ]] || fail 'CLASSLENS_OBSIDIAN_GRAPH_DIR is set but empty.'
     path="$CLASSLENS_OBSIDIAN_GRAPH_DIR"
   elif [[ -f "${PROJECT_ROOT}/.graphify-obsidian-dir" ]]; then
-    path="$(< "${PROJECT_ROOT}/.graphify-obsidian-dir")"
+    path=''
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ -n "${line//[[:space:]]/}" ]]; then
+        path="$line"
+        break
+      fi
+    done < "${PROJECT_ROOT}/.graphify-obsidian-dir"
+    [[ -n "$path" ]] || fail '.graphify-obsidian-dir has no non-empty destination line.'
   fi
   validate_obsidian_dir "$path"
 }
@@ -78,6 +86,7 @@ build_graph() {
   destination="$(resolve_obsidian_dir)" || return 1
   require_graphify
   "$GRAPHIFY_BIN" extract . --code-only
+  "$GRAPHIFY_BIN" cluster-only . --no-label
   export_graph "$destination"
 }
 
@@ -85,7 +94,8 @@ update_graph() {
   local destination
   destination="$(resolve_obsidian_dir)" || return 1
   require_graphify
-  "$GRAPHIFY_BIN" update .
+  "$GRAPHIFY_BIN" extract . --code-only --force
+  "$GRAPHIFY_BIN" cluster-only . --no-label
   export_graph "$destination"
 }
 
@@ -94,20 +104,31 @@ check_graph() {
   require_graphify
   [[ -f graphify-out/graph.json ]] || fail 'Missing graphify-out/graph.json. Run build first.'
   python_bin="$(command -v python3 || command -v python)" || fail 'python3 or python is required to validate graph JSON.'
-  "$python_bin" - <<'PY'
+  "$python_bin" - "$EXPECTED_GRAPHIFY_VERSION" <<'PY'
 import json
 import sys
+from pathlib import Path
 
 try:
+    version_file = Path(".agents/skills/graphify/.graphify_version")
+    if not version_file.is_file():
+        raise ValueError("Missing Graphify skill version file: .agents/skills/graphify/.graphify_version")
+    if version_file.read_text(encoding="utf-8").strip() != sys.argv[1]:
+        raise ValueError(f"Graphify skill version must match {sys.argv[1]}")
     with open("graphify-out/graph.json", encoding="utf-8") as source:
-        graph = json.load(source)["graph"]
-    for field in ("schema_version", "graphify_version"):
-        if not graph.get(field):
-            raise ValueError(f"Missing non-empty graph.{field}")
+        graph = json.load(source)
+    if not isinstance(graph, dict) or not isinstance(graph.get("graph"), dict):
+        raise ValueError("graph must be an object")
+    if not isinstance(graph.get("nodes"), list) or not graph["nodes"]:
+        raise ValueError("nodes must be a non-empty array")
+    if not isinstance(graph.get("links"), list):
+        raise ValueError("links must be an array")
+    if not isinstance(graph.get("built_at_commit"), str) or not graph["built_at_commit"].strip():
+        raise ValueError("built_at_commit must be a non-empty string")
 except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
     print(f"ClassLens Graphify: invalid graph metadata: {error}", file=sys.stderr)
     sys.exit(1)
-print("Graphify CLI and graph metadata verified.")
+print("Graphify CLI, skill version, and graph structure verified.")
 PY
 }
 
