@@ -70,6 +70,7 @@ resolve_obsidian_dir() {
 export_graph() {
   local destination="$1"
   local missing_parent=''
+  local vault_root python_bin
   "$GRAPHIFY_BIN" export html
   if [[ "$destination" != "$LOCAL_OBSIDIAN_DIR" && ! -d "${destination%/*}" ]]; then
     missing_parent="${destination%/*}"
@@ -77,7 +78,49 @@ export_graph() {
       "$missing_parent" "$LOCAL_OBSIDIAN_DIR" >&2
     destination="$LOCAL_OBSIDIAN_DIR"
   fi
+  vault_root="$destination"
+  if [[ "$destination" != "$LOCAL_OBSIDIAN_DIR" ]]; then
+    # Start above Graphify's own generated .obsidian directory.
+    vault_root="${destination%/*}"
+    while [[ ! -d "${vault_root}/.obsidian" ]]; do
+      [[ "$vault_root" != / ]] || fail "Could not find a containing Obsidian vault for ${destination}."
+      vault_root="$(dirname -- "$vault_root")"
+    done
+  fi
   "$GRAPHIFY_BIN" export obsidian --dir "$destination"
+  python_bin="$(command -v python3 || command -v python)" || fail 'python3 or python is required to validate Canvas paths.'
+  "$python_bin" - "$destination" "$vault_root" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    destination, vault_root = (Path(path).resolve() for path in sys.argv[1:])
+    prefix = destination.relative_to(vault_root)
+    canvas_path = destination / "graph.canvas"
+    canvas = json.loads(canvas_path.read_text(encoding="utf-8"))
+    changed = False
+    for node in canvas["nodes"]:
+        if node.get("type") != "file":
+            continue
+        relative = Path(node["file"])
+        if relative.is_absolute():
+            raise ValueError(f"Canvas file target must be relative: {relative}")
+        if not relative.is_relative_to(prefix):
+            relative = prefix / relative
+        target = (vault_root / relative).resolve()
+        if not target.is_relative_to(destination) or not target.is_file():
+            raise ValueError(f"Canvas file target must exist inside {destination}: {relative}")
+        if node["file"] != relative.as_posix():
+            node["file"] = relative.as_posix()
+            changed = True
+    if changed:
+        canvas_path.write_text(json.dumps(canvas, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+    print(f"ClassLens Graphify: invalid Canvas paths: {error}", file=sys.stderr)
+    sys.exit(1)
+print(f"Canvas file targets verified relative to vault: {vault_root}")
+PY
   [[ -z "$missing_parent" ]] || fail "Configured Obsidian parent is missing: ${missing_parent}. Local exports were preserved."
 }
 

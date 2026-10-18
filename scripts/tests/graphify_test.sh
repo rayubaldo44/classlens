@@ -15,6 +15,16 @@ if [[ "${BASH_SOURCE[0]##*/}" == 'fake-graphify' ]]; then
   fi
   printf '\n' >> "$FAKE_LOG"
   [[ "${1:-}" != "${FAKE_FAIL:-}" ]] || exit 9
+  if [[ "${1:-}" == export && "${2:-}" == obsidian ]]; then
+    destination="$4"
+    mkdir -p "${destination}/.obsidian"
+    if [[ "${FAKE_MISSING_CANVAS_TARGET:-}" != 1 ]]; then
+      printf 'Generated note\n' > "${destination}/Example note.md"
+    fi
+    if [[ "${FAKE_KEEP_CANVAS:-}" != 1 || ! -f "${destination}/graph.canvas" ]]; then
+      printf '%s\n' '{"nodes":[{"id":"note","type":"file","file":"Example note.md","x":0,"y":0,"width":200,"height":100},{"id":"group","type":"group","file":"keep-group-field.md","x":0,"y":0,"width":300,"height":200}],"edges":[]}' > "${destination}/graph.canvas"
+    fi
+  fi
   exit 0
 fi
 
@@ -27,7 +37,7 @@ failed=0
 
 fixture() {
   CASE_ROOT="${TEST_ROOT}/$1"
-  mkdir -p "${CASE_ROOT}/scripts" "${CASE_ROOT}/graphify-out" "${CASE_ROOT}/vault with spaces" "${CASE_ROOT}/.agents/skills/graphify"
+  mkdir -p "${CASE_ROOT}/scripts" "${CASE_ROOT}/graphify-out" "${CASE_ROOT}/vault with spaces/.obsidian" "${CASE_ROOT}/.agents/skills/graphify"
   printf '0.9.77\n' > "${CASE_ROOT}/.agents/skills/graphify/.graphify_version"
   cp "${BASH_SOURCE[0]}" "${CASE_ROOT}/fake-graphify"
   chmod +x "${CASE_ROOT}/fake-graphify"
@@ -37,7 +47,7 @@ fixture() {
   export CLASSLENS_GRAPHIFY_BIN="${CASE_ROOT}/fake-graphify"
   export FAKE_LOG="${CASE_ROOT}/calls.log"
   export FAKE_ALL_CALLS="${CASE_ROOT}/all-calls.log"
-  unset CLASSLENS_OBSIDIAN_GRAPH_DIR FAKE_FAIL FAKE_VERSION
+  unset CLASSLENS_OBSIDIAN_GRAPH_DIR FAKE_FAIL FAKE_VERSION FAKE_KEEP_CANVAS FAKE_MISSING_CANVAS_TARGET
   : > "$FAKE_LOG"
   : > "$FAKE_ALL_CALLS"
 }
@@ -197,6 +207,70 @@ query_without_question() { run_wrapper query; assert_failure; assert_no_cli; }
 query_blank_question() { run_wrapper query '   '; assert_failure; assert_no_cli; }
 query_intact() { run_wrapper query what connects analysis to 'remediation?'; assert_success; assert_calls 'query<what connects analysis to remediation?>'; }
 
+assert_canvas_file() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+canvas = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+note, group = canvas["nodes"]
+assert note["file"] == sys.argv[2], note["file"]
+assert (Path(sys.argv[3]) / note["file"]).is_file()
+assert group["file"] == "keep-group-field.md"
+assert canvas["edges"] == []
+PY
+}
+
+external_canvas() {
+  mkdir -p "${CASE_ROOT}/vault with spaces/projects/ClassLens/Graphify/.obsidian"
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/projects/ClassLens/Graphify"
+  run_wrapper build
+  assert_success
+  assert_canvas_file "${CLASSLENS_OBSIDIAN_GRAPH_DIR}/graph.canvas" 'projects/ClassLens/Graphify/Example note.md' "${CASE_ROOT}/vault with spaces"
+}
+
+external_canvas_without_vault() {
+  rmdir "${CASE_ROOT}/vault with spaces/.obsidian"
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/Graphify"
+  run_wrapper build
+  assert_failure
+  assert_diagnostic 'containing Obsidian vault'
+  [[ ! -e "${CLASSLENS_OBSIDIAN_GRAPH_DIR}/graph.canvas" ]]
+}
+
+external_canvas_idempotent() {
+  mkdir -p "${CASE_ROOT}/vault with spaces/projects/ClassLens"
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/projects/ClassLens/Graphify"
+  export FAKE_KEEP_CANVAS=1
+  run_wrapper build
+  assert_success
+  run_wrapper update
+  assert_success
+  assert_canvas_file "${CLASSLENS_OBSIDIAN_GRAPH_DIR}/graph.canvas" 'projects/ClassLens/Graphify/Example note.md' "${CASE_ROOT}/vault with spaces"
+}
+
+local_canvas() {
+  run_wrapper build
+  assert_success
+  assert_canvas_file "${CASE_ROOT}/graphify-out/obsidian/graph.canvas" 'Example note.md' "${CASE_ROOT}/graphify-out/obsidian"
+}
+
+fallback_canvas() {
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/missing/Graphify"
+  run_wrapper build
+  assert_failure
+  assert_canvas_file "${CASE_ROOT}/graphify-out/obsidian/graph.canvas" 'Example note.md' "${CASE_ROOT}/graphify-out/obsidian"
+}
+
+missing_canvas_target() {
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/Graphify"
+  export FAKE_MISSING_CANVAS_TARGET=1
+  run_wrapper build
+  assert_failure
+  assert_diagnostic 'Canvas file target'
+}
+
 run_case build_default_order_and_root build_default
 run_case environment_overrides_config env_precedence
 run_case config_overrides_local_default config_precedence
@@ -238,6 +312,12 @@ run_case archify_generated_directories_excluded archify_excluded
 run_case query_rejects_missing_question query_without_question
 run_case query_rejects_blank_question query_blank_question
 run_case query_passes_one_intact_argument query_intact
+run_case external_canvas_uses_containing_vault_paths external_canvas
+run_case external_canvas_rejects_missing_containing_vault external_canvas_without_vault
+run_case external_canvas_rewrite_is_idempotent external_canvas_idempotent
+run_case local_canvas_keeps_standalone_paths local_canvas
+run_case missing_parent_canvas_keeps_standalone_paths fallback_canvas
+run_case canvas_rejects_missing_file_target missing_canvas_target
 
 printf '%s passed, %s failed\n' "$passed" "$failed"
 [[ "$failed" == 0 ]]
