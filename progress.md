@@ -1,5 +1,14 @@
 # Golden Path Reliability Progress
 
+## 2026-10-19 — Graphify repository milestone documented
+
+- Continued the approved subagent-driven plan in `feature/graphify-obsidian`; Tasks 1–3 implemented and verified the wrapper/exclusions, official 0.9.77 CLI/skill, real graph, query, and isolated external export.
+- Re-ran all 47 wrapper contract tests and the saved-graph check successfully while preparing Task 4. Current report confirms 929 nodes / 2,828 links / 53 communities and zero input/output tokens, built from `269091f3`.
+- Updated README operations/removal, D-032, reconciled design, STATUS, TASKS, and planning memory. Preserved earlier planning/P0 history; added a completed tooling milestone because no prior Graphify checkbox existed.
+- Recorded full code-only refresh, no-label clustering, actual metadata checks, corrected vault-root Canvas targets, optional SQL/query limitations, and the unavailable final checksum baseline.
+- Task 5 dashboard synchronization and final branch review remain. No external vault note was edited in Task 4.
+- Task 4 verification: 84 relative Markdown file links resolve across 37 tracked Markdown files; `git diff --check` passes; local output/config are ignored. Independent artifact inspection reconfirmed 929 nodes / 2,828 links, 982 notes, and 929/929 Canvas targets resolving once inside Graphify.
+
 ## 2026-10-18 — Graphify implementation planning
 
 - The user approved `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`.

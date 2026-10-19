@@ -1,6 +1,8 @@
 # Graphify and Obsidian Integration Design
 
-**Status:** Approved on 2026-10-18; implementation planned
+**Status:** Approved on 2026-10-18; code graph/export implemented and verified on 2026-10-18. Dashboard synchronization and final branch review remain Task 5.
+
+**Implementation evidence:** 47 wrapper contract tests; successful real build and full refresh with Graphify 0.9.77; 929 nodes / 2,828 links / 53 communities; 982 generated Markdown notes; all 929 Canvas file targets resolve from the containing Vault-EN root; saved-graph check and source-backed queries pass. See [current state](../../../STATUS.md) and [D-032](../../DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export). The following behavior is reconciled with the pinned release rather than the original implementation-plan assumptions.
 
 ## Goal
 
@@ -20,6 +22,7 @@ This is preferred over exporting into the ClassLens project-note directory becau
 
 - Install the official PyPI package `graphifyy` as an isolated `uv` tool. The executable remains `graphify`.
 - Register Graphify for Codex with a project-scoped installation so its skill and query-first guidance are reviewable with the repository.
+- Use `graphify install --platform agents --project` for `.agents/skills/graphify/`. The 0.9.77 `codex` installer also created a hook; that output was removed and is not part of the integration.
 - Inspect every installer-created change before retaining it. Existing ClassLens instructions remain authoritative, including the required status/task/history workflow.
 - Pin the installed Graphify version in repository documentation and expose it through the verification command. The repository will not vendor Graphify's Python environment.
 
@@ -34,9 +37,9 @@ This is preferred over exporting into the ClassLens project-note directory becau
 
 Add `scripts/graphify.sh` with these operations:
 
-- `build`: verify prerequisites, run `graphify extract . --code-only`, export the interactive HTML graph, and export Obsidian notes.
-- `update`: run `graphify update .`, regenerate the HTML graph, and refresh the Obsidian export.
-- `check`: verify the executable/version, required project integration files, saved graph schema metadata, and configured Obsidian destination without rebuilding.
+- `build`: verify prerequisites, run `graphify extract . --code-only`, run `cluster-only . --no-label`, export the interactive HTML graph, and export Obsidian notes.
+- `update`: run `graphify extract . --code-only --force`, run `cluster-only . --no-label`, regenerate the HTML graph, and refresh the Obsidian export. Native `update .` in 0.9.77 included Markdown, so refresh deliberately uses a full local code-only scan.
+- `check`: verify CLI/skill version `0.9.77` and actual saved JSON shape (graph object, non-empty nodes array, links array, non-empty `built_at_commit`) without rebuilding. Upstream schema/version metadata fields are absent; none are fabricated. Destination validation occurs on build/update; `check` does not validate destination or freshness.
 - `query <question>`: delegate to `graphify query` against the saved local graph.
 
 The script resolves the Obsidian destination in this order:
@@ -54,6 +57,7 @@ The script refuses an empty destination, the repository root, the filesystem roo
 ### Obsidian integration
 
 - Export one generated note per graph node, generated community notes, and `graph.canvas` under `02_Projects/ClassLens/Graphify/`.
+- Rewrite external Canvas file targets relative to the existing containing vault root, ignore the exporter's nested `.obsidian` when finding that root, and verify each target exists inside the dedicated generated folder.
 - Preserve `ClassLens.md`, `ClassLens-Kanban.md`, the `Context/` notes, personal prose, frontmatter, plugin settings, and `.obsidian/` configuration.
 - Add a concise link from the hand-maintained ClassLens project note to the generated `graph.canvas` and label it as generated, rebuildable code structure.
 - Do not copy raw student responses, environment values, provider payloads, or evaluation reports into the vault.
@@ -62,7 +66,7 @@ The script refuses an empty destination, the repository root, the filesystem roo
 
 1. The wrapper validates the Graphify executable and destination.
 2. Graphify reads eligible repository code while honoring `.gitignore` and `.graphifyignore`.
-3. Local tree-sitter extraction produces the saved graph and report under `graphify-out/`; no semantic backend is selected.
+3. Local structural extraction produces the saved graph under `graphify-out/`; no-label clustering produces the report without selecting a semantic backend. Community names remain placeholders.
 4. The HTML exporter regenerates the local interactive view from the saved graph.
 5. The Obsidian exporter writes only Graphify-owned artifacts into the isolated external destination.
 6. Codex queries the saved local graph with `graphify query`, `path`, or `explain`; Obsidian renders the generated wiki links and Canvas.
@@ -71,9 +75,9 @@ The script refuses an empty destination, the repository root, the filesystem roo
 
 - A missing `graphify` executable or unsupported version fails with an installation command and a nonzero exit status.
 - A missing external vault is not created implicitly beyond the configured dedicated `Graphify` leaf. The script reports the expected parent and leaves the local export available.
-- Extraction failure prevents both exports, preserving the previously generated graph and vault artifacts for inspection.
+- Extraction or clustering failure prevents both exports; the wrapper does not delete prior export artifacts. It does not transactionally roll back upstream graph changes.
 - Export failure reports which output failed and does not claim the integration is current.
-- The smaller-graph safety guard is never bypassed automatically. After a deliberate large deletion, a developer must inspect the warning and invoke Graphify's force behavior explicitly.
+- The explicit `update` command uses `--force`, so it accepts a smaller replacement graph. Developers should inspect unexpected count changes; this is the accepted cost of the code-only refresh workaround.
 - The script never prints secrets, reads backend `.env` files, or auto-detects a semantic provider.
 
 ## Documentation and project state
@@ -87,14 +91,16 @@ The script refuses an empty destination, the repository root, the filesystem roo
 
 The implementation is complete only when all of the following pass:
 
-- `scripts/graphify.sh check` reports the pinned installed version and valid local configuration.
+- `scripts/graphify.sh check` reports valid pinned CLI/skill versions and actual saved graph structure.
 - A clean `build` creates `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`, and the interactive HTML export.
-- The graph metadata includes schema and Graphify version fields, and the graph contains representative Python and TypeScript source nodes.
+- CLI/skill version checks and actual JSON-shape checks pass, and the graph contains representative Python and TypeScript source nodes. The optional SQL parser is unavailable in this installation, so the migration is eligible but not extracted.
 - A scoped query returns graph-backed context for a ClassLens architecture question.
 - The Obsidian destination contains generated notes and `graph.canvas` while the existing project note, Kanban, Context notes, and vault configuration remain unchanged except for the intentional dashboard link/status sync.
 - A no-op `update` succeeds and retains a queryable graph.
 - `git status` does not include generated graph output or machine-local destination configuration.
 - Shell syntax checks, `git diff --check`, and the repository's narrow documentation/link checks pass.
+
+Protected-file checksums verified all 108 existing project/Context/configuration files unchanged through the corrected real build and failed sandboxed refresh. The temporary baseline was unavailable after the final approved successful refresh, so a final byte-for-byte comparison is not claimed. That final refresh's confinement is supported by wrapper verification and Canvas target checks. Artifacts are parseable and readable; GUI/Obsidian rendering has not been verified. Broad queries may truncate at the default budget.
 
 ## Non-goals
 

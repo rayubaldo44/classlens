@@ -4,10 +4,33 @@
 
 - [complete] Approve and commit the local-first integration design.
 - [complete] Write and self-review the implementation plan.
-- [in_progress] Obtain execution-method approval.
-- [pending] Implement, verify, document, and sync the generated graph to Obsidian.
+- [complete] Obtain execution-method approval (subagent-driven work in `feature/graphify-obsidian`).
+- [complete] Implement and verify the pinned wrapper, official project skill, code-only graph, and isolated Obsidian export (Tasks 1–3).
+- [complete] Document the verified integration (Task 4); relative Markdown links, whitespace, ignored artifacts, and current Canvas targets verified.
+- [pending] Synchronize the dashboard and complete final review (Task 5).
 
-The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`. This session is plan-only; implementation begins after plan review.
+The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`. The plan-only stage ended with user approval; implementation evidence and deviations follow below. Earlier P0 campaign history remains unchanged.
+
+## Graphify implementation update — verified 2026-10-18, documented 2026-10-19
+
+- [complete] Safe wrapper/exclusions and 47 passing contract tests; pinned CLI/project skill 0.9.77.
+- [complete] Real build and explicit full code-only refresh: 929 nodes / 2,828 links / 53 communities, no LLM; local JSON/report/HTML and 982 external notes plus Canvas.
+- [complete] Source-backed queries, excluded-source inspection, and 929/929 Canvas file targets resolving from Vault-EN.
+- [pending] Task 5 dashboard link/status sync, final checks, and whole-branch review.
+
+### Graphify errors and resolutions
+
+| Error | Resolution |
+|---|---|
+| `codex` project installer added a hook | Removed that output; used the official `agents` installer and bounded `AGENTS.md` guidance. |
+| Native `update .` indexed Markdown | Use explicit full `extract . --code-only --force`; accept full-scan cost and shrinkage. |
+| Extraction omitted report and advertised metadata fields | Generate report with `cluster-only . --no-label`; validate pinned CLI/skill and actual JSON shape without fabricated fields. |
+| External Canvas basenames resolved only from Graphify/ | Rewrite/validate file targets relative to the containing vault root. |
+| Sandbox denied external export writes | Narrowly authorized wrapper build/update succeeded. |
+| Temporary checksum baseline disappeared before final approved refresh comparison | Record earlier 108-file preservation checks honestly; no final byte-identity claim. |
+| Task 4 `graphify uninstall --help` was rejected as an unknown option | Used the top-level documented help; no uninstall was performed. |
+| Task 4 first documentation patch named STATUS.md twice | Patch validation rejected it without edits; consolidated the file update and reapplied. |
+| Task 4 commit could not create the shared worktree index lock in the sandbox | Narrowly approved Git staging/commit completed successfully. |
 
 ## Goal
 Complete the unchecked P0 tasks in `TASKS.md` in dependency order, preserving the verified local golden path and recording any external blocker honestly.

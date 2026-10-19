@@ -58,6 +58,42 @@ The runner validates Python 3.11 dependencies, frontend dependencies, required f
 | Database | Supabase PostgreSQL migration, adapters, integration test, and restart recovery live-verified |
 | Deployment | Vercel frontend and Render backend provisioned; hosted cross-origin workflow verification pending |
 
+## Code knowledge graph
+
+Graphify is optional developer tooling. Install the pinned official package separately from the application dependencies:
+
+~~~bash
+uv tool install graphifyy==0.9.77
+graphify --version
+~~~
+
+The official project skill is committed at `.agents/skills/graphify/`. To regenerate it with this release, run `graphify install --platform agents --project` and review the diff. Use the `agents` platform: the `codex` installer in 0.9.77 also creates a hook. Keep the bounded Graphify guidance in `AGENTS.md` and the required start-of-task document reads.
+
+For this machine's existing Obsidian vault, save the dedicated destination in the ignored local config (review any existing value before replacing it):
+
+~~~bash
+printf '%s\n' '/home/rayubaldo44/obsidian-developer-vault/Vault-EN/02_Projects/ClassLens/Graphify' > .graphify-obsidian-dir
+~~~
+
+Alternatively, set `CLASSLENS_OBSIDIAN_GRAPH_DIR` to an absolute dedicated `Graphify` leaf inside an existing Obsidian vault. The environment value takes precedence over the first non-empty config-file line. Without either setting, output goes to `graphify-out/obsidian`. An unavailable external parent produces a local fallback and a nonzero exit; create/open the intended vault before retrying. External Canvas paths are rewritten and checked relative to the containing vault root, so open the existing `Vault-EN` vault rather than treating the generated folder as a new vault.
+
+Run from the repository root:
+
+~~~bash
+./scripts/graphify.sh build
+./scripts/graphify.sh update
+./scripts/graphify.sh check
+./scripts/graphify.sh query "what connects assessment intake to misconception analysis?"
+~~~
+
+`build` extracts code locally; `update` explicitly performs a full `extract . --code-only --force` refresh. Both run `cluster-only . --no-label` and export the visuals. This avoids 0.9.77's `update .` behavior that included Markdown and avoids provider auto-detection for community naming. Refresh after source changes; there are no hooks or watchers. The forced refresh accepts a smaller replacement graph, so inspect unexpected count changes. Query results provide source context to verify against code, and broad questions can exceed the default output budget.
+
+Open `graphify-out/graph.html` in a browser for the interactive graph. `graphify-out/GRAPH_REPORT.md` provides counts and community navigation; `graphify-out/graph.json` backs queries. In Obsidian, open `02_Projects/ClassLens/Graphify/graph.canvas` for the generated Canvas and follow its symbol notes. These outputs and `.graphify-obsidian-dir` are ignored; the wrapper, exclusions, tests, skill, and instructions are committed.
+
+Extraction uses `--code-only` and no LLM. `.graphifyignore` excludes environment files, demo/evaluation content, dependencies, caches, worktrees, and generated artifacts. Graphify Cloud, MCP, semantic providers, hooks, and watch mode are not configured. Community names remain `Community N`. Source/tests/shell scripts are eligible; the current installation lacks the optional SQL parser, so the migration is not extracted. The pinned release omits advertised graph schema/version fields; `check` instead validates CLI/skill version `0.9.77`, NetworkX-style graph/nodes/links shape, non-empty nodes, and `built_at_commit`. It does not prove graph freshness; compare that commit with source changes.
+
+To uninstall the isolated CLI, run `uv tool uninstall graphifyy`. To remove this repository integration, make a reviewed change removing `.agents/skills/graphify/`, the Graphify section in `AGENTS.md`, `.graphifyignore`, `scripts/graphify.sh`, `scripts/tests/graphify_test.sh`, and the two Graphify `.gitignore` entries. Move the ignored local config/output and dedicated external `Graphify/` folder to trash if no longer wanted, and remove the dashboard link; preserve the parent ClassLens notes and vault settings. Avoid the upstream broad `graphify uninstall --purge`, which also removes other detected platform integrations.
+
 ## Verified demo result
 
 The deterministic follow-up fixture produces:
@@ -78,6 +114,8 @@ classlens/
 ├── backend/              # FastAPI services, providers, schemas, and tests
 ├── data/demo/            # Versioned synthetic assessment/material fixtures
 ├── scripts/demo.sh       # Safe local check/start/reset/status/stop runner
+├── scripts/graphify.sh   # Pinned local code graph, query, and Obsidian export
+├── .graphifyignore       # Graph extraction exclusions
 ├── database/migrations/  # Reproducible golden-path PostgreSQL schema
 ├── docs/                 # Product, architecture, API, AI, data, and demo guides
 ├── STATUS.md             # Current verified state

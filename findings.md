@@ -1,5 +1,15 @@
 # Golden Path Reliability Findings
 
+## Graphify implementation findings — verified 2026-10-18, documented 2026-10-19
+
+- The planning findings below describe the starting state. The official CLI and committed `.agents/skills/graphify/` now pin 0.9.77; installer-generated `codex` hook output was removed in favor of `--platform agents --project`.
+- Native `update .` included Markdown in this release. The wrapper therefore refreshes with full `extract . --code-only --force` and uses `cluster-only . --no-label` for a report without provider auto-detection. It accepts shrinkage and retains placeholder community names.
+- Actual graph metadata lacks the advertised schema/version fields. Compatibility checks validate pinned CLI/skill plus actual graph/nodes/links shape, non-empty nodes, and `built_at_commit`; they do not prove freshness.
+- Real build/full refresh scanned 82 code files, skipped 37 non-code files, and made no LLM extraction calls. Current output has 929 nodes / 2,828 links / 53 communities; ignored local JSON/report/HTML and external 982 generated notes plus Canvas exist. Excluded/document node and link source paths are absent.
+- External Canvas paths must start at Vault-EN, not Graphify/. The wrapper skips the generated nested `.obsidian`, prefixes file targets exactly once, and verifies confinement/existence. All 929 targets resolve from the real vault root.
+- Earlier protected-file checksum comparisons covered 108 files through the corrected build and failed sandboxed refresh. The final approved refresh completed successfully, but its temporary baseline disappeared before a new byte-for-byte comparison; do not claim that comparison or GUI rendering.
+- Optional SQL parsing is unavailable, so the migration is not extracted. Broad queries can truncate at the default budget. Cloud/MCP/hooks/watchers/semantic providers are not configured.
+
 ## Graphify planning findings — 2026-10-18
 
 - The official package is `graphifyy`; the executable is `graphify`. The latest GitHub release found during planning is `0.9.77`.

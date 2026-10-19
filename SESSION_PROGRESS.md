@@ -1278,3 +1278,20 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: review the spec and choose native or subagent-driven execution for the next session. Native execution is recommended because downstream service and frontend tasks depend closely on the same reviewed-group contract.
 
 ---
+
+## Session / Milestone: Local Graphify code graph and Obsidian export verified
+
+**Date:** 2026-10-18 (Asia/Manila); documentation recorded 2026-10-19
+
+**Status:** Repository tooling and generated export implemented and verified; dashboard synchronization and final branch review remain
+
+- Attempted and completed: added a pinned official `graphifyy==0.9.77` workflow, a committed project skill, exclusion rules, safe destination handling, source-backed queries, local HTML/report/JSON, and generated notes/Canvas isolated under the existing Obsidian `ClassLens/Graphify/` subtree.
+- Files created or significantly modified: `.graphifyignore`, `.gitignore`, `scripts/graphify.sh`, `scripts/tests/graphify_test.sh`, `.agents/skills/graphify/`, `AGENTS.md`, `README.md`, `docs/DECISIONS.md`, the Graphify design spec, `STATUS.md`, `TASKS.md`, and root planning files. Generated graph/export and machine-local configuration remain ignored or external.
+- Verified/tested: 47 wrapper tests pass. Real build and full code-only refresh scanned 82 code files, skipped 37 non-code files, and used no LLM; output has 929 nodes / 2,828 links / 53 communities and 982 generated Markdown notes. All 929 Canvas file targets resolve from Vault-EN, excluded/document source paths are absent, and saved-graph checks and source-backed queries pass. The implementation's regression run passed 86 backend tests (one opt-in integration skipped), three frontend test files, lint, and production build. Task 4 reran the wrapper tests and graph check; application suites were not repeated for documentation-only edits.
+- Problems encountered: the `codex` installer added a hook; native `update .` included Markdown; extraction omitted a report and advertised metadata fields; Canvas basenames resolved from the generated folder rather than the vault. Narrow external-write approval was needed. The temporary protected-file baseline disappeared before the final approved refresh comparison.
+- Important decisions: use the official `agents` installer and bounded project instructions; refresh through full `extract . --code-only --force`; generate the report with `cluster-only . --no-label`; validate pinned CLI/skill and actual JSON shape without invented metadata; rewrite and verify Canvas paths from the containing vault. D-032 records the accepted tradeoffs.
+- Preservation evidence: earlier checks proved all 108 protected project/Context/configuration files unchanged through the corrected build and failed sandboxed refresh. The final approved refresh succeeded, but no final byte-for-byte baseline comparison is claimed. Final confinement is supported by wrapper and Canvas checks; GUI/Obsidian rendering has not been verified.
+- Remaining work: synchronize the dashboard link/status, run final verification, and complete whole-branch review. Optional SQL parsing is absent, so the migration is not extracted; broad queries can truncate; community names remain placeholders. No Cloud/MCP/hooks/watchers/semantic providers are configured.
+- Recommended next step: execute Task 5 of the [Graphify implementation plan](docs/superpowers/plans/2026-10-18-graphify-obsidian.md#task-5-obsidian-dashboard-link-final-verification-and-review), preserving hand-maintained notes and vault settings.
+
+---

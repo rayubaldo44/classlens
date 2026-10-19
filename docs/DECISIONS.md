@@ -4,6 +4,13 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-032 — Local code graph with isolated Obsidian export
+
+- **Status:** Accepted on 2026-10-18; implementation and real export verified on 2026-10-18
+- **Decision:** Use the official `graphifyy==0.9.77` isolated `uv` tool and committed project-scoped `agents` skill. The repository wrapper extracts with `--code-only`, refreshes explicitly with full forced code-only extraction, clusters with `--no-label`, and exports ignored local graph/HTML/report plus generated notes and Canvas under the existing vault's dedicated `ClassLens/Graphify/` subtree. Configure no Cloud, MCP, semantic provider, hook, or watcher.
+- **Reason:** This gives source-backed navigation and an Obsidian visual without mixing generated symbols into hand-maintained project notes or sending content to a semantic model. The pinned release's native `update .` included Markdown; its `codex` installer created a hook; and extraction alone did not produce the report. The wrapper and `agents` installer preserve the approved scope.
+- **Consequence:** Refreshes cost a full local scan and accept graph shrinkage; community names stay placeholders. External Canvas targets must resolve from the containing vault root. The release omits advertised graph schema/version metadata, so checks pin the CLI/skill and validate actual NetworkX-style shape, non-empty nodes, and `built_at_commit` without inventing fields. Future upgrades require deliberate compatibility review. The optional SQL parser is absent in this installation. See [the setup and removal instructions](../README.md#code-knowledge-graph) and [the reconciled design](superpowers/specs/2026-10-16-graphify-obsidian-design.md).
+
 ### D-027 — Bound and idempotently retry remediation generation
 
 - **Status:** Accepted and implemented on 2026-10-13

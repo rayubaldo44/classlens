@@ -1,12 +1,14 @@
 # ClassLens Status
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-19
 
 **Current phase:** Final P0 golden path verified locally; local demo selected while the paid Render upgrade is deferred
 
 **Deadline context:** Hackathon MVP intended to be demo-ready tomorrow
 
 ## Verified working
+
+- Graphify developer tooling is implemented with pinned `graphifyy==0.9.77`, an official project skill, exclusion rules, and a safe wrapper. The verified 2026-10-18 build/full refresh scanned 82 code files, skipped 37 non-code files, used no LLM, and produced 929 nodes / 2,828 links / 53 communities. Ignored local JSON/report/HTML and 982 generated Markdown notes plus `graph.canvas` in the dedicated Obsidian `ClassLens/Graphify/` subtree exist; all 929 Canvas file targets resolve from the existing Vault-EN root. Wrapper tests pass (47/47), saved-graph checks and source-backed queries pass, and excluded/document source paths are absent. See [setup, usage, and removal](README.md#code-knowledge-graph) and [D-032](docs/DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export). The dashboard link/status sync and final whole-change review remain the next integration steps.
 
 - Repository-backed interactive architecture and data-flow diagrams were generated with Archify from commit `5fb327f` on 2026-10-06. Both passed showcase source/layout validation, strict artifact checks and Chromium browser checks with no diagnostics; selected light/dark captures were manually inspected. See [Architecture](docs/ARCHITECTURE.md#interactive-repository-diagrams). This verifies the diagrams, not a new application or hosted golden-path run.
 - The public landing page is available at `/`, with a direct path to the teacher dashboard at `/dashboard` and a clearly labeled synthetic-demo path to `/upload`. The supplied mascot replaces the CL mark in the landing header, workspace sidebar, and favicon. Motion animates the landing entrance, section reveal, and button gestures; reduced-motion preferences suppress movement. Desktop and mobile Firefox captures, direct route loads, frontend lint, and production build passed locally.
@@ -79,6 +81,8 @@
 - Two timed human-operated stage rehearsals passed on the judging machine in 1:31 and 1:22.4. A separate 1:20 exploration of pattern 2 correctly exercised the insufficient-evidence comparison state.
 
 ## Known issues and constraints
+
+- Graphify refresh is a full forced code-only scan rather than incremental update; no-label clustering leaves placeholder community names. The current optional SQL parser is missing, so migrations are not extracted; broad queries may truncate. Version checks use the pinned CLI/skill and actual JSON structure because upstream schema/version metadata fields are absent. Earlier checksum comparisons verified all 108 protected vault files unchanged through the corrected build and failed sandboxed refresh; the temporary baseline disappeared before the final approved refresh, so no final byte-for-byte comparison is claimed. Final export confinement is supported by wrapper checks and resolved Canvas targets. No GUI/Obsidian rendering verification is claimed.
 
 - Gemini and Supabase are network dependencies. Gemini produced intermittent transient 503 responses during verification; the bounded retry reduced but cannot eliminate that risk.
 - Analysis, retrieval, generation, and database service operations remain synchronous internally, but run outside async request handlers in the bounded worker pool. First embedding-model use and first post-restart material retrieval are slower because vectors are loaded/rebuilt.
