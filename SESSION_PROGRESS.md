@@ -1295,3 +1295,19 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: execute Task 5 of the [Graphify implementation plan](docs/superpowers/plans/2026-10-18-graphify-obsidian.md#task-5-obsidian-dashboard-link-final-verification-and-review), preserving hand-maintained notes and vault settings.
 
 ---
+
+## Session / Milestone: Graphify Obsidian dashboard synchronized
+
+**Date:** 2026-10-19 (Asia/Manila)
+
+**Status:** Dashboard synchronization and final integration checks verified; whole-branch review remains
+
+- Attempted and completed: synchronized the verified Graphify milestone into the existing ClassLens project note, added the vault-relative generated Canvas link, and added one verified Done item to the existing Kanban.
+- Files significantly modified: external `ClassLens.md` and `ClassLens-Kanban.md`; repository `STATUS.md`, `TASKS.md`, `task_plan.md`, `progress.md`, and this log.
+- Verified/tested: both external notes read back successfully and the dashboard link resolves. Bash syntax, all 47 wrapper tests, saved-graph check, graph-backed/source-confirmed query, artifact counts, exclusions, and Canvas confinement checks pass. The export still has 982 Markdown notes and all 929 file targets resolve inside `ClassLens/Graphify/` from Vault-EN. The graph was built at `269091f3`; later branch changes are documentation only.
+- Problems encountered: none in this synchronization. The earlier missing final export checksum baseline remains a documented limitation; no retrospective preservation claim is added.
+- Important decisions: keep repository documentation authoritative and generated detail out of the dashboard; preserve existing unrelated project prose, frontmatter, and Kanban settings.
+- Remaining work: whole-branch review and any verified review fixes. GUI rendering remains unverified; optional SQL parsing and broad-query limits remain documented.
+- Recommended next step: review the complete Graphify branch, emphasizing destination safety, extraction boundaries, and reproducibility.
+
+---

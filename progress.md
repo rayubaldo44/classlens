@@ -1,5 +1,12 @@
 # Golden Path Reliability Progress
 
+## 2026-10-19 — Graphify dashboard synchronization verified
+
+- Added the generated Canvas link, one concise verified milestone, and a tooling status summary to the existing Obsidian ClassLens note. Added one verified Done item to its Kanban; preserved unrelated content and plugin settings.
+- Read back both notes and resolved the dashboard link. Re-ran Bash syntax, all 47 wrapper tests, graph check, source-backed query, and artifact/confinement checks; all pass. Graph remains built at `269091f3`; subsequent repository changes are documentation only.
+- Confirmed 982 generated notes and all 929 Canvas targets resolve inside the dedicated export subtree. Task 5 changes only the two intended external notes; earlier export-preservation limitations remain unchanged.
+- Final whole-branch review remains pending. No application code changed or application-suite rerun was needed for this synchronization.
+
 ## 2026-10-19 — Graphify repository milestone documented
 
 - Continued the approved subagent-driven plan in `feature/graphify-obsidian`; Tasks 1–3 implemented and verified the wrapper/exclusions, official 0.9.77 CLI/skill, real graph, query, and isolated external export.

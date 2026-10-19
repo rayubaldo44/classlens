@@ -7,7 +7,8 @@
 - [complete] Obtain execution-method approval (subagent-driven work in `feature/graphify-obsidian`).
 - [complete] Implement and verify the pinned wrapper, official project skill, code-only graph, and isolated Obsidian export (Tasks 1–3).
 - [complete] Document the verified integration (Task 4); relative Markdown links, whitespace, ignored artifacts, and current Canvas targets verified.
-- [pending] Synchronize the dashboard and complete final review (Task 5).
+- [complete] Synchronize the dashboard and Kanban; verify the Canvas link and read back both notes (Task 5).
+- [pending] Complete whole-branch review (Task 5).
 
 The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`. The plan-only stage ended with user approval; implementation evidence and deviations follow below. Earlier P0 campaign history remains unchanged.
 
@@ -16,7 +17,8 @@ The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-desi
 - [complete] Safe wrapper/exclusions and 47 passing contract tests; pinned CLI/project skill 0.9.77.
 - [complete] Real build and explicit full code-only refresh: 929 nodes / 2,828 links / 53 communities, no LLM; local JSON/report/HTML and 982 external notes plus Canvas.
 - [complete] Source-backed queries, excluded-source inspection, and 929/929 Canvas file targets resolving from Vault-EN.
-- [pending] Task 5 dashboard link/status sync, final checks, and whole-branch review.
+- [complete] Task 5 dashboard link/status sync and final integration checks.
+- [pending] Task 5 whole-branch review.
 
 ### Graphify errors and resolutions
 
