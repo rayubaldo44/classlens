@@ -100,7 +100,7 @@ The implementation is complete only when all of the following pass:
 - `git status` does not include generated graph output or machine-local destination configuration.
 - Shell syntax checks, `git diff --check`, and the repository's narrow documentation/link checks pass.
 
-Protected-file checksums verified all 108 existing project/Context/configuration files unchanged through the corrected real build and failed sandboxed refresh. The temporary baseline was unavailable after the final approved successful refresh, so a final byte-for-byte comparison is not claimed. That final refresh's confinement is supported by wrapper verification and Canvas target checks. Artifacts are parseable and readable; GUI/Obsidian rendering has not been verified. Broad queries may truncate at the default budget.
+Protected-file checksums verified all 108 existing project/Context/configuration files unchanged through the corrected real build and failed sandboxed refresh. The temporary baseline was unavailable after the earlier pre-hardening final-approved successful refresh, so no byte-for-byte comparison is claimed for that historical refresh. The latest hardened refresh at `a625910` has fresh checksum evidence: all 108 protected files remained unchanged during generated refresh, and the other 107 remained unchanged during the intentional dashboard correction. Export confinement is also supported by wrapper verification and Canvas target checks. Artifacts are parseable and readable; GUI/Obsidian rendering has not been verified. Broad queries may truncate at the default budget.
 
 ## Non-goals
 
