@@ -32,3 +32,4 @@ htmlcov/
 .env*
 data/demo/
 backend/evaluation/
+docs/

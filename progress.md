@@ -1,5 +1,14 @@
 # Golden Path Reliability Progress
 
+## 2026-10-19 — Graphify final-review safety fixes verified
+
+- Added failing regressions for retained document nodes, source exclusions/provenance, safe report guidance, and child symlink writes. Initial RED: 49 passed / 26 failed; final GREEN: 78 passed / 0 failed. Follow-up RED cases independently caught docs-code scope and pre-clustering validation gaps before their fixes.
+- Build/update now retain recoverable graph inputs/cache and extract from a clean baseline; full source checks gate clustering and exports. Recursive symlink preflight runs before writers; generated report guidance uses the safe wrapper command.
+- Real contaminated-document fixture recovered into 32 clean nodes / 62 links, with canary retained only in the archive. Main output refreshed to 980 nodes / 2,973 links / 47 communities, 1,027 notes, and all 980 Canvas targets resolving. Previous graph/counts remain historical.
+- All 108 protected vault files stayed byte-identical across the generated refresh. Backend 86 passed / 1 opt-in integration skipped; three frontend test files, lint/build pass. No application source changed.
+- Updated README, D-032, current status/backlog, design status, and planning memory. Dashboard sync is complete; scoped review of these final fixes remains. Optional SQL/query/GUI and earlier missing-baseline limitations remain recorded.
+- Corrected the existing dashboard's Graphify status/counts and read them back; all other 107 protected vault files, including Kanban, remain unchanged.
+
 ## 2026-10-19 — Graphify dashboard synchronization verified
 
 - Added the generated Canvas link, one concise verified milestone, and a tooling status summary to the existing Obsidian ClassLens note. Added one verified Done item to its Kanban; preserved unrelated content and plugin settings.

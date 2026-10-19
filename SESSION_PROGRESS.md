@@ -1311,3 +1311,21 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: review the complete Graphify branch, emphasizing destination safety, extraction boundaries, and reproducibility.
 
 ---
+
+## Session / Milestone: Graphify final-review safety fixes verified
+
+**Date:** 2026-10-19 (Asia/Manila)
+
+**Status:** Review fixes implemented and verified; scoped re-review remains
+
+- Attempted and completed: reproduced forced code-only extraction retaining document nodes and exporters following destination child symlinks. Both build/update now archive prior graph inputs/cache recoverably, extract from a clean baseline, validate all node/link/hyperedge source provenance before clustering/export, and replace generated report freshness guidance with the safe wrapper command. Recursive preflight rejects symlinks before upstream writers.
+- Files created or significantly modified: `scripts/graphify_validate.py`, `scripts/graphify.sh`, `scripts/tests/graphify_test.sh`, `.graphifyignore`, `README.md`, D-032, the Graphify design, `STATUS.md`, `TASKS.md`, and root planning files. Generated artifacts remain ignored/external.
+- Verified/tested: initial RED 49 passed / 26 failed; final wrapper suite 78 passed. Follow-up regressions caught documentation-code scope and validation-before-clustering gaps before fixes. A separate real Graphify canary fixture rebuilt to 32 nodes / 62 links with document data only in its recoverable archive. Main clean refresh scanned 83 code files, skipped 20 non-code files, used no LLM, and produced 980 nodes / 2,973 links / 47 communities and 1,027 notes. All 980 Canvas targets resolve from Vault-EN; every explicit source passes scope checks and generated subtrees contain no symlinks. Backend 86 passed / 1 opt-in integration skipped; frontend three test files, lint/build pass.
+- Preservation evidence: a new retained baseline proves all 108 protected vault files unchanged during this generated refresh. This evidence applies to this fix cycle only and does not replace the previously unavailable historical baseline. The original 929-node graph remains recoverable; its Canvas targets were checked before refresh.
+- Obsidian synchronization: updated only the existing Graphify status sentence and milestone bullets in `ClassLens.md` to the final counts and safety checks; read-back matches the reviewed copy. The other 107 protected files, including Kanban and vault configuration, remain byte-identical.
+- Problems encountered: a real fixture without a Git commit failed the existing `built_at_commit` check before exports; adding a fixture baseline commit allowed the intended recovery verification. A negative shell assertion initially did not enforce early failure; wrapping it as a helper made the pre-clustering regression fail correctly before implementation.
+- Important decisions: always rebuild from clean archived inputs; permit source-empty nodes only for explicit upstream AST/external-import reference stubs with validated incident code edges. Keep prior milestone entries unchanged and current counts in STATUS/design/backlog.
+- Remaining work: scoped re-review and final branch integration. Optional SQL parsing remains absent, broad queries can truncate, and GUI rendering is unverified. No hooks/watch/Cloud/MCP/semantic provider is configured.
+- Recommended next step: re-review these fixes, then complete final branch handoff.
+
+---

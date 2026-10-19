@@ -1,5 +1,14 @@
 # Golden Path Reliability Findings
 
+## Graphify final-review findings — verified 2026-10-19
+
+- Even `extract . --code-only --force` deliberately merges the existing semantic layer in 0.9.77. Both wrapper operations now archive graph inputs/cache recoverably before extraction. A real document-canary fixture proves clean output and retained recovery data.
+- Every node/link/hyperedge explicit source must be an existing allowed code/config path inside the repository, pass both exclusion sets, and traverse no symlinks. Source-empty AST/import reference stubs require validated incident code edges; isolated/ambiguous/missing provenance fails.
+- Upstream writers follow internal destination symlinks. Recursive preflight now rejects files/directories before extraction, clustering, or either exporter. Regression sentinels remain unchanged and exporters are not invoked.
+- The upstream generated report recommended native refresh. The wrapper replaces that freshness section with its safe command after clustering.
+- Current final-source refresh: 83 code files, 20 non-code files skipped, no LLM; 980 nodes / 2,973 links / 47 communities, 1,027 notes, 980/980 Canvas targets. Earlier numerical entries below remain historical.
+- All 78 wrapper tests pass; backend 86 passed / 1 opt-in integration skipped; three frontend test files, lint/build pass. A fresh 108-file baseline proves protected vault files unchanged during this refresh. No retrospective preservation or GUI-rendering claim is added.
+
 ## Graphify implementation findings — verified 2026-10-18, documented 2026-10-19
 
 - The planning findings below describe the starting state. The official CLI and committed `.agents/skills/graphify/` now pin 0.9.77; installer-generated `codex` hook output was removed in favor of `--platform agents --project`.

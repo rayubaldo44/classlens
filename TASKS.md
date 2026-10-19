@@ -160,7 +160,7 @@ The initial mock UI was a frontend-only scaffold milestone. Its completion did n
 ### Developer tooling — local Graphify and Obsidian export
 
 - [x] Add a pinned, explicit code-only Graphify workflow with source-backed queries, ignored local HTML/report/JSON, and generated notes/Canvas isolated under the existing Obsidian `ClassLens/Graphify/` subtree. (2026-10-18)
-  - Verified 47 wrapper tests; 929 nodes / 2,828 links / 53 communities; 982 generated notes; all 929 Canvas targets resolve from Vault-EN. See [README](README.md#code-knowledge-graph). This records a newly verified tooling milestone; there was no prior Graphify backlog checkbox to move. Dashboard and Kanban synchronization and read-back passed on 2026-10-19; final branch review remains in the [implementation plan](docs/superpowers/plans/2026-10-18-graphify-obsidian.md#task-5-obsidian-dashboard-link-final-verification-and-review).
+  - Final-review fixes verified on 2026-10-19: 78 wrapper tests; recoverable clean rebuild; complete source-scope validation; safe report guidance; pre-write recursive symlink rejection. Current output: 980 nodes / 2,973 links / 47 communities, 1,027 generated notes, and all 980 Canvas targets resolving from Vault-EN. See [README](README.md#code-knowledge-graph). This records a newly verified tooling milestone; there was no prior Graphify backlog checkbox to move. Dashboard/Kanban synchronization is complete; final scoped re-review remains in the [implementation plan](docs/superpowers/plans/2026-10-18-graphify-obsidian.md#task-5-obsidian-dashboard-link-final-verification-and-review).
 
 ### Frontend milestone — clickable golden-path skeleton
 

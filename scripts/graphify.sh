@@ -12,15 +12,21 @@ usage() {
   printf '%s\n' \
     'Usage: ./scripts/graphify.sh <build|update|check|query QUESTION>' \
     '' \
-    '  build   Extract code only, cluster without AI labels, and export.' \
-    '  update  Refresh code only with --force, cluster without AI labels, and export.' \
-    '  check   Verify the pinned CLI/skill and generated graph structure.' \
+    '  build   Rebuild code only from recoverably archived inputs, validate, and export.' \
+    '  update  Rebuild code only with --force, validate, and export.' \
+    '  check   Verify the pinned CLI/skill, graph structure, and allowed source scope.' \
     '  query   Ask one question of the existing graph.'
 }
 
 fail() {
   printf 'ClassLens Graphify: %s\n' "$1" >&2
   exit 1
+}
+
+validate_generated() {
+  local python_bin
+  python_bin="$(command -v python3 || command -v python)" || fail 'python3 or python is required for Graphify safety checks.'
+  "$python_bin" "${PROJECT_ROOT}/scripts/graphify_validate.py" "$@"
 }
 
 require_graphify() {
@@ -71,7 +77,6 @@ export_graph() {
   local destination="$1"
   local missing_parent=''
   local vault_root python_bin
-  "$GRAPHIFY_BIN" export html
   if [[ "$destination" != "$LOCAL_OBSIDIAN_DIR" && ! -d "${destination%/*}" ]]; then
     missing_parent="${destination%/*}"
     printf 'ClassLens Graphify: configured Obsidian parent is missing: %s; exporting locally to %s.\n' \
@@ -87,6 +92,10 @@ export_graph() {
       vault_root="$(dirname -- "$vault_root")"
     done
   fi
+  # Upstream exporters write through child symlinks. Inspect both destinations
+  # before either exporter; Canvas validation after writing cannot protect them.
+  validate_generated symlinks "${PROJECT_ROOT}/graphify-out" "$destination"
+  "$GRAPHIFY_BIN" export html
   "$GRAPHIFY_BIN" export obsidian --dir "$destination"
   python_bin="$(command -v python3 || command -v python)" || fail 'python3 or python is required to validate Canvas paths.'
   "$python_bin" - "$destination" "$vault_root" <<'PY'
@@ -128,8 +137,13 @@ build_graph() {
   local destination
   destination="$(resolve_obsidian_dir)" || return 1
   require_graphify
+  validate_generated symlinks "${PROJECT_ROOT}/graphify-out" "$destination"
+  validate_generated prepare
   "$GRAPHIFY_BIN" extract . --code-only
+  check_graph
   "$GRAPHIFY_BIN" cluster-only . --no-label
+  check_graph
+  validate_generated report
   export_graph "$destination"
 }
 
@@ -137,8 +151,13 @@ update_graph() {
   local destination
   destination="$(resolve_obsidian_dir)" || return 1
   require_graphify
+  validate_generated symlinks "${PROJECT_ROOT}/graphify-out" "$destination"
+  validate_generated prepare
   "$GRAPHIFY_BIN" extract . --code-only --force
+  check_graph
   "$GRAPHIFY_BIN" cluster-only . --no-label
+  check_graph
+  validate_generated report
   export_graph "$destination"
 }
 
@@ -173,6 +192,7 @@ except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
     sys.exit(1)
 print("Graphify CLI, skill version, and graph structure verified.")
 PY
+  validate_generated sources
 }
 
 query_graph() {

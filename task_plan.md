@@ -9,8 +9,18 @@
 - [complete] Document the verified integration (Task 4); relative Markdown links, whitespace, ignored artifacts, and current Canvas targets verified.
 - [complete] Synchronize the dashboard and Kanban; verify the Canvas link and read back both notes (Task 5).
 - [pending] Complete whole-branch review (Task 5).
+- [complete] Implement and verify final review fixes: recoverable clean rebuilds, complete source-scope checks, safe generated report guidance, and recursive symlink rejection (78 wrapper tests; real fixture and external refresh).
+- [pending] Scoped re-review of final fixes.
 
 The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`. The plan-only stage ended with user approval; implementation evidence and deviations follow below. Earlier P0 campaign history remains unchanged.
+
+## Graphify final-review fixes — verified 2026-10-19
+
+- Clean rebuilds archive prior inputs/cache under ignored `graphify-out/recovery/`, because forced code-only extraction still merges old document nodes. Validation gates clustering and exports, including explicit node/link/hyperedge source paths and narrowly proven upstream reference stubs.
+- Recursive symlink preflight protects HTML, notes, Canvas, manifests, and generated configuration before upstream writes. Generated report guidance now uses the wrapper.
+- Current graph: 980 nodes / 2,973 links / 47 communities; 1,027 notes; 980/980 Canvas targets resolve. The earlier 929-node graph/counts below are historical. Final changes add indexed tooling/tests.
+- Fresh regression checks pass: 78 wrapper cases; backend 86 passed / 1 opt-in integration skipped; three frontend test files, lint/build. A separate real-CLI contaminated graph recovered cleanly. All 108 protected vault files remained unchanged during generated refresh; earlier missing-baseline limitations are not rewritten.
+- Dashboard sync is complete; final scoped re-review remains.
 
 ## Graphify implementation update — verified 2026-10-18, documented 2026-10-19
 
@@ -33,6 +43,9 @@ The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-desi
 | Task 4 `graphify uninstall --help` was rejected as an unknown option | Used the top-level documented help; no uninstall was performed. |
 | Task 4 first documentation patch named STATUS.md twice | Patch validation rejected it without edits; consolidated the file update and reapplied. |
 | Task 4 commit could not create the shared worktree index lock in the sandbox | Narrowly approved Git staging/commit completed successfully. |
+| Final review found forced code-only extraction preserves old document nodes | Archive prior graph inputs/cache and validate the complete clean graph before clustering/export. |
+| Final review found child symlinks reach upstream exporters | Reject all symlinks recursively in generated destinations before writers run. |
+| Generated report recommended unsafe native refresh | Replace freshness guidance with `./scripts/graphify.sh update`. |
 
 ## Goal
 Complete the unchecked P0 tasks in `TASKS.md` in dependency order, preserving the verified local golden path and recording any external blocker honestly.

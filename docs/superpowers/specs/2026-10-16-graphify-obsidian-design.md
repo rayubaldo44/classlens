@@ -1,8 +1,8 @@
 # Graphify and Obsidian Integration Design
 
-**Status:** Approved on 2026-10-18; code graph/export implemented and verified on 2026-10-18. Dashboard synchronization and final branch review remain Task 5.
+**Status:** Approved on 2026-10-18; code graph/export and dashboard synchronization implemented and verified. Final review safety fixes implemented and verified on 2026-10-19; scoped re-review remains.
 
-**Implementation evidence:** 47 wrapper contract tests; successful real build and full refresh with Graphify 0.9.77; 929 nodes / 2,828 links / 53 communities; 982 generated Markdown notes; all 929 Canvas file targets resolve from the containing Vault-EN root; saved-graph check and source-backed queries pass. See [current state](../../../STATUS.md) and [D-032](../../DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export). The following behavior is reconciled with the pinned release rather than the original implementation-plan assumptions.
+**Implementation evidence:** 78 wrapper contract tests; successful real clean refresh with Graphify 0.9.77; 980 nodes / 2,973 links / 47 communities; 1,027 generated Markdown notes; all 980 Canvas file targets resolve from the containing Vault-EN root; saved-graph source checks and source-backed queries pass. A separate real-CLI document-contamination fixture rebuilt cleanly while preserving the prior graph in recovery. See [current state](../../../STATUS.md) and [D-032](../../DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export). The following behavior is reconciled with the pinned release rather than the original implementation-plan assumptions.
 
 ## Goal
 
@@ -28,7 +28,7 @@ This is preferred over exporting into the ClassLens project-note directory becau
 
 ### Repository configuration
 
-- Add `.graphifyignore` for dependency trees, virtual environments, caches, build output, browser artifacts, local worktrees, generated Graphify output, hidden environment files, and demo/evaluation data that should not become graph nodes.
+- Add `.graphifyignore` for documentation, dependency trees, virtual environments, caches, build output, browser artifacts, local worktrees, generated Graphify output, hidden environment files, and demo/evaluation data that should not become graph nodes.
 - Keep application source, tests, migrations, and shell automation eligible for structural indexing. Markdown and other documents are skipped by the explicit code-only extraction mode.
 - Add `graphify-out/` to `.gitignore`. It is a reproducible local artifact rather than an authoritative project document.
 - Do not add Git hooks or watch mode in the initial integration. Refreshes remain explicit so commits cannot unexpectedly mutate the graph or external vault.
@@ -37,9 +37,9 @@ This is preferred over exporting into the ClassLens project-note directory becau
 
 Add `scripts/graphify.sh` with these operations:
 
-- `build`: verify prerequisites, run `graphify extract . --code-only`, run `cluster-only . --no-label`, export the interactive HTML graph, and export Obsidian notes.
-- `update`: run `graphify extract . --code-only --force`, run `cluster-only . --no-label`, regenerate the HTML graph, and refresh the Obsidian export. Native `update .` in 0.9.77 included Markdown, so refresh deliberately uses a full local code-only scan.
-- `check`: verify CLI/skill version `0.9.77` and actual saved JSON shape (graph object, non-empty nodes array, links array, non-empty `built_at_commit`) without rebuilding. Upstream schema/version metadata fields are absent; none are fabricated. Destination validation occurs on build/update; `check` does not validate destination or freshness.
+- `build`: verify prerequisites and reject symlinks in generated destinations; move prior graph inputs/cache into ignored `graphify-out/recovery/before-rebuild-*/`; run `graphify extract . --code-only` from that clean baseline; validate source scope before clustering; run `cluster-only . --no-label`; validate again and repair the report's refresh guidance; export HTML and Obsidian notes after another symlink check.
+- `update`: use the same clean rebuild sequence with `graphify extract . --code-only --force`. Both native `update .` and forced code-only extraction can preserve document nodes in 0.9.77, so clean inputs and source validation are required.
+- `check`: verify CLI/skill version `0.9.77`, actual saved JSON shape (graph object, non-empty nodes array, links array, non-empty `built_at_commit`), and every node/link/hyperedge source without rebuilding. Explicit sources must exist inside the repository, traverse no symlinks, use the ClassLens code/config allowlist, and pass Git plus Graphify exclusions. Only explicit AST/external-import reference stubs with validated incident code edges may have an empty source; missing, isolated, or ambiguous provenance fails. Upstream schema/version metadata fields are absent; none are fabricated. Destination validation occurs on build/update; `check` does not validate destination or freshness.
 - `query <question>`: delegate to `graphify query` against the saved local graph.
 
 The script resolves the Obsidian destination in this order:
@@ -66,7 +66,7 @@ The script refuses an empty destination, the repository root, the filesystem roo
 
 1. The wrapper validates the Graphify executable and destination.
 2. Graphify reads eligible repository code while honoring `.gitignore` and `.graphifyignore`.
-3. Local structural extraction produces the saved graph under `graphify-out/`; no-label clustering produces the report without selecting a semantic backend. Community names remain placeholders.
+3. Prior graph inputs/cache are recoverably archived; local structural extraction produces the saved graph under `graphify-out/`. Complete source-scope checks gate clustering and export; no-label clustering produces the report without selecting a semantic backend. Report guidance is repaired to use `./scripts/graphify.sh update`. Community names remain placeholders.
 4. The HTML exporter regenerates the local interactive view from the saved graph.
 5. The Obsidian exporter writes only Graphify-owned artifacts into the isolated external destination.
 6. Codex queries the saved local graph with `graphify query`, `path`, or `explain`; Obsidian renders the generated wiki links and Canvas.
@@ -75,9 +75,9 @@ The script refuses an empty destination, the repository root, the filesystem roo
 
 - A missing `graphify` executable or unsupported version fails with an installation command and a nonzero exit status.
 - A missing external vault is not created implicitly beyond the configured dedicated `Graphify` leaf. The script reports the expected parent and leaves the local export available.
-- Extraction or clustering failure prevents both exports; the wrapper does not delete prior export artifacts. It does not transactionally roll back upstream graph changes.
+- Extraction, source validation, or clustering failure prevents explicit exporters; source validation also precedes the clustering command's internal HTML writer. Prior graph inputs/cache remain recoverable and existing visuals are retained until upstream writers run. Upstream changes are not transactionally rolled back.
 - Export failure reports which output failed and does not claim the integration is current.
-- The explicit `update` command uses `--force`, so it accepts a smaller replacement graph. Developers should inspect unexpected count changes; this is the accepted cost of the code-only refresh workaround.
+- Clean rebuilds accept a smaller replacement graph. Developers should inspect unexpected count changes and manually retire old ignored recovery archives when no longer needed.
 - The script never prints secrets, reads backend `.env` files, or auto-detects a semantic provider.
 
 ## Documentation and project state

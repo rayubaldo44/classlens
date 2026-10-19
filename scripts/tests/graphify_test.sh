@@ -15,6 +15,20 @@ if [[ "${BASH_SOURCE[0]##*/}" == 'fake-graphify' ]]; then
   fi
   printf '\n' >> "$FAKE_LOG"
   [[ "${1:-}" != "${FAKE_FAIL:-}" ]] || exit 9
+  if [[ "${1:-}" == extract ]]; then
+    mkdir -p graphify-out
+    if [[ -n "${FAKE_EXTRACT_GRAPH:-}" ]]; then
+      printf '%s\n' "$FAKE_EXTRACT_GRAPH" > graphify-out/graph.json
+    elif [[ ! -f graphify-out/graph.json ]]; then
+      printf '%s\n' '{"graph":{},"nodes":[{"id":"example","source_file":"example.py"}],"links":[],"built_at_commit":"abc123"}' > graphify-out/graph.json
+    fi
+  fi
+  if [[ "${1:-}" == cluster-only ]]; then
+    printf '%s\n' '# Graph Report' '## Graph Freshness' '- Run `graphify update .` after code changes (no API cost).' '## Community Hubs' > graphify-out/GRAPH_REPORT.md
+    if [[ -n "${FAKE_CLUSTER_GRAPH:-}" ]]; then
+      printf '%s\n' "$FAKE_CLUSTER_GRAPH" > graphify-out/graph.json
+    fi
+  fi
   if [[ "${1:-}" == export && "${2:-}" == obsidian ]]; then
     destination="$4"
     mkdir -p "${destination}/.obsidian"
@@ -44,10 +58,17 @@ fixture() {
   if [[ -f "${PROJECT_ROOT}/scripts/graphify.sh" ]]; then
     cp "${PROJECT_ROOT}/scripts/graphify.sh" "${CASE_ROOT}/scripts/graphify.sh"
   fi
+  if [[ -f "${PROJECT_ROOT}/scripts/graphify_validate.py" ]]; then
+    cp "${PROJECT_ROOT}/scripts/graphify_validate.py" "${CASE_ROOT}/scripts/graphify_validate.py"
+  fi
+  cp "${PROJECT_ROOT}/.graphifyignore" "${CASE_ROOT}/.graphifyignore"
+  printf 'private/\n' > "${CASE_ROOT}/.gitignore"
+  printf 'def example(): pass\n' > "${CASE_ROOT}/example.py"
+  git init -q "$CASE_ROOT"
   export CLASSLENS_GRAPHIFY_BIN="${CASE_ROOT}/fake-graphify"
   export FAKE_LOG="${CASE_ROOT}/calls.log"
   export FAKE_ALL_CALLS="${CASE_ROOT}/all-calls.log"
-  unset CLASSLENS_OBSIDIAN_GRAPH_DIR FAKE_FAIL FAKE_VERSION FAKE_KEEP_CANVAS FAKE_MISSING_CANVAS_TARGET
+  unset CLASSLENS_OBSIDIAN_GRAPH_DIR FAKE_FAIL FAKE_VERSION FAKE_KEEP_CANVAS FAKE_MISSING_CANVAS_TARGET FAKE_EXTRACT_GRAPH FAKE_CLUSTER_GRAPH
   : > "$FAKE_LOG"
   : > "$FAKE_ALL_CALLS"
 }
@@ -181,7 +202,7 @@ failed_update_clustering() {
 }
 
 graph_fixture() { printf '%s\n' "$1" > "${CASE_ROOT}/graphify-out/graph.json"; }
-valid_graph() { graph_fixture '{"directed":false,"multigraph":false,"graph":{},"nodes":[{"id":"example"}],"links":[],"built_at_commit":"abc123"}'; }
+valid_graph() { graph_fixture '{"directed":false,"multigraph":false,"graph":{},"nodes":[{"id":"example","source_file":"example.py"}],"links":[],"built_at_commit":"abc123"}'; }
 wrong_version() { valid_graph; export FAKE_VERSION=0.9.76; run_wrapper check; assert_failure; assert_calls ''; }
 missing_graph() { run_wrapper check; assert_failure; assert_calls ''; }
 invalid_json() { graph_fixture '{broken'; run_wrapper check; assert_failure; }
@@ -271,6 +292,142 @@ missing_canvas_target() {
   assert_diagnostic 'Canvas file target'
 }
 
+# These catch a merged document layer reaching exporters, invalid provenance,
+# and exporter writes through child links; the fake models the upstream writes.
+no_exports() { ! grep -q '^export' "$FAKE_LOG"; }
+no_clustering() { ! grep -q '^cluster-only' "$FAKE_LOG"; }
+document_graph='{"graph":{},"nodes":[{"id":"doc","source_file":"README.md","file_type":"document"}],"links":[],"built_at_commit":"old"}'
+recover_contamination() {
+  graph_fixture "$document_graph"
+  printf 'Hand-maintained prose\n' > "${CASE_ROOT}/README.md"
+  printf 'Old visual\n' > "${CASE_ROOT}/graphify-out/graph.html"
+  run_wrapper "$1"
+  assert_success
+  python3 - "$CASE_ROOT" "$document_graph" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1]) / 'graphify-out'
+assert json.loads((root / 'graph.json').read_text())['nodes'][0]['source_file'] == 'example.py'
+assert any(json.loads(path.read_text()) == json.loads(sys.argv[2]) for path in (root / 'recovery').glob('*/graph.json'))
+PY
+  assert_diagnostic 'Recoverable graph inputs'
+}
+recover_build() { recover_contamination build; }
+recover_update() { recover_contamination update; }
+failed_clean_rebuild() {
+  graph_fixture "$document_graph"
+  printf 'Old visual\n' > "${CASE_ROOT}/graphify-out/graph.html"
+  export FAKE_FAIL=extract
+  run_wrapper update
+  assert_failure
+  no_exports
+  [[ "$(< "${CASE_ROOT}/graphify-out/graph.html")" == 'Old visual' ]]
+  [[ "$(find "${CASE_ROOT}/graphify-out/recovery" -name graph.json -type f | wc -l)" == 1 ]]
+}
+reject_extracted_document() {
+  export FAKE_EXTRACT_GRAPH="$document_graph"
+  run_wrapper build
+  assert_failure
+  no_exports
+  no_clustering
+  assert_diagnostic 'source scope'
+}
+reject_clustered_document() {
+  export FAKE_CLUSTER_GRAPH="$document_graph"
+  run_wrapper update
+  assert_failure
+  no_exports
+  assert_diagnostic 'source scope'
+}
+check_source() {
+  graph_fixture '{"graph":{},"nodes":[{"id":"example","source_file":"'"$1"'"}],"links":[],"built_at_commit":"abc123"}'
+  run_wrapper check
+  assert_failure
+  assert_diagnostic 'source scope'
+}
+check_document() { printf 'doc\n' > "${CASE_ROOT}/README.md"; check_source README.md; }
+check_archify() { mkdir -p "${CASE_ROOT}/.archify"; printf 'code\n' > "${CASE_ROOT}/.archify/generated.py"; check_source .archify/generated.py; }
+check_docs_code() { mkdir -p "${CASE_ROOT}/docs"; printf 'code\n' > "${CASE_ROOT}/docs/example.py"; check_source docs/example.py; }
+check_env_negation() { printf '!/.env.example.py\n' >> "${CASE_ROOT}/.gitignore"; printf 'credential\n' > "${CASE_ROOT}/.env.example.py"; check_source .env.example.py; }
+check_generated() { printf 'code\n' > "${CASE_ROOT}/graphify-out/generated.py"; check_source graphify-out/generated.py; }
+check_ignored() { mkdir -p "${CASE_ROOT}/private"; printf 'code\n' > "${CASE_ROOT}/private/secret.py"; check_source private/secret.py; }
+check_prohibited() { mkdir -p "${CASE_ROOT}/backend/evaluation"; printf 'code\n' > "${CASE_ROOT}/backend/evaluation/private.py"; check_source backend/evaluation/private.py; }
+check_missing_source() { check_source missing.py; }
+check_outside_source() { printf 'outside\n' > "${CASE_ROOT}/../outside.py"; check_source ../outside.py; }
+check_absolute_source() { check_source "${CASE_ROOT}/example.py"; }
+check_symlink_source() { ln -s ../outside.py "${CASE_ROOT}/alias.py"; check_source alias.py; }
+check_link_source() {
+  graph_fixture '{"graph":{},"nodes":[{"id":"example","source_file":"example.py"}],"links":[{"source":"example","target":"example","source_file":"README.md"}],"built_at_commit":"abc123"}'
+  run_wrapper check; assert_failure; assert_diagnostic 'source scope'
+}
+check_hyperedge_source() {
+  graph_fixture '{"graph":{},"nodes":[{"id":"example","source_file":"example.py"}],"links":[],"hyperedges":[{"source_file":"README.md"}],"built_at_commit":"abc123"}'
+  run_wrapper check; assert_failure; assert_diagnostic 'source scope'
+}
+check_stub() {
+  graph_fixture "$1"
+  run_wrapper check
+}
+valid_reference_stub() {
+  check_stub '{"graph":{},"nodes":[{"id":"code","source_file":"example.py"},{"id":"stub","source_file":"","file_type":"code","_origin":"ast"}],"links":[{"source":"code","target":"stub","source_file":"example.py"}],"built_at_commit":"abc123"}'
+  assert_success
+}
+valid_external_stub() {
+  check_stub '{"graph":{},"nodes":[{"id":"code","source_file":"example.py"},{"id":"stub","source_file":"","file_type":"concept","external":true,"type":"external"}],"links":[{"source":"code","target":"stub","source_file":"example.py"}],"built_at_commit":"abc123"}'
+  assert_success
+}
+isolated_stub() {
+  check_stub '{"graph":{},"nodes":[{"id":"stub","source_file":"","file_type":"code","_origin":"ast"}],"links":[],"built_at_commit":"abc123"}'
+  assert_failure; assert_diagnostic 'source scope'
+}
+ambiguous_stub() {
+  check_stub '{"graph":{},"nodes":[{"id":"code","source_file":"example.py"},{"id":"stub","source_file":""}],"links":[{"source":"code","target":"stub","source_file":"example.py"}],"built_at_commit":"abc123"}'
+  assert_failure; assert_diagnostic 'source scope'
+}
+missing_edge_provenance() {
+  check_stub '{"graph":{},"nodes":[{"id":"code","source_file":"example.py"},{"id":"stub","source_file":"","file_type":"code","_origin":"ast"}],"links":[{"source":"code","target":"stub"}],"built_at_commit":"abc123"}'
+  assert_failure; assert_diagnostic 'source scope'
+}
+safe_report() {
+  run_wrapper "$1"; assert_success
+  grep -Fq './scripts/graphify.sh update' "${CASE_ROOT}/graphify-out/GRAPH_REPORT.md"
+  ! grep -Fq 'graphify update .' "${CASE_ROOT}/graphify-out/GRAPH_REPORT.md"
+}
+build_report() { safe_report build; }
+update_report() { safe_report update; }
+reject_child_link() {
+  local child="$1" destination="${CASE_ROOT}/vault with spaces/Graphify"
+  mkdir -p "$destination" "${CASE_ROOT}/outside-dir"
+  printf 'protected\n' > "${CASE_ROOT}/outside-dir/sentinel"
+  if [[ "$child" == */* ]]; then mkdir -p "${destination}/${child%/*}"; fi
+  ln -s "${CASE_ROOT}/outside-dir/sentinel" "${destination}/${child}"
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="$destination"
+  run_wrapper update
+  assert_failure; no_exports; assert_diagnostic 'symlink'
+  [[ "$(< "${CASE_ROOT}/outside-dir/sentinel")" == protected ]]
+}
+canvas_link() { reject_child_link graph.canvas; }
+note_link() { reject_child_link 'Example note.md'; }
+manifest_link() { reject_child_link .graphify-manifest.json; }
+config_file_link() { reject_child_link .obsidian/graph.json; }
+directory_link() {
+  local destination="${CASE_ROOT}/vault with spaces/Graphify"
+  mkdir -p "$destination" "${CASE_ROOT}/outside-dir"
+  printf 'protected\n' > "${CASE_ROOT}/outside-dir/sentinel"
+  ln -s "${CASE_ROOT}/outside-dir" "${destination}/.obsidian"
+  export CLASSLENS_OBSIDIAN_GRAPH_DIR="$destination"
+  run_wrapper build
+  assert_failure; no_exports; assert_diagnostic 'symlink'
+  [[ "$(< "${CASE_ROOT}/outside-dir/sentinel")" == protected ]]
+}
+html_link() {
+  printf 'protected\n' > "${CASE_ROOT}/sentinel"
+  ln -s "${CASE_ROOT}/sentinel" "${CASE_ROOT}/graphify-out/graph.html"
+  run_wrapper build
+  assert_failure; no_exports; assert_diagnostic 'symlink'
+  [[ "$(< "${CASE_ROOT}/sentinel")" == protected ]]
+}
+
 run_case build_default_order_and_root build_default
 run_case environment_overrides_config env_precedence
 run_case config_overrides_local_default config_precedence
@@ -318,6 +475,37 @@ run_case external_canvas_rewrite_is_idempotent external_canvas_idempotent
 run_case local_canvas_keeps_standalone_paths local_canvas
 run_case missing_parent_canvas_keeps_standalone_paths fallback_canvas
 run_case canvas_rejects_missing_file_target missing_canvas_target
+run_case build_recovers_existing_document_graph recover_build
+run_case update_recovers_existing_document_graph recover_update
+run_case failed_clean_rebuild_preserves_recovery_and_visual failed_clean_rebuild
+run_case build_blocks_contaminated_extraction_before_exports reject_extracted_document
+run_case update_checks_scope_after_clustering reject_clustered_document
+run_case check_rejects_document_source check_document
+run_case check_rejects_archify_code_source check_archify
+run_case check_rejects_code_under_documentation check_docs_code
+run_case git_negation_cannot_override_graphify_exclusions check_env_negation
+run_case check_rejects_generated_code_source check_generated
+run_case check_rejects_gitignored_code_source check_ignored
+run_case check_rejects_prohibited_evaluation_source check_prohibited
+run_case check_rejects_nonexistent_source check_missing_source
+run_case check_rejects_outside_source check_outside_source
+run_case check_rejects_absolute_source check_absolute_source
+run_case check_rejects_source_symlink check_symlink_source
+run_case check_validates_every_link_source check_link_source
+run_case check_validates_hyperedge_source check_hyperedge_source
+run_case check_accepts_code_proven_reference_stub valid_reference_stub
+run_case check_accepts_code_proven_external_reference valid_external_stub
+run_case check_rejects_isolated_source_empty_stub isolated_stub
+run_case check_rejects_ambiguous_source_empty_stub ambiguous_stub
+run_case check_rejects_stub_without_edge_provenance missing_edge_provenance
+run_case build_report_recommends_safe_wrapper build_report
+run_case update_report_recommends_safe_wrapper update_report
+run_case reject_canvas_symlink_before_export canvas_link
+run_case reject_note_symlink_before_export note_link
+run_case reject_manifest_symlink_before_export manifest_link
+run_case reject_configuration_file_symlink_before_export config_file_link
+run_case reject_configuration_directory_symlink_before_export directory_link
+run_case reject_html_symlink_before_export html_link
 
 printf '%s passed, %s failed\n' "$passed" "$failed"
 [[ "$failed" == 0 ]]
