@@ -9,7 +9,7 @@ from app.providers.material_index.protocol import MaterialRecord
 from app.providers.material_index.memory import InMemoryMaterialIndex
 from app.schemas.materials import LearningMaterial, MaterialChunk
 from app.services.material_retrieval import retrieve_for_misconception
-from test_material_retrieval import FakeEmbeddingService, context, settings
+from test_material_retrieval import FakeEmbeddingService, context, review_stores, settings
 from test_misconception_analysis import (
     FakeEmbeddingService as AnalysisEmbeddings,
     csv_row,
@@ -155,6 +155,7 @@ def test_persisted_chunks_are_reembedded_when_vector_cache_is_empty() -> None:
         embedding_service=embedding,
         material_index=index,
         settings=settings(threshold=0.8),
+        **review_stores(),
     )
 
     assert result.status == "retrieved"

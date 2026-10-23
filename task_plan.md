@@ -84,3 +84,16 @@ The active Render service may still use a 512 MB compute plan. Three analysis-ti
 ## Completion Criteria
 - Production completes ordinary upload through results and survives direct-route reloads, or the exact external blocker is documented with a working local demo and fallback.
 - Two timed human-operated rehearsals remain a user/judging-machine gate and must not be marked complete from automation alone.
+
+## 2026-10-23 — Teacher Group Review Plan Execution
+
+- [complete] Persist immutable-evidence review state and append-only actions through migration 002.
+- [complete] Expose and validate rename, same-question merge, dismiss, and restore APIs.
+- [complete] Carry reviewed and original source-group provenance through retrieval, remediation, and results.
+- [complete] Add frontend recovery, accessible review controls, history, and controlled failure handling.
+- [complete] Verify PostgreSQL integration, backend/frontend suites, reload persistence, and post-remediation locking.
+- [complete] Reconcile authoritative docs and sync the verified milestone to Obsidian.
+- [complete] Run the required fresh whole-branch review and resolve all seven Important findings in one regression-first fix pass.
+- [complete] Run the final all-layer gate across migrations, PostgreSQL integration, backend, frontend, build, Chromium, diffs, and documentation links.
+- [complete] Sync the hardened milestone to the existing Obsidian project dashboard and Kanban.
+- [in progress] Prepare branch integration choices.

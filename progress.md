@@ -41,7 +41,16 @@
 - Confirmed the worktree was clean at the start of planning and mapped the existing script/documentation conventions.
 - Wrote and self-reviewed `docs/superpowers/plans/2026-10-18-graphify-obsidian.md`: five testable tasks covering the wrapper, pinned CLI/skill, real graph/export, authoritative documentation, and Obsidian sync/review.
 - No Graphify package, generated graph, or vault export has been created yet.
+## 2026-10-23 — Teacher group review workflow
 
+- Implemented migration, persistence adapters, deterministic review service, GET/POST API, downstream provenance, frontend contracts/recovery, teacher controls, and browser coverage in the isolated `feature/teacher-group-review` worktree.
+- Applied migrations 001+002 to disposable PostgreSQL 17; the enabled fresh-repository integration passed.
+- Verified backend `105 passed, 1 skipped`; frontend tests, lint, production build, and all five Chromium tests passed.
+- Updated PRODUCT, ARCHITECTURE, AI_PIPELINE, DATABASE, API, DECISIONS, STATUS, TASKS, and SESSION_PROGRESS with the verified behavior.
+- Synced the completion, D-033 decision, and next state to the existing ClassLens Obsidian dashboard and Kanban while preserving the Graphify milestone.
+- Remaining: complete the required fresh whole-branch review, make at most one important-finding fix pass, then present integration choices.
+- Fresh replacement review completed with seven Important findings and no Critical findings. One TDD fix pass addressed all Important items. The final gate passed migrations 001+002, PostgreSQL integration 1/1, backend `110 passed, 1 skipped`, 14 frontend unit tests, lint, build, six Chromium tests, diff checks, and documentation links. The review's minor presentation item is ledgered for later.
+- Synced the hardened completion record and D-033 consequences to the existing ClassLens Obsidian dashboard and moved the review workflow card to Done without altering the Graphify records.
 ## 2026-10-08 — P0 task execution resumed
 - Re-read repository instructions, current status/backlog, recent development history, and planning files.
 - Set the active work order to hosted capacity verification, hosted golden path if available, then local warm-up/rehearsal/fallback work.

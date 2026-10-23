@@ -29,7 +29,17 @@
 - The existing ClassLens vault already contains hand-maintained project, Kanban, and Context notes. Generated Graphify output must remain under the isolated `ClassLens/Graphify/` subtree.
 - The repository has no Graphify installation, output, wrapper, or test harness yet. `scripts/demo.sh` establishes the local Bash style: strict mode, repository-root resolution, explicit failure messages, and command dispatch.
 - The wrapper needs a fake `graphify` executable in tests so destination validation and command composition can be proven before the real CLI writes to the external vault.
+## Teacher Group Review Findings — 2026-10-23
 
+- Detected analysis groups remain immutable; teacher decisions are stored as a revisioned overlay and append-only events.
+- Same-question merges union exact original source-group IDs and student members. Because response vectors are not persisted or recomputed, merged coherence is intentionally `null`.
+- Retrieval, remediation, and comparison resolve the active reviewed identity server-side while preserving original source-group provenance.
+- Review actions affecting evidence already used by a remediation fail with `group_review_locked`, preventing silent downstream retargeting.
+- Migration 002 enables RLS on both review tables and keeps React behind the FastAPI/psycopg boundary with no browser database policies.
+- The first Playwright launch failed only because the sandbox denied the local test-server port; the unchanged full suite passed with local-port permission.
+- Verified totals: backend `105 passed, 1 skipped`; opt-in PostgreSQL integration `1 passed`; frontend unit suites, lint, build, and Playwright `5 passed`.
+- Fresh review reproduced seven Important edge cases. The fix pass now rejects stale/no-op actions, closes the generation/review race, prevents incomplete merged-result claims, restores legacy provenance, removes the retrieval bypass, scopes locks per group, and makes restored review reads retryable.
+- Minor deferred: show saved review notes and reviewed/source-provenance indicators in additional UI locations; current history and merged analysis controls retain the underlying data.
 ## Current P0 Findings — 2026-10-08
 
 - Vercel SPA routing is deployed from commit `593e475`; production `/dashboard`, `/upload`, and `/analysis` return HTTP 200.

@@ -6,6 +6,7 @@ import pytest
 
 from app.main import app
 from app.providers.analysis_store import InMemoryAnalysisStore, get_analysis_store
+from app.providers.group_review_store import InMemoryGroupReviewStore, get_group_review_store
 from app.providers.llm import GeminiLLMService, LLMProviderError, get_llm_service
 from app.providers.material_index import InMemoryMaterialIndex, MaterialRecord, get_material_index
 from app.providers.remediation_store import InMemoryRemediationStore, get_remediation_store
@@ -33,6 +34,8 @@ from app.schemas.remediations import (
     RemediationMisconceptionContext,
     RemediationReviewRequest,
 )
+from app.schemas.group_reviews import GroupReviewActionRequest
+from app.services.group_reviews import apply_group_review, get_group_reviews
 from app.services.remediation import RemediationError, generate_grounded_remediation, review_remediation
 from app.services.assessment_intake import ParsedAssessment
 
@@ -224,6 +227,7 @@ async def generate_with_canonical_context(
     store: InMemoryRemediationStore,
     analysis_store: InMemoryAnalysisStore | None = None,
     material_index: InMemoryMaterialIndex | None = None,
+    review_store: InMemoryGroupReviewStore | None = None,
 ):
     if analysis_store is None or material_index is None:
         analysis_store, material_index = canonical_context_stores()
@@ -233,6 +237,7 @@ async def generate_with_canonical_context(
         store=store,
         analysis_store=analysis_store,
         material_index=material_index,
+        review_store=review_store,
     )
 
 
@@ -252,6 +257,39 @@ def test_generation_uses_group_evidence_and_exact_teacher_sources() -> None:
     assert "affected_response_count" in fake.prompts[0]
     assert "relevance_score" not in fake.prompts[0]
     assert store.get(result.remediation.remediation_id) is not None
+
+
+def test_teacher_renamed_group_is_canonical_prompt_and_dismissed_group_is_rejected() -> None:
+    request = generation_request()
+    analysis_store, material_index = canonical_context_stores()
+    review_store = InMemoryGroupReviewStore()
+    apply_group_review(
+        request.analysis_id,
+        GroupReviewActionRequest(action="rename", group_ids=[request.misconception.group_id], label="Energy versus matter"),
+        analysis_store, review_store, None,
+    )
+    request.misconception.provisional_label = "Energy versus matter"
+    fake = FakeLLMService()
+    generated = run_test_async(generate_with_canonical_context(
+        request, llm_service=fake, store=InMemoryRemediationStore(), analysis_store=analysis_store,
+        material_index=material_index, review_store=review_store,
+    ))
+    assert generated.remediation is not None
+    assert generated.remediation.source_group_ids == [request.misconception.group_id]
+    assert "Energy versus matter" in fake.prompts[0]
+
+    apply_group_review(
+        request.analysis_id,
+        GroupReviewActionRequest(action="dismiss", group_ids=[request.misconception.group_id], expected_revision=1),
+        analysis_store, review_store, None,
+    )
+    with pytest.raises(RemediationError) as caught:
+        run_test_async(generate_with_canonical_context(
+            request.model_copy(update={"generation_request_id": "dismissed_request"}, deep=True),
+            llm_service=FakeLLMService(), store=InMemoryRemediationStore(), analysis_store=analysis_store,
+            material_index=material_index, review_store=review_store,
+        ))
+    assert caught.value.code == "reviewed_group_not_available"
 
 
 @pytest.mark.parametrize(
@@ -340,6 +378,46 @@ def test_repeated_generation_request_returns_one_persisted_draft() -> None:
     assert first.remediation is not None
     assert second.remediation is not None
     assert first.remediation.remediation_id == second.remediation.remediation_id
+
+
+def test_generation_does_not_persist_if_group_is_dismissed_during_provider_call() -> None:
+    request = generation_request(generation_request_id="review_race")
+    analysis_store, material_index = canonical_context_stores()
+    review_store = InMemoryGroupReviewStore()
+    remediation_store = InMemoryRemediationStore()
+
+    class HeldLLM(FakeLLMService):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def generate_remediation(self, prompt: str):
+            self.started.set()
+            await self.release.wait()
+            return await super().generate_remediation(prompt)
+
+    async def exercise() -> None:
+        llm = HeldLLM()
+        task = asyncio.create_task(generate_with_canonical_context(
+            request, llm_service=llm, store=remediation_store, analysis_store=analysis_store,
+            material_index=material_index, review_store=review_store,
+        ))
+        await llm.started.wait()
+        apply_group_review(
+            request.analysis_id,
+            GroupReviewActionRequest(
+                action="dismiss", group_ids=[request.misconception.group_id], expected_revision=0
+            ),
+            analysis_store, review_store, remediation_store,
+        )
+        llm.release.set()
+        with pytest.raises(RemediationError) as caught:
+            await task
+        assert caught.value.code == "reviewed_group_not_available"
+
+    run_test_async(exercise())
+    assert remediation_store._records == {}
 
 
 def test_insufficient_context_does_not_call_llm_or_save_record() -> None:
@@ -455,6 +533,7 @@ def test_typed_api_generation_get_edit_and_reject_flow() -> None:
     app.dependency_overrides[get_remediation_store] = override_store
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_material_index] = override_material_index
+    app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
 
     async def send() -> tuple[httpx.Response, httpx.Response, httpx.Response]:
         transport = httpx.ASGITransport(app=app)
@@ -501,6 +580,7 @@ def test_api_returns_controlled_provider_error_without_fabricated_remediation() 
     app.dependency_overrides[get_remediation_store] = override_store
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_material_index] = override_material_index
+    app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
 
     async def send() -> httpx.Response:
         transport = httpx.ASGITransport(app=app)
@@ -539,6 +619,7 @@ def test_api_rejects_altered_context_with_conflict_before_llm() -> None:
     app.dependency_overrides[get_remediation_store] = override_store
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_material_index] = override_material_index
+    app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
 
     async def send() -> httpx.Response:
         transport = httpx.ASGITransport(app=app)

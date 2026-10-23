@@ -7,6 +7,7 @@ import {
   parseWorkflowPointer,
   remediationMatchesWorkflow,
   retrievalMatchesWorkflow,
+  groupReviewMatchesWorkflow,
 } from '../src/workflowStorage.ts'
 
 test('saved workflow parser accepts a complete ordered pointer chain', () => {
@@ -45,11 +46,23 @@ test('restored records must match every saved upstream identifier', () => {
   }
 
   assert.equal(analysisMatchesWorkflow(pointer, { analysis_id: 'analysis_demo', groups: [{ group_id: 'grp_demo' }] }), true)
-  assert.equal(analysisMatchesWorkflow(pointer, { analysis_id: 'analysis_demo', groups: [{ group_id: 'grp_other' }] }), false)
+  assert.equal(analysisMatchesWorkflow(pointer, { analysis_id: 'analysis_demo', groups: [{ group_id: 'grp_other' }] }), true)
   assert.equal(retrievalMatchesWorkflow(pointer, { group_id: 'grp_demo', material: { material_id: 'mat_other' } }), false)
   assert.equal(remediationMatchesWorkflow(pointer, { remediation_id: 'rem_demo', analysis_id: 'analysis_demo', group_id: 'grp_other' }), false)
   assert.equal(comparisonMatchesWorkflow(pointer, {
     comparison_id: 'comparison_demo',
     trace: { baseline_analysis_id: 'analysis_demo', baseline_group_id: 'grp_demo', remediation_id: 'rem_other' },
   }), false)
+})
+
+test('reviewed selection recovery accepts only an active reviewed group', () => {
+  const pointer = { analysis_id: 'analysis_demo', group_id: 'rgrp_merged' }
+  const reviews = {
+    analysis_id: 'analysis_demo',
+    active_groups: [{ reviewed_group_id: 'rgrp_merged' }],
+    dismissed_groups: [{ reviewed_group_id: 'grp_dismissed' }],
+  }
+  assert.equal(groupReviewMatchesWorkflow(pointer, reviews), true)
+  assert.equal(groupReviewMatchesWorkflow({ ...pointer, group_id: 'grp_dismissed' }, reviews), false)
+  assert.equal(groupReviewMatchesWorkflow({ ...pointer, group_id: 'rgrp_stale' }, reviews), false)
 })

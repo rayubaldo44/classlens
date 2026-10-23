@@ -221,9 +221,39 @@ Reconstructs a persisted analysis response and its evidence groups. Missing IDs 
 
 The member list above is abbreviated only in this documentation example. Runtime responses contain every member identifier. When no group has at least the configured support, the endpoint returns `status: "insufficient_data"`, an empty `groups` list, and an explanatory `message`. Embedding failures return the standard error envelope with `503`, a safe `embedding_failed` or `embedding_invalid_response` code, and no fabricated group.
 
+## Teacher group review — implemented overlay contract
+
+The original analysis response and relational misconception evidence remain immutable. These endpoints expose a separately persisted, revisioned overlay plus append-only action history.
+
+### `GET /api/v1/assessments/analyses/{analysis_id}/group-reviews`
+
+Returns `analysis_id`, the current `revision`, `active_groups`, `dismissed_groups`, and ordered `events`. Before the first action, revision is `0`, history is empty, and every detected group appears as an active reviewed group whose `reviewed_group_id` and sole `source_group_id` equal the original `group_id`.
+
+The response also contains `locked_group_ids`. A reviewed group appears there when an existing generated, approved, or rejected remediation refers to its reviewed identity or original source evidence. The frontend disables only those groups; unrelated evidence remains reviewable.
+
+Each reviewed group contains its display label, visibility status, exact source IDs and member IDs, copied representative responses, question context, counts, and nullable coherence. Teacher-created merges report `coherence: null` because clustering is not rerun.
+
+### `POST /api/v1/assessments/analyses/{analysis_id}/group-reviews`
+
+Accepts:
+
+```json
+{
+  "action": "rename | merge | dismiss | restore",
+  "group_ids": ["grp_..."],
+  "expected_revision": 0,
+  "label": "Required for rename and merge",
+  "review_note": "Optional teacher note"
+}
+```
+
+Rename, dismiss, and restore require exactly one applicable current reviewed group. Merge requires at least two distinct active groups from the same question. `expected_revision` must match the current overlay revision; stale clients receive `409 group_review_stale`. Rename/merge labels are trimmed and limited to 120 characters; dismiss/restore reject a label, and an identical rename returns `409 group_review_no_change` without adding history. Every successful action increments the revision and appends an event containing the action, source IDs, resulting reviewed ID, before/after state snapshots, optional note, and timestamp.
+
+Missing analyses return `404 analysis_not_found`. Unknown, stale, inactive, duplicate-state, or cross-question selections return a structured `409` and do not change state or history. If any remediation already refers to a selected reviewed group or one of its source groups, the endpoint returns `409 group_review_locked`; existing downstream evidence is not retargeted. Framework-level malformed request validation retains FastAPI's HTTP 422 body.
+
 ## Misconception details
 
-There is no standalone misconception-group endpoint in the MVP. The persisted analysis response contains every group, complete member identifiers, representative evidence, question context, support counts, and coherence. The frontend selects a group from that canonical response and carries its `analysis_id`/`group_id` linkage into retrieval and remediation. The 100-eligible-response-per-question intake limit bounds the returned membership list; a future larger-data contract would need pagination or an explicit group-detail resource.
+There is no standalone misconception-group endpoint in the MVP. The persisted analysis response contains every immutable detected group, complete member identifiers, representative evidence, question context, support counts, and coherence. The group-review resource derives the active teacher-reviewed view and carries its `analysis_id`/`reviewed_group_id` plus `source_group_ids` into retrieval, remediation, and comparison. The 100-eligible-response-per-question intake limit bounds the returned membership list; a future larger-data contract would need pagination or an explicit group-detail resource.
 
 ## Learning-material ingestion and retrieval — implemented MVP contract
 
@@ -260,10 +290,11 @@ Ingests `data/demo/learning_materials/photosynthesis_grade7.txt` through the sam
 
 ### `POST /api/v1/learning-materials/{material_id}/retrieve`
 
-Accepts a detected group context:
+Accepts an active reviewed-group context. `analysis_id` is required so FastAPI can resolve the group against canonical review state; omitting it is a validation error, and dismissed/stale groups cannot retrieve passages.
 
 ```json
 {
+  "analysis_id": "analysis_1a191d0a7331cb82",
   "group_id": "grp_704762a85fd8",
   "question_id": "Q1",
   "question": "Explain how plants make food during photosynthesis.",

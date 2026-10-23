@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class MaterialChunk(BaseModel):
@@ -31,11 +31,12 @@ class MaterialIngestionResponse(BaseModel):
 
 
 class MisconceptionRetrievalContext(BaseModel):
+    analysis_id: str = Field(min_length=1, max_length=100)
     group_id: str = Field(min_length=1, max_length=100)
     question_id: str = Field(min_length=1, max_length=100)
     question: str = Field(min_length=1, max_length=2000)
     correct_answer: str = Field(min_length=1, max_length=4000)
-    representative_answers: list[str] = Field(min_length=1, max_length=3)
+    representative_answers: list[str] = Field(min_length=1)
 
 
 class RetrievedChunk(BaseModel):
@@ -57,7 +58,14 @@ class RetrievalMetadata(BaseModel):
 class MaterialRetrievalResponse(BaseModel):
     status: Literal["retrieved", "insufficient_relevant_context"]
     group_id: str
+    source_group_ids: list[str] = Field(default_factory=list)
     material: LearningMaterial
     retrieval: RetrievalMetadata
     results: list[RetrievedChunk]
     message: str | None = None
+
+    @model_validator(mode="after")
+    def default_source_group_ids(self):
+        if not self.source_group_ids:
+            self.source_group_ids = [self.group_id]
+        return self

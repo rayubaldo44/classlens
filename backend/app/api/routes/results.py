@@ -10,6 +10,7 @@ from app.providers.analysis_store import AnalysisStore, get_analysis_store
 from app.providers.embeddings import EmbeddingService, get_embedding_service
 from app.providers.remediation_store import RemediationStore, get_remediation_store
 from app.providers.results_store import ResultsStore, get_results_store
+from app.providers.group_review_store import GroupReviewStore, get_group_review_store
 from app.schemas.assessment import ErrorResponse
 from app.schemas.results import FollowUpComparisonLink, FollowUpComparisonRecord
 from app.services.assessment_intake import MAX_CSV_BYTES, IntakeError, parse_assessment_csv_full
@@ -43,6 +44,7 @@ async def submit_follow_up_results(
     analysis_store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     remediation_store: Annotated[RemediationStore, Depends(get_remediation_store)],
     results_store: Annotated[ResultsStore, Depends(get_results_store)],
+    review_store: Annotated[GroupReviewStore, Depends(get_group_review_store)],
 ) -> FollowUpComparisonRecord:
     filename = file.filename or "follow_up_responses.csv"
     if not filename.lower().endswith(".csv"):
@@ -66,6 +68,7 @@ async def submit_follow_up_results(
         analysis_store=analysis_store,
         remediation_store=remediation_store,
         results_store=results_store,
+        review_store=review_store,
     )
 
 
@@ -80,6 +83,7 @@ async def submit_photosynthesis_demo_follow_up(
     analysis_store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     remediation_store: Annotated[RemediationStore, Depends(get_remediation_store)],
     results_store: Annotated[ResultsStore, Depends(get_results_store)],
+    review_store: Annotated[GroupReviewStore, Depends(get_group_review_store)],
 ) -> FollowUpComparisonRecord:
     started = perf_counter()
     parsed = await run_in_worker(
@@ -99,6 +103,7 @@ async def submit_photosynthesis_demo_follow_up(
         analysis_store=analysis_store,
         remediation_store=remediation_store,
         results_store=results_store,
+        review_store=review_store,
     )
 
 

@@ -1,6 +1,6 @@
 # Implemented Database Design
 
-**Implementation status:** The golden-path PostgreSQL schema and repository adapters are implemented in `database/migrations/001_golden_path_persistence.sql`. The migration, database-gated integration test, full workflow, and restart recovery were verified against the configured Supabase PostgreSQL instance on 2026-10-02.
+**Implementation status:** The golden-path PostgreSQL schema and repository adapters are implemented in `database/migrations/001_golden_path_persistence.sql`; the teacher group-review overlay and downstream reviewed-group provenance are added by `database/migrations/002_teacher_group_reviews.sql`. Both migrations and the database-gated integration test were verified against disposable PostgreSQL 17 on 2026-10-23. The original migration, full workflow, and restart recovery were also verified against configured Supabase PostgreSQL on 2026-10-02.
 
 ## Connection and security
 
@@ -10,6 +10,7 @@ Apply the migration from the repository root:
 
 ```bash
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f database/migrations/001_golden_path_persistence.sql
+psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f database/migrations/002_teacher_group_reviews.sql
 ```
 
 ## Implemented tables
@@ -22,6 +23,8 @@ psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f database/migrations/001_golden_pat
 | `analysis_runs` | Existing public analysis ID, assessment link, model/grouping configuration, status, and response snapshot. |
 | `misconception_groups` | Question-specific evidence group belonging to one analysis run. |
 | `misconception_members` | Group-to-response membership and representative evidence metadata. |
+| `analysis_group_review_states` | Current revisioned reviewed-group overlay for an analysis; detected groups remain unchanged. |
+| `analysis_group_review_events` | Append-only rename, merge, dismiss, and restore history with before/after state snapshots and optional teacher notes. |
 | `learning_materials` | Content-derived material identity, source metadata, chunk settings, and embedding model metadata. |
 | `document_chunks` | Exact normalized chunk text, stable chunk ID, order, offsets, and hash. |
 | `interventions` | Analysis/group link, original generation, teacher-edited content, review state, and generation provenance. |
@@ -35,12 +38,13 @@ The application does not create `classes` because the implemented intake contrac
 ```text
 baseline assessment ─┬─ questions ─ student responses
                      └─ analysis run ─ misconception groups ─ members
+                                      └─ review state + ordered review events
 
 learning material ─ document chunks ─ intervention sources
-analysis/group ─ intervention ─ approved review state
+analysis/reviewed group + original source groups ─ intervention ─ approved review state
 
 baseline assessment ─ follow-up assessment ─ follow-up analysis
-baseline analysis/group + approved intervention + follow-up analysis ─ comparison
+baseline analysis/reviewed group/source groups + approved intervention + follow-up analysis ─ comparison
 ```
 
 - Foreign keys use restrictive deletion to avoid silently removing evidence or provenance.
@@ -48,6 +52,10 @@ baseline analysis/group + approved intervention + follow-up analysis ─ compari
 - Analysis, material, and comparison IDs are deterministic, making safe retries idempotent.
 - Lifecycle/status columns use checks; blank answers cannot be marked correct.
 - Assessment/analysis/group/member writes and material/chunk writes use transactions.
+- A review write locks the current state row, compares the expected state, and atomically updates the revisioned overlay plus one event. Stale concurrent actions fail without a partial history entry.
+- Original detected group/member rows are immutable. Same-question merges materialize a new reviewed identity from the exact union of source groups and student members and record `coherence: null` because vectors are not recomputed.
+- Interventions and comparisons store both the reviewed group identity and original source-group IDs. Any review action affecting evidence already used by a remediation is rejected.
+- When pre-migration comparison JSON lacks `baseline_source_group_ids`, boundary validation restores the legacy single detected `baseline_group_id` as its sole source. This keeps existing saved comparisons valid after migration 002 without rewriting historical JSON.
 - Teacher review updates preserve immutable generated content and reject changes after approval/rejection.
 - Before generation, the application reloads the analysis/group and material/chunks through their PostgreSQL-backed repositories. Browser snapshot fields must match those records before Gemini is called; saved intervention source text, identifiers, indexes, and offsets are rebuilt from the canonical chunks.
 

@@ -6,6 +6,7 @@ import type {
   MaterialRetrievalResponse,
   RemediationGenerationResponse,
   RemediationRecord,
+  GroupReviewResponse,
 } from './client'
 
 type JsonObject = Record<string, unknown>
@@ -105,6 +106,45 @@ export const isAnalysisResponse = (value: unknown): value is AnalysisResponse =>
     && isNullableString(value.message)
 }
 
+const isReviewedGroup = (value: unknown) => isObject(value)
+  && isNonEmptyString(value.reviewed_group_id)
+  && isNonEmptyString(value.display_label)
+  && (value.status === 'active' || value.status === 'dismissed')
+  && isArrayOf(value.source_group_ids, isNonEmptyString) && value.source_group_ids.length > 0
+  && new Set(value.source_group_ids).size === value.source_group_ids.length
+  && isNonEmptyString(value.question_id) && isNonEmptyString(value.question) && isNonEmptyString(value.correct_answer)
+  && isPositiveInteger(value.support_count) && isPositiveInteger(value.eligible_response_count)
+  && isArrayOf(value.member_student_ids, isNonEmptyString)
+  && isArrayOf(value.representative_responses, isRepresentativeResponse)
+  && (value.coherence === null || isFiniteNumber(value.coherence))
+
+const isReviewState = (value: unknown) => isObject(value)
+  && isNonEmptyString(value.analysis_id) && isCount(value.revision)
+  && isArrayOf(value.groups, isReviewedGroup)
+
+const isReviewEvent = (value: unknown) => isObject(value)
+  && isNonEmptyString(value.event_id) && isNonEmptyString(value.analysis_id) && isPositiveInteger(value.sequence)
+  && ['rename', 'merge', 'dismiss', 'restore'].includes(String(value.action))
+  && isArrayOf(value.source_group_ids, isNonEmptyString) && value.source_group_ids.length > 0
+  && isNonEmptyString(value.resulting_reviewed_group_id)
+  && (value.previous_state === null || isReviewState(value.previous_state))
+  && isReviewState(value.next_state) && isNullableString(value.review_note) && isDateTime(value.created_at)
+
+export const isGroupReviewResponse = (value: unknown): value is GroupReviewResponse => {
+  if (!isObject(value) || !isCount(value.revision)
+    || !isArrayOf(value.active_groups, isReviewedGroup)
+    || !isArrayOf(value.dismissed_groups, isReviewedGroup)
+    || !isArrayOf(value.locked_group_ids, isNonEmptyString)
+    || !isArrayOf(value.events, isReviewEvent)) return false
+  if (!isNonEmptyString(value.analysis_id)) return false
+  if ((value.active_groups as JsonObject[]).some((group) => group.status !== 'active')) return false
+  if ((value.dismissed_groups as JsonObject[]).some((group) => group.status !== 'dismissed')) return false
+  return value.events.every((event, index) => {
+    const item = event as JsonObject
+    return item.analysis_id === value.analysis_id && item.sequence === index + 1
+  })
+}
+
 const isLearningMaterial = (value: unknown) => isObject(value)
   && isNonEmptyString(value.material_id)
   && isNonEmptyString(value.title)
@@ -137,6 +177,7 @@ export const isMaterialRetrievalResponse = (value: unknown): value is MaterialRe
     : value.status === 'insufficient_relevant_context' && value.results.length === 0
   return hasConsistentStatus
     && isNonEmptyString(value.group_id)
+    && isArrayOf(value.source_group_ids, isNonEmptyString) && value.source_group_ids.length > 0
     && isLearningMaterial(value.material)
     && isObject(value.retrieval)
     && value.retrieval.algorithm === 'cosine_similarity_v1'
@@ -181,6 +222,7 @@ export const isRemediationRecord = (value: unknown): value is RemediationRecord 
   && (value.status === 'generated' || value.status === 'approved' || value.status === 'rejected')
   && isNonEmptyString(value.analysis_id)
   && isNonEmptyString(value.group_id)
+  && isArrayOf(value.source_group_ids, isNonEmptyString) && value.source_group_ids.length > 0
   && isNonEmptyString(value.provider)
   && isNonEmptyString(value.model)
   && value.prompt_version === 'grounded_remediation_v1'
@@ -213,6 +255,7 @@ const isResultsTrace = (value: unknown) => isObject(value)
   && isNonEmptyString(value.baseline_analysis_id)
   && isNonEmptyString(value.follow_up_analysis_id)
   && isNonEmptyString(value.baseline_group_id)
+  && isArrayOf(value.baseline_source_group_ids, isNonEmptyString) && value.baseline_source_group_ids.length > 0
   && (value.follow_up_group_id === null || isNonEmptyString(value.follow_up_group_id))
   && isNonEmptyString(value.remediation_id)
   && value.remediation_status === 'approved'

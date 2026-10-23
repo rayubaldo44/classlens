@@ -1344,5 +1344,34 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Important decisions: validate the union of both supported hyperedge slots and fail closed on malformed slot/item shapes. Retain the suggested opt-in real-CLI canary as non-blocking future hardening because the committed suite already covers the safety behavior and a separate real 0.9.77 contaminated-graph run remains recorded.
 - Remaining work: none for the Graphify review. Optional SQL parsing, broad-query truncation, and GUI rendering remain documented limitations. Hosted deployment and educator review remain external blockers; the next unblocked product task is the planned teacher group-review workflow.
 - Recommended next step: execute Task 1 of the teacher group-review plan with migration/store tests first, unless the Render capacity or educator-review blockers change.
+## Session / Milestone: Teacher group review workflow implemented
 
+**Date:** 2026-10-23 (Asia/Manila)
+
+**Status:** Rename, merge, dismiss, restore, persistence, provenance, and browser recovery verified
+
+- Attempted and completed: implemented the planned teacher review workflow as a revisioned overlay over immutable detected groups, including append-only action history, safe same-question merges, downstream reviewed/source-group provenance, remediation-aware locking, typed FastAPI contracts, runtime-validated React integration, and accessible analysis-screen controls.
+- Files created or significantly modified: `database/migrations/002_teacher_group_reviews.sql`; group-review schemas, store, service, route, and PostgreSQL adapter files under `backend/app/`; remediation/results provenance schemas and services; `frontend/src/App.tsx`, API contracts/client, styles, and tests; `.github/workflows/ci.yml`; authoritative product, architecture, AI, database, API, decision, status, and backlog documentation.
+- What was completed: teachers can rename, merge, dismiss, and restore proposed groups; review state/history survives repository recreation and browser reload; merges retain the exact source-group/member union and report no fabricated coherence; retrieval, remediation, and comparison use the reviewed identity while retaining original source IDs; actions affecting evidence with an existing remediation return a controlled lock error.
+- Verified/tested: migrations 001 and 002 applied to disposable PostgreSQL 17 and the opt-in integration test passed (`1 passed`). The full backend suite passed (`105 passed, 1 skipped`); all three frontend unit suites, ESLint, and the production build passed; the full Chromium suite passed (`5 passed`), including reload persistence, controlled 409 state preservation, and disabled review controls after remediation.
+- Problems encountered: the first local Playwright launch failed with `listen EPERM` on `127.0.0.1:4173` because the sandbox denied binding the test web server. Re-running the same suite with local-port permission passed without an application change.
+- Important decisions: preserve machine-detected evidence instead of mutating it; store reviewed state and history separately; set merged coherence to `null`; use optimistic state comparison plus a row lock for atomic writes; and freeze affected group review once remediation establishes downstream provenance.
+- Remaining work: the feature branch still needs final whole-branch review and integration choice. Hosted deployment/reload verification remains separate because Render capacity is unchanged.
+- Recommended next step: complete the final branch review, address any important findings, then integrate `feature/teacher-group-review` using the repository's normal branch workflow.
+
+---
+
+## Session / Milestone: Teacher group review final-review hardening
+
+**Date:** 2026-10-23 (Asia/Manila)
+
+**Status:** Important whole-branch review findings fixed with regressions
+
+- Attempted and completed: ran the required fresh whole-branch review and one consolidated fix pass for all seven Important findings. Added client revision checks and no-op rejection, atomic generation/review finalization, mandatory retrieval analysis context, legacy comparison provenance normalization, complete merged-source follow-up matching, per-group remediation locks, and retry-safe restored review loading.
+- Files significantly modified: group-review/material/results schemas and services, remediation generation, review API, React review state and controls, backend/frontend regression tests, and authoritative API/AI/database/decision/status/backlog documentation.
+- Verified/tested: each backend issue was reproduced by a failing focused regression before its fix. The final gate recreated disposable PostgreSQL 17, applied migrations 001+002, passed the enabled integration test (`1 passed`), backend suite (`110 passed, 1 skipped`), 14 frontend unit tests, ESLint, production build, and all six Chromium tests covering accessibility, review actions, controlled conflict, restored review retry, per-group locks, and the ordinary golden path. Diff and relative documentation-link checks also passed.
+- Problems encountered: React development effects can issue and cancel duplicate review reads, so the browser retry fixture was changed from a brittle request ordinal to a controlled failure window. The earlier global-lock copy also required an expected-text update after locks became group-specific.
+- Important decisions: require every merged source pattern to be re-identified before calculating improvement; return `insufficient_data` for partial merged matches. Normalize legacy single-group comparison JSON at the schema boundary rather than rewriting historical records.
+- Remaining work: prepare branch integration options. The hardened milestone is synchronized to the existing Obsidian dashboard and Kanban; the minor review request to surface notes/provenance in additional UI locations remains deferred.
+- Recommended next step: integrate the reviewed feature branch after the final gate, then treat the extra review-history presentation detail as a separate polish task.
 ---

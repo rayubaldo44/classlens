@@ -7,6 +7,8 @@ from app.concurrency import run_in_worker
 from app.config import get_material_settings
 from app.providers.embeddings import EmbeddingService, get_embedding_service
 from app.providers.material_index import MaterialIndex, get_material_index
+from app.providers.analysis_store import AnalysisStore, get_analysis_store
+from app.providers.group_review_store import GroupReviewStore, get_group_review_store
 from app.schemas.assessment import ErrorResponse
 from app.schemas.materials import (
     MaterialIngestionResponse,
@@ -81,6 +83,8 @@ async def retrieve_material_for_misconception(
     context: MisconceptionRetrievalContext,
     embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
     material_index: Annotated[MaterialIndex, Depends(get_material_index)],
+    analysis_store: Annotated[AnalysisStore, Depends(get_analysis_store)],
+    review_store: Annotated[GroupReviewStore, Depends(get_group_review_store)],
 ) -> MaterialRetrievalResponse:
     return await run_in_worker(
         retrieve_for_misconception,
@@ -89,4 +93,6 @@ async def retrieve_material_for_misconception(
         embedding_service=embedding_service,
         material_index=material_index,
         settings=get_material_settings(),
+        analysis_store=analysis_store,
+        review_store=review_store,
     )

@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .api.routes.assessments import router as assessments_router
 from .api.routes.analysis import router as analysis_router
+from .api.routes.group_reviews import router as group_reviews_router
 from .api.routes.materials import router as materials_router
 from .api.routes.remediations import router as remediations_router
 from .api.routes.results import router as results_router
@@ -22,6 +23,7 @@ from .services.material_ingestion import MaterialError
 from .providers.llm import LLMProviderError
 from .services.remediation import RemediationError
 from .services.results import ResultsError
+from .services.group_reviews import GroupReviewError
 from .database import DatabaseError, get_database
 from .providers.embeddings import get_embedding_service
 from .providers.embeddings.sentence_transformer import embedding_model_loaded
@@ -89,6 +91,7 @@ app.add_middleware(
 )
 app.include_router(assessments_router)
 app.include_router(analysis_router)
+app.include_router(group_reviews_router)
 app.include_router(materials_router)
 app.include_router(remediations_router)
 app.include_router(results_router)
@@ -181,7 +184,9 @@ async def handle_remediation_error(_request: Request, error: RemediationError) -
     log_error("request", error.code)
     status_code = (
         404 if error.code in {"remediation_not_found", "remediation_context_not_found"}
-        else 409 if error.code in {"remediation_invalid_transition", "remediation_context_mismatch"}
+        else 409 if error.code in {
+            "remediation_invalid_transition", "remediation_context_mismatch", "reviewed_group_not_available"
+        }
         else 502 if error.code in {"llm_malformed_output", "llm_ungrounded_output"}
         else 503 if error.retryable or error.code == "llm_not_configured"
         else 400
@@ -222,6 +227,21 @@ async def handle_results_error(_request: Request, error: ResultsError) -> JSONRe
     )
 
 
+@app.exception_handler(GroupReviewError)
+async def handle_group_review_error(_request: Request, error: GroupReviewError) -> JSONResponse:
+    log_error("request", error.code)
+    return JSONResponse(
+        status_code=error.status_code,
+        content={
+            "error": {
+                "code": error.code,
+                "message": error.message,
+                "details": error.details,
+                "retryable": False,
+                "request_id": f"req_{uuid4().hex}",
+            }
+        },
+    )
 @app.exception_handler(DatabaseError)
 async def handle_database_error(_request: Request, error: DatabaseError) -> JSONResponse:
     log_error("request", error.code)

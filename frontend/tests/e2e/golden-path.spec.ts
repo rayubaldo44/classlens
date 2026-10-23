@@ -75,6 +75,24 @@ const analysis = {
   groups: [group],
   message: null,
 }
+const reviewedGroup = {
+  reviewed_group_id: group.group_id,
+  display_label: group.provisional_label,
+  status: 'active',
+  source_group_ids: [group.group_id],
+  question_id: group.question_id,
+  question: group.question,
+  correct_answer: group.correct_answer,
+  support_count: group.support_count,
+  eligible_response_count: group.eligible_response_count,
+  member_student_ids: group.member_student_ids,
+  representative_responses: group.representative_responses,
+  coherence: group.coherence,
+}
+const groupReviews = {
+  analysis_id: analysis.analysis_id, revision: 0,
+  active_groups: [reviewedGroup], dismissed_groups: [], locked_group_ids: [], events: [],
+}
 
 const material = {
   material_id: 'material_photosynthesis',
@@ -92,6 +110,7 @@ const material = {
 const retrieval = {
   status: 'retrieved',
   group_id: group.group_id,
+  source_group_ids: [group.group_id],
   material,
   retrieval: {
     algorithm: 'cosine_similarity_v1',
@@ -126,6 +145,7 @@ const remediation = {
   status: 'generated',
   analysis_id: analysis.analysis_id,
   group_id: group.group_id,
+  source_group_ids: [group.group_id],
   provider: 'test-provider',
   model: 'test-model',
   prompt_version: 'grounded_remediation_v1',
@@ -158,6 +178,7 @@ const comparison = {
     baseline_analysis_id: analysis.analysis_id,
     follow_up_analysis_id: 'analysis_follow_up',
     baseline_group_id: group.group_id,
+    baseline_source_group_ids: [group.group_id],
     follow_up_group_id: 'grp_follow_up',
     remediation_id: remediation.remediation_id,
     remediation_status: 'approved',
@@ -205,6 +226,7 @@ async function json(route: Route, body: unknown, status = 200) {
 
 async function installApi(page: Page) {
   let generationAttempts = 0
+  let remediationExists = false
   let approvedRemediation = { ...remediation, content: { ...generatedContent } }
 
   await page.route('http://api.classlens.test/**', async (route) => {
@@ -218,6 +240,10 @@ async function installApi(page: Page) {
       return json(route, analysis)
     }
     if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}`) return json(route, analysis)
+    if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}/group-reviews`) return json(route, {
+      ...groupReviews,
+      locked_group_ids: remediationExists ? [reviewedGroup.reviewed_group_id] : [],
+    })
     if (pathname === '/api/v1/learning-materials/ingest') {
       return json(route, { status: 'ready', material, message: 'Teaching material is ready.' })
     }
@@ -230,6 +256,7 @@ async function installApi(page: Page) {
         }, 503)
       }
       await new Promise((resolve) => setTimeout(resolve, 1_500))
+      remediationExists = true
       return json(route, { status: 'generated', remediation, message: null })
     }
     if (pathname === `/api/v1/remediations/${remediation.remediation_id}` && request.method() === 'PATCH') {
@@ -308,4 +335,9 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await expect(page.getByLabel('Teacher explanation')).toHaveValue(approvedExplanation)
   await page.getByRole('button', { name: '06 Results' }).click()
   await expect(page.getByText('13.9 pp reduction')).toBeVisible()
+
+  await page.getByRole('button', { name: '03 Learning gaps' }).click()
+  await expect(page.getByText('Groups used by a remediation are locked; unrelated evidence remains reviewable.')).toBeVisible()
+  await page.getByRole('button', { name: 'Review groups' }).click()
+  await expect(page.getByRole('button', { name: `Rename ${reviewedGroup.display_label}` })).toBeDisabled()
 })

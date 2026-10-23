@@ -2,14 +2,17 @@ from datetime import UTC, datetime
 from time import perf_counter
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from app.config import AnalysisSettings
 from app.providers.analysis_store import AnalysisStore
 from app.providers.embeddings import EmbeddingService
 from app.providers.remediation_store import RemediationStore
+from app.providers.group_review_store import GroupReviewStore, InMemoryGroupReviewStore
 from app.providers.results_store import ResultsStore
 from app.schemas.analysis import MisconceptionGroup
+from app.schemas.group_reviews import ReviewedMisconceptionGroup
 from app.schemas.assessment import NormalizedResponse
 from app.schemas.results import (
     AssessmentResultSnapshot,
@@ -21,6 +24,7 @@ from app.schemas.results import (
 )
 from app.services.assessment_intake import ParsedAssessment
 from app.services.misconception_analysis import analyze_assessment
+from app.services.group_reviews import GroupReviewError, resolve_reviewed_group
 from app.telemetry import log_stage
 
 
@@ -48,6 +52,7 @@ def create_follow_up_comparison(
     analysis_store: AnalysisStore,
     remediation_store: RemediationStore,
     results_store: ResultsStore,
+    review_store: GroupReviewStore | None = None,
 ) -> FollowUpComparisonRecord:
     baseline = analysis_store.get(link.baseline_analysis_id)
     if baseline is None:
@@ -56,12 +61,19 @@ def create_follow_up_comparison(
             "The initial assessment analysis is not available in persistent storage. Analyze it again before adding follow-up results.",
         )
 
-    baseline_group = next((group for group in baseline.result.groups if group.group_id == link.group_id), None)
-    if baseline_group is None:
+    try:
+        baseline_group = resolve_reviewed_group(
+            link.baseline_analysis_id,
+            link.group_id,
+            analysis_store,
+            review_store or InMemoryGroupReviewStore(),
+        )
+    except GroupReviewError as error:
         raise ResultsError(
             "misconception_not_found",
-            "The selected misconception does not belong to the initial assessment analysis.",
-        )
+            "The selected reviewed misconception is not active in the initial assessment analysis.",
+            details=error.details,
+        ) from error
 
     remediation = remediation_store.get(link.remediation_id)
     if remediation is None:
@@ -69,7 +81,11 @@ def create_follow_up_comparison(
             "intervention_not_found",
             "The intervention is not available in persistent storage.",
         )
-    if remediation.group_id != baseline_group.group_id or remediation.analysis_id != baseline.result.analysis_id:
+    if (
+        remediation.group_id != baseline_group.reviewed_group_id
+        or remediation.source_group_ids != baseline_group.source_group_ids
+        or remediation.analysis_id != baseline.result.analysis_id
+    ):
         raise ResultsError(
             "results_context_mismatch",
             "The approved intervention does not belong to the selected misconception.",
@@ -91,14 +107,15 @@ def create_follow_up_comparison(
     )
     log_stage("database_persistence", (perf_counter() - started) * 1000, operation="follow_up_analysis_save")
 
-    follow_up_group = _match_follow_up_group(baseline_group, follow_up_analysis.groups)
+    follow_up_group = _match_follow_up_group(baseline_group, baseline.result.groups, follow_up_analysis.groups)
     comparison_id = _comparison_id(link, follow_up_analysis.analysis_id)
     trace = ResultsTrace(
         baseline_assessment_id=baseline.result.assessment_id,
         follow_up_assessment_id=follow_up_analysis.assessment_id,
         baseline_analysis_id=baseline.result.analysis_id,
         follow_up_analysis_id=follow_up_analysis.analysis_id,
-        baseline_group_id=baseline_group.group_id,
+        baseline_group_id=baseline_group.reviewed_group_id,
+        baseline_source_group_ids=baseline_group.source_group_ids,
         follow_up_group_id=follow_up_group.group_id if follow_up_group else None,
         remediation_id=remediation.remediation_id,
         remediation_status="approved",
@@ -115,7 +132,7 @@ def create_follow_up_comparison(
             topic=baseline.result.assessment.topic,
             question_id=baseline_group.question_id,
             question=baseline_group.question,
-            misconception_label=baseline_group.provisional_label,
+            misconception_label=baseline_group.display_label,
             trace=trace,
             message=(
                 "The follow-up analysis did not produce a recurring group with enough overlapping students "
@@ -149,7 +166,7 @@ def create_follow_up_comparison(
         topic=baseline.result.assessment.topic,
         question_id=baseline_group.question_id,
         question=baseline_group.question,
-        misconception_label=baseline_group.provisional_label,
+        misconception_label=baseline_group.display_label,
         trace=trace,
         metrics=metrics,
         message="Observed before/after change only; this comparison does not establish that the intervention caused the change.",
@@ -174,7 +191,7 @@ def get_follow_up_comparison(comparison_id: str, *, results_store: ResultsStore)
 def _validate_follow_up_context(
     baseline: ParsedAssessment,
     follow_up: ParsedAssessment,
-    group: MisconceptionGroup,
+    group: ReviewedMisconceptionGroup,
 ) -> None:
     baseline_meta = baseline.preview.assessment
     follow_up_meta = follow_up.preview.assessment
@@ -223,32 +240,51 @@ def _validate_follow_up_context(
         )
 
 
+@dataclass(frozen=True)
+class _MatchedFollowUpGroup:
+    group_id: str | None
+    support_count: int
+    member_student_ids: list[str]
+
+
 def _match_follow_up_group(
-    baseline_group: MisconceptionGroup,
+    baseline_group: ReviewedMisconceptionGroup,
+    baseline_candidates: list[MisconceptionGroup],
     candidates: list[MisconceptionGroup],
-) -> MisconceptionGroup | None:
-    baseline_members = set(baseline_group.member_student_ids)
+) -> _MatchedFollowUpGroup | None:
     same_question = [candidate for candidate in candidates if candidate.question_id == baseline_group.question_id]
-    ranked = sorted(
-        same_question,
-        key=lambda candidate: (
-            len(baseline_members.intersection(candidate.member_student_ids)),
-            candidate.coherence,
-            candidate.support_count,
-        ),
-        reverse=True,
-    )
-    if not ranked:
+    source_groups = [group for group in baseline_candidates if group.group_id in baseline_group.source_group_ids]
+    if len(source_groups) != len(baseline_group.source_group_ids):
         return None
-    overlap = len(baseline_members.intersection(ranked[0].member_student_ids))
-    return ranked[0] if overlap >= 2 else None
+    matched: list[MisconceptionGroup] = []
+    for source in source_groups:
+        source_members = set(source.member_student_ids)
+        ranked = sorted(
+            same_question,
+            key=lambda candidate: (
+                len(source_members.intersection(candidate.member_student_ids)),
+                candidate.coherence,
+                candidate.support_count,
+            ),
+            reverse=True,
+        )
+        if not ranked or len(source_members.intersection(ranked[0].member_student_ids)) < 2:
+            return None
+        matched.append(ranked[0])
+    unique = {group.group_id: group for group in matched}
+    members = sorted({student for group in unique.values() for student in group.member_student_ids})
+    return _MatchedFollowUpGroup(
+        group_id=next(iter(unique)) if len(unique) == 1 else None,
+        support_count=len(members),
+        member_student_ids=members,
+    )
 
 
 def _calculate_metrics(
     baseline_responses: list[NormalizedResponse],
     follow_up_responses: list[NormalizedResponse],
     baseline_group: MisconceptionGroup,
-    follow_up_group: MisconceptionGroup,
+    follow_up_group: _MatchedFollowUpGroup,
     *,
     baseline_analysis_id: str,
     follow_up_analysis_id: str,

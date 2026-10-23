@@ -4,9 +4,11 @@ from functools import lru_cache
 
 from app.database import Database, DatabaseError, get_database
 from app.providers.analysis_store import AnalysisSnapshot
+from app.providers.group_review_store import GroupReviewStore
 from app.providers.material_index.protocol import MaterialRecord, MaterialSearchHit
 from app.schemas.analysis import AnalysisResponse
 from app.schemas.assessment import AssessmentPreview, NormalizedResponse
+from app.schemas.group_reviews import GroupReviewEvent, GroupReviewState, StoredGroupReviews
 from app.schemas.materials import LearningMaterial, MaterialChunk
 from app.schemas.remediations import RemediationRecord
 from app.schemas.results import FollowUpComparisonRecord
@@ -184,6 +186,90 @@ class PostgresAnalysisStore:
         return AnalysisSnapshot(parsed=parsed, result=AnalysisResponse.model_validate(row[1]))
 
 
+class PostgresGroupReviewStore(GroupReviewStore):
+    def __init__(self, database: Database) -> None:
+        self.database = database
+
+    def get(self, analysis_id: str) -> StoredGroupReviews | None:
+        with self.database.connection() as connection:
+            state_row = connection.execute(
+                "select state_json from analysis_group_review_states where analysis_id=%s",
+                (analysis_id,),
+            ).fetchone()
+            if state_row is None:
+                return None
+            event_rows = connection.execute(
+                """
+                select public_id,analysis_id,sequence,action,source_group_ids,
+                       resulting_reviewed_group_id,previous_state_json,next_state_json,review_note,created_at
+                from analysis_group_review_events where analysis_id=%s order by sequence
+                """,
+                (analysis_id,),
+            ).fetchall()
+        try:
+            state = GroupReviewState.model_validate(state_row[0])
+            events = [
+                GroupReviewEvent(
+                    event_id=row[0], analysis_id=row[1], sequence=row[2], action=row[3],
+                    source_group_ids=list(row[4]), resulting_reviewed_group_id=row[5],
+                    previous_state=GroupReviewState.model_validate(row[6]) if row[6] else None,
+                    next_state=GroupReviewState.model_validate(row[7]), review_note=row[8], created_at=row[9],
+                )
+                for row in event_rows
+            ]
+        except Exception as error:
+            raise DatabaseError(
+                "database_invalid_group_review",
+                "Stored group review data is invalid.",
+                retryable=False,
+                details={"validation_error": type(error).__name__},
+            ) from error
+        return StoredGroupReviews(state=state, events=events)
+
+    def save(
+        self,
+        analysis_id: str,
+        previous_state: GroupReviewState | None,
+        next_state: GroupReviewState,
+        event: GroupReviewEvent,
+    ) -> None:
+        with self.database.connection() as connection, connection.transaction():
+            row = connection.execute(
+                "select state_json from analysis_group_review_states where analysis_id=%s for update",
+                (analysis_id,),
+            ).fetchone()
+            current_state = GroupReviewState.model_validate(row[0]) if row else None
+            if current_state != previous_state:
+                raise DatabaseError(
+                    "group_review_stale",
+                    "The group review changed before this action could be saved.",
+                    retryable=False,
+                )
+            connection.execute(
+                """
+                insert into analysis_group_review_states (analysis_id,revision,state_json)
+                values (%s,%s,%s::jsonb)
+                on conflict (analysis_id) do update set revision=excluded.revision,
+                  state_json=excluded.state_json,updated_at=now()
+                """,
+                (analysis_id, next_state.revision, _json(next_state.model_dump(mode="json"))),
+            )
+            connection.execute(
+                """
+                insert into analysis_group_review_events
+                  (public_id,analysis_id,sequence,action,source_group_ids,resulting_reviewed_group_id,
+                   previous_state_json,next_state_json,review_note,created_at)
+                values (%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s)
+                """,
+                (
+                    event.event_id, analysis_id, event.sequence, event.action, event.source_group_ids,
+                    event.resulting_reviewed_group_id,
+                    _json(event.previous_state.model_dump(mode="json")) if event.previous_state else None,
+                    _json(event.next_state.model_dump(mode="json")), event.review_note, event.created_at,
+                ),
+            )
+
+
 class PostgresMaterialIndex:
     def __init__(self, database: Database) -> None:
         self.database = database
@@ -270,6 +356,12 @@ class PostgresRemediationStore:
         self.database = database
 
     def save(self, record: RemediationRecord) -> None:
+        if not record.source_group_ids:
+            raise DatabaseError(
+                "database_invalid_relationship",
+                "A persisted remediation requires original source group provenance.",
+                retryable=False,
+            )
         with self.database.connection() as connection, connection.transaction():
             existing = connection.execute("select status from interventions where id=%s for update", (record.remediation_id,)).fetchone()
             if existing is not None and existing[0] != "generated":
@@ -277,14 +369,16 @@ class PostgresRemediationStore:
             connection.execute(
                 """
                 insert into interventions
-                  (id,analysis_id,group_public_id,status,provider,model,prompt_version,generated_content,
+                  (id,analysis_id,group_public_id,reviewed_group_public_id,source_group_public_ids,
+                   status,provider,model,prompt_version,generated_content,
                    edited_content,review_notes,record_json,created_at,updated_at)
-                values (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s::jsonb,%s,%s)
+                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s::jsonb,%s,%s)
                 on conflict (id) do update set status=excluded.status, edited_content=excluded.edited_content,
                   review_notes=excluded.review_notes, record_json=excluded.record_json, updated_at=excluded.updated_at
                 """,
                 (
-                    record.remediation_id, record.analysis_id, record.group_id, record.status, record.provider,
+                    record.remediation_id, record.analysis_id, record.source_group_ids[0], record.group_id,
+                    record.source_group_ids, record.status, record.provider,
                     record.model, record.prompt_version, _json(record.generated_content.model_dump(mode="json")),
                     _json(record.content.model_dump(mode="json")), record.review_notes,
                     _json(record.model_dump(mode="json")), record.created_at, record.updated_at,
@@ -307,6 +401,14 @@ class PostgresRemediationStore:
             row = connection.execute("select record_json from interventions where id=%s", (remediation_id,)).fetchone()
         return RemediationRecord.model_validate(row[0]) if row else None
 
+    def list_for_analysis(self, analysis_id: str) -> list[RemediationRecord]:
+        with self.database.connection() as connection:
+            rows = connection.execute(
+                "select record_json from interventions where analysis_id=%s order by created_at",
+                (analysis_id,),
+            ).fetchall()
+        return [RemediationRecord.model_validate(row[0]) for row in rows]
+
 
 class PostgresResultsStore:
     def __init__(self, database: Database) -> None:
@@ -321,12 +423,14 @@ class PostgresResultsStore:
                 """
                 insert into assessment_comparisons
                   (id,baseline_analysis_id,follow_up_analysis_id,baseline_group_public_id,
+                   baseline_reviewed_group_public_id,baseline_source_group_public_ids,
                    follow_up_group_public_id,intervention_id,status,matching_method,record_json,created_at)
-                values (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
                 on conflict (id) do update set record_json=excluded.record_json
                 """,
                 (record.comparison_id, trace.baseline_analysis_id, trace.follow_up_analysis_id,
-                 trace.baseline_group_id, trace.follow_up_group_id, trace.remediation_id,
+                 trace.baseline_source_group_ids[0], trace.baseline_group_id, trace.baseline_source_group_ids,
+                 trace.follow_up_group_id, trace.remediation_id,
                  record.status, trace.comparison_method, _json(record.model_dump(mode="json")), record.created_at),
             )
 
@@ -339,6 +443,11 @@ class PostgresResultsStore:
 @lru_cache(maxsize=1)
 def get_postgres_analysis_store() -> PostgresAnalysisStore:
     return PostgresAnalysisStore(get_database())
+
+
+@lru_cache(maxsize=1)
+def get_postgres_group_review_store() -> PostgresGroupReviewStore:
+    return PostgresGroupReviewStore(get_database())
 
 
 @lru_cache(maxsize=1)

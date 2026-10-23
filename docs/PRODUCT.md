@@ -29,6 +29,7 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 - As a teacher, I can load a valid response file and understand any validation problem before analysis begins.
 - As a teacher, I can see proposed recurring misconceptions for a particular question rather than only low scores.
 - As a teacher, I can inspect representative responses and group support before accepting an AI interpretation.
+- As a teacher, I can rename, merge, dismiss, or restore proposed groups without losing their original evidence or review history.
 - As a teacher, I can upload or select my own instructional material and see which passages support remediation.
 - As a teacher, I can edit, approve, or reject a proposed intervention before it is used.
 - As a teacher, I can compare transparent baseline and follow-up results and distinguish missing data from poor performance.
@@ -56,6 +57,9 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 - Show group size, question, expected concept, representative responses, and relevant caveats.
 - Keep response wording faithful to the submitted data.
 - Let the teacher treat a group as a proposal rather than a proven diagnosis.
+- Preserve detected groups as immutable evidence and store teacher review as a separate, revisioned overlay.
+- Allow same-question groups to be renamed, merged, dismissed, or restored; merged groups must retain the complete source-group and member provenance and must not claim a recomputed coherence score.
+- Show ordered review history, including optional teacher notes, and prevent affected group-review changes after remediation exists so downstream evidence remains stable.
 
 ### Learning-material retrieval
 
@@ -85,13 +89,14 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 3. An embedding model converts relevant student responses into semantic vectors.
 4. Similar incorrect responses are grouped into potential recurring misconceptions.
 5. The current MVP assigns generic provisional labels and displays exact group evidence. LLM-authored group descriptions remain a proposed post-demo step.
-6. The teacher opens a group and sees representative responses and supporting evidence.
-7. The teacher uploads or selects relevant instructional material.
-8. Retrieval finds relevant passages from that material.
-9. An LLM generates a targeted remediation activity and follow-up questions grounded in the retrieved passages.
-10. The teacher reviews, edits, and approves or rejects the intervention.
-11. Follow-up results are recorded or loaded from clearly labeled demo data.
-12. The dashboard compares baseline and follow-up performance.
+6. The teacher reviews the proposals and may rename, merge, dismiss, or restore them while retaining exact source evidence and history.
+7. The teacher opens an active reviewed group and sees representative responses and supporting evidence.
+8. The teacher uploads or selects relevant instructional material.
+9. Retrieval finds relevant passages from that material.
+10. An LLM generates a targeted remediation activity and follow-up questions grounded in the retrieved passages.
+11. The teacher reviews, edits, and approves or rejects the intervention.
+12. Follow-up results are recorded or loaded from clearly labeled demo data.
+13. The dashboard compares baseline and follow-up performance.
 
 The implementation order and acceptance criteria are maintained in [TASKS.md](../TASKS.md).
 
