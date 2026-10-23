@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class FollowUpComparisonLink(BaseModel):
@@ -52,6 +52,12 @@ class ResultsTrace(BaseModel):
     remediation_id: str
     remediation_status: Literal["approved"]
     comparison_method: Literal["same_question_member_overlap_v1"]
+
+    @model_validator(mode="after")
+    def restore_legacy_source_group(self):
+        if not self.baseline_source_group_ids:
+            self.baseline_source_group_ids = [self.baseline_group_id]
+        return self
 
 
 class FollowUpComparisonRecord(BaseModel):

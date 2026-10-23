@@ -82,11 +82,12 @@ export type GroupReviewEvent = {
 export type GroupReviewResponse = {
   analysis_id: string; revision: number
   active_groups: ReviewedMisconceptionGroup[]; dismissed_groups: ReviewedMisconceptionGroup[]
+  locked_group_ids: string[]
   events: GroupReviewEvent[]
 }
 export type GroupReviewActionRequest = {
   action: 'rename' | 'merge' | 'dismiss' | 'restore'; group_ids: string[]
-  label?: string; review_note?: string
+  expected_revision: number; label?: string; review_note?: string
 }
 export type LearningMaterial = {
   material_id: string

@@ -72,6 +72,7 @@ const reviewedGroup = {
 }
 const reviewState = {
   analysis_id: 'analysis_demo', revision: 1, active_groups: [reviewedGroup], dismissed_groups: [],
+  locked_group_ids: [],
   events: [{
     event_id: 'grev_1', analysis_id: 'analysis_demo', sequence: 1, action: 'merge',
     source_group_ids: ['grp_demo'], resulting_reviewed_group_id: 'grp_demo', previous_state: null,
@@ -130,4 +131,11 @@ test('group review accepts nullable coherence and rejects malformed provenance o
   const malformedHistory = structuredClone(reviewState)
   malformedHistory.events[0].sequence = 2
   assert.equal(isGroupReviewResponse(malformedHistory), false)
+})
+
+test('group review requires per-group remediation lock state', () => {
+  const missingLocks = structuredClone(reviewState) as Record<string, unknown>
+  delete missingLocks.locked_group_ids
+  assert.equal(isGroupReviewResponse(missingLocks), false)
+  assert.equal(isGroupReviewResponse({ ...reviewState, locked_group_ids: ['grp_demo'] }), true)
 })

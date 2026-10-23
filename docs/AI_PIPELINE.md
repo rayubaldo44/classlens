@@ -130,7 +130,7 @@ Detected groups, memberships, representative responses, and coherence remain imm
 
 Every action retains the exact original source-group IDs, members, representative responses, counts, and question context. A merge unions source groups and student members, creates a stable reviewed-group identity, and sets coherence to `null`: it does not re-embed responses or invent a numeric claim about the merged evidence. Each event records before/after state, its source IDs, resulting reviewed ID, optional teacher note, timestamp, and monotonically increasing sequence.
 
-The PostgreSQL writer locks the current state row and rejects stale concurrent updates before atomically saving the next revision and event. Retrieval, remediation, and results use the active reviewed identity while preserving original source-group provenance. Once any remediation refers to an affected reviewed or source group, rename, merge, dismiss, and restore actions for that evidence return `group_review_locked`; existing downstream records are never silently retargeted.
+The client submits its expected overlay revision. The PostgreSQL writer locks the current state row and rejects stale concurrent updates before atomically saving the next revision and event; identical renames create no event. Retrieval, remediation, and results use the active reviewed identity while preserving original source-group provenance. Once any remediation refers to an affected reviewed or source group, rename, merge, dismiss, and restore actions for that evidence return `group_review_locked`; unrelated groups remain reviewable. Generation revalidates the reviewed evidence and saves the draft while holding the same per-analysis review lock, so a concurrent dismissal wins before generation or is blocked after the draft exists—never leaving a draft attached to dismissed evidence.
 
 ## 8. LLM misconception interpretation — proposed, not implemented
 
@@ -207,12 +207,12 @@ Follow-up CSVs use the same schema, validation, normalization, correctness bound
 
 The service validates that subject, grade level, topic, question ID, prompt, and correct answer still correspond. Follow-up student IDs must be members of the baseline cohort; absent and blank answers remain missing rather than becoming incorrect or resolved.
 
-Because clustering IDs can change as answers improve, the selected follow-up misconception is matched by:
+Because clustering IDs can change as answers improve, each original source group represented by the selected reviewed group is matched by:
 
 1. the same question ID; and
-2. the greatest overlap with the original group members, with at least two overlapping members required.
+2. the greatest overlap with that source group's original members, with at least two overlapping members required.
 
-The recorded method is `same_question_member_overlap_v1`. If no recurring group reaches that evidence threshold, the result is `insufficient_data` with no calculated improvement metrics.
+The recorded method is `same_question_member_overlap_v1`. A single-source reviewed group behaves as before. For a teacher merge, every constituent source pattern must be re-identified; matched follow-up memberships are then unioned exactly once. If any constituent is missing or ambiguous, the result is `insufficient_data` with no calculated improvement metrics rather than an incomplete improvement claim.
 
 For a completed comparison, deterministic arithmetic reports:
 

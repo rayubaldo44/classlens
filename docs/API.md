@@ -229,6 +229,8 @@ The original analysis response and relational misconception evidence remain immu
 
 Returns `analysis_id`, the current `revision`, `active_groups`, `dismissed_groups`, and ordered `events`. Before the first action, revision is `0`, history is empty, and every detected group appears as an active reviewed group whose `reviewed_group_id` and sole `source_group_id` equal the original `group_id`.
 
+The response also contains `locked_group_ids`. A reviewed group appears there when an existing generated, approved, or rejected remediation refers to its reviewed identity or original source evidence. The frontend disables only those groups; unrelated evidence remains reviewable.
+
 Each reviewed group contains its display label, visibility status, exact source IDs and member IDs, copied representative responses, question context, counts, and nullable coherence. Teacher-created merges report `coherence: null` because clustering is not rerun.
 
 ### `POST /api/v1/assessments/analyses/{analysis_id}/group-reviews`
@@ -239,12 +241,13 @@ Accepts:
 {
   "action": "rename | merge | dismiss | restore",
   "group_ids": ["grp_..."],
+  "expected_revision": 0,
   "label": "Required for rename and merge",
   "review_note": "Optional teacher note"
 }
 ```
 
-Rename, dismiss, and restore require exactly one applicable current reviewed group. Merge requires at least two distinct active groups from the same question. Rename/merge labels are trimmed and limited to 120 characters; dismiss/restore reject a label. Every successful action increments the revision and appends an event containing the action, source IDs, resulting reviewed ID, before/after state snapshots, optional note, and timestamp.
+Rename, dismiss, and restore require exactly one applicable current reviewed group. Merge requires at least two distinct active groups from the same question. `expected_revision` must match the current overlay revision; stale clients receive `409 group_review_stale`. Rename/merge labels are trimmed and limited to 120 characters; dismiss/restore reject a label, and an identical rename returns `409 group_review_no_change` without adding history. Every successful action increments the revision and appends an event containing the action, source IDs, resulting reviewed ID, before/after state snapshots, optional note, and timestamp.
 
 Missing analyses return `404 analysis_not_found`. Unknown, stale, inactive, duplicate-state, or cross-question selections return a structured `409` and do not change state or history. If any remediation already refers to a selected reviewed group or one of its source groups, the endpoint returns `409 group_review_locked`; existing downstream evidence is not retargeted. Framework-level malformed request validation retains FastAPI's HTTP 422 body.
 
@@ -287,10 +290,11 @@ Ingests `data/demo/learning_materials/photosynthesis_grade7.txt` through the sam
 
 ### `POST /api/v1/learning-materials/{material_id}/retrieve`
 
-Accepts a detected group context:
+Accepts an active reviewed-group context. `analysis_id` is required so FastAPI can resolve the group against canonical review state; omitting it is a validation error, and dismissed/stale groups cannot retrieve passages.
 
 ```json
 {
+  "analysis_id": "analysis_1a191d0a7331cb82",
   "group_id": "grp_704762a85fd8",
   "question_id": "Q1",
   "question": "Explain how plants make food during photosynthesis.",

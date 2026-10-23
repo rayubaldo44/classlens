@@ -55,6 +55,7 @@ baseline analysis/reviewed group/source groups + approved intervention + follow-
 - A review write locks the current state row, compares the expected state, and atomically updates the revisioned overlay plus one event. Stale concurrent actions fail without a partial history entry.
 - Original detected group/member rows are immutable. Same-question merges materialize a new reviewed identity from the exact union of source groups and student members and record `coherence: null` because vectors are not recomputed.
 - Interventions and comparisons store both the reviewed group identity and original source-group IDs. Any review action affecting evidence already used by a remediation is rejected.
+- When pre-migration comparison JSON lacks `baseline_source_group_ids`, boundary validation restores the legacy single detected `baseline_group_id` as its sole source. This keeps existing saved comparisons valid after migration 002 without rewriting historical JSON.
 - Teacher review updates preserve immutable generated content and reject changes after approval/rejection.
 - Before generation, the application reloads the analysis/group and material/chunks through their PostgreSQL-backed repositories. Browser snapshot fields must match those records before Gemini is called; saved intervention source text, identifiers, indexes, and offsets are rebuilt from the canonical chunks.
 

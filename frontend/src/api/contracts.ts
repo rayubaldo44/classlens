@@ -134,6 +134,7 @@ export const isGroupReviewResponse = (value: unknown): value is GroupReviewRespo
   if (!isObject(value) || !isCount(value.revision)
     || !isArrayOf(value.active_groups, isReviewedGroup)
     || !isArrayOf(value.dismissed_groups, isReviewedGroup)
+    || !isArrayOf(value.locked_group_ids, isNonEmptyString)
     || !isArrayOf(value.events, isReviewEvent)) return false
   if (!isNonEmptyString(value.analysis_id)) return false
   if ((value.active_groups as JsonObject[]).some((group) => group.status !== 'active')) return false

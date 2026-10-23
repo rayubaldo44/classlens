@@ -31,7 +31,7 @@ class MaterialIngestionResponse(BaseModel):
 
 
 class MisconceptionRetrievalContext(BaseModel):
-    analysis_id: str | None = Field(default=None, min_length=1, max_length=100)
+    analysis_id: str = Field(min_length=1, max_length=100)
     group_id: str = Field(min_length=1, max_length=100)
     question_id: str = Field(min_length=1, max_length=100)
     question: str = Field(min_length=1, max_length=2000)

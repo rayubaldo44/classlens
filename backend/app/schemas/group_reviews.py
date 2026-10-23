@@ -12,6 +12,7 @@ GroupReviewStatus = Literal["active", "dismissed"]
 class GroupReviewActionRequest(BaseModel):
     action: GroupReviewAction
     group_ids: list[str] = Field(min_length=1)
+    expected_revision: int = Field(default=0, ge=0)
     label: str | None = None
     review_note: str | None = None
 
@@ -75,6 +76,7 @@ class GroupReviewResponse(BaseModel):
     revision: int = Field(ge=0)
     active_groups: list[ReviewedMisconceptionGroup]
     dismissed_groups: list[ReviewedMisconceptionGroup]
+    locked_group_ids: list[str]
     events: list[GroupReviewEvent]
 
 

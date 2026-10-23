@@ -26,7 +26,7 @@ from app.schemas.remediations import (
     RemediationSource,
 )
 from app.telemetry import log_stage
-from app.services.group_reviews import GroupReviewError, resolve_reviewed_group
+from app.services.group_reviews import GroupReviewError, group_review_lock, resolve_reviewed_group
 
 
 _GENERATION_LOCKS: dict[str, asyncio.Lock] = {}
@@ -133,9 +133,38 @@ async def generate_grounded_remediation(
             updated_at=now,
         )
         started = perf_counter()
-        await run_in_worker(store.save, record)
+        await run_in_worker(
+            _save_if_review_is_current,
+            request,
+            record,
+            analysis,
+            material,
+            store,
+            analysis_store,
+            review_store,
+        )
         log_stage("database_persistence", (perf_counter() - started) * 1000, operation="remediation_save")
         return RemediationGenerationResponse(status="generated", remediation=record)
+
+
+def _save_if_review_is_current(
+    request: RemediationGenerationRequest,
+    record: RemediationRecord,
+    analysis: AnalysisSnapshot,
+    material: MaterialRecord,
+    store: RemediationStore,
+    analysis_store: AnalysisStore,
+    review_store: GroupReviewStore | None,
+) -> None:
+    with group_review_lock(request.analysis_id):
+        _canonical_generation_request(
+            request,
+            analysis=analysis,
+            material=material,
+            review_store=review_store,
+            analysis_store=analysis_store,
+        )
+        store.save(record)
 
 
 def _remediation_id(request: RemediationGenerationRequest) -> str:

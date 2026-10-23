@@ -280,7 +280,7 @@ def test_teacher_renamed_group_is_canonical_prompt_and_dismissed_group_is_reject
 
     apply_group_review(
         request.analysis_id,
-        GroupReviewActionRequest(action="dismiss", group_ids=[request.misconception.group_id]),
+        GroupReviewActionRequest(action="dismiss", group_ids=[request.misconception.group_id], expected_revision=1),
         analysis_store, review_store, None,
     )
     with pytest.raises(RemediationError) as caught:
@@ -378,6 +378,46 @@ def test_repeated_generation_request_returns_one_persisted_draft() -> None:
     assert first.remediation is not None
     assert second.remediation is not None
     assert first.remediation.remediation_id == second.remediation.remediation_id
+
+
+def test_generation_does_not_persist_if_group_is_dismissed_during_provider_call() -> None:
+    request = generation_request(generation_request_id="review_race")
+    analysis_store, material_index = canonical_context_stores()
+    review_store = InMemoryGroupReviewStore()
+    remediation_store = InMemoryRemediationStore()
+
+    class HeldLLM(FakeLLMService):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def generate_remediation(self, prompt: str):
+            self.started.set()
+            await self.release.wait()
+            return await super().generate_remediation(prompt)
+
+    async def exercise() -> None:
+        llm = HeldLLM()
+        task = asyncio.create_task(generate_with_canonical_context(
+            request, llm_service=llm, store=remediation_store, analysis_store=analysis_store,
+            material_index=material_index, review_store=review_store,
+        ))
+        await llm.started.wait()
+        apply_group_review(
+            request.analysis_id,
+            GroupReviewActionRequest(
+                action="dismiss", group_ids=[request.misconception.group_id], expected_revision=0
+            ),
+            analysis_store, review_store, remediation_store,
+        )
+        llm.release.set()
+        with pytest.raises(RemediationError) as caught:
+            await task
+        assert caught.value.code == "reviewed_group_not_available"
+
+    run_test_async(exercise())
+    assert remediation_store._records == {}
 
 
 def test_insufficient_context_does_not_call_llm_or_save_record() -> None:

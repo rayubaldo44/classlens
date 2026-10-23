@@ -44,4 +44,7 @@ The active Render service may still use a 512 MB compute plan. Three analysis-ti
 - [complete] Add frontend recovery, accessible review controls, history, and controlled failure handling.
 - [complete] Verify PostgreSQL integration, backend/frontend suites, reload persistence, and post-remediation locking.
 - [complete] Reconcile authoritative docs and sync the verified milestone to Obsidian.
-- [in progress] Run the required fresh whole-branch review, resolve important findings, and prepare branch integration choices.
+- [complete] Run the required fresh whole-branch review and resolve all seven Important findings in one regression-first fix pass.
+- [complete] Run the final all-layer gate across migrations, PostgreSQL integration, backend, frontend, build, Chromium, diffs, and documentation links.
+- [complete] Sync the hardened milestone to the existing Obsidian project dashboard and Kanban.
+- [in progress] Prepare branch integration choices.

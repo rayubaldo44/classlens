@@ -113,6 +113,7 @@ Depends on: P0 gates; preserve the implemented workflow.
   - Implemented as immutable detected groups plus a persisted reviewed overlay and append-only events. Same-question merges union exact evidence, report no fabricated coherence, and lock affected review actions after remediation exists.
   - Spec: [`docs/superpowers/specs/2026-10-14-teacher-group-review-design.md`](docs/superpowers/specs/2026-10-14-teacher-group-review-design.md)
   - Execution plan: [`docs/superpowers/plans/2026-10-14-teacher-group-review.md`](docs/superpowers/plans/2026-10-14-teacher-group-review.md). PostgreSQL integration, backend/unit/frontend checks, and browser reload/lock coverage pass.
+  - Fresh branch review hardening (2026-10-23): stale revisions/no-op renames, generation/review races, merged-result undercounting, legacy comparison provenance, retrieval bypass, per-group lock scope, and review-fetch retry recovery are covered.
 - [ ] Export an approved intervention and evidence summary.
 - [x] Remove unused response/evidence examples from `frontend/src/mockData.ts`; retain scenario metadata and navigation definitions.
 - [x] Reconcile stale implementation wording in authoritative documentation with verified code/state; keep proposed features visibly separate. (2026-10-14)

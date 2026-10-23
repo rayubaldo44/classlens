@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from time import perf_counter
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from app.config import AnalysisSettings
@@ -106,7 +107,7 @@ def create_follow_up_comparison(
     )
     log_stage("database_persistence", (perf_counter() - started) * 1000, operation="follow_up_analysis_save")
 
-    follow_up_group = _match_follow_up_group(baseline_group, follow_up_analysis.groups)
+    follow_up_group = _match_follow_up_group(baseline_group, baseline.result.groups, follow_up_analysis.groups)
     comparison_id = _comparison_id(link, follow_up_analysis.analysis_id)
     trace = ResultsTrace(
         baseline_assessment_id=baseline.result.assessment_id,
@@ -239,32 +240,51 @@ def _validate_follow_up_context(
         )
 
 
+@dataclass(frozen=True)
+class _MatchedFollowUpGroup:
+    group_id: str | None
+    support_count: int
+    member_student_ids: list[str]
+
+
 def _match_follow_up_group(
     baseline_group: ReviewedMisconceptionGroup,
+    baseline_candidates: list[MisconceptionGroup],
     candidates: list[MisconceptionGroup],
-) -> MisconceptionGroup | None:
-    baseline_members = set(baseline_group.member_student_ids)
+) -> _MatchedFollowUpGroup | None:
     same_question = [candidate for candidate in candidates if candidate.question_id == baseline_group.question_id]
-    ranked = sorted(
-        same_question,
-        key=lambda candidate: (
-            len(baseline_members.intersection(candidate.member_student_ids)),
-            candidate.coherence,
-            candidate.support_count,
-        ),
-        reverse=True,
-    )
-    if not ranked:
+    source_groups = [group for group in baseline_candidates if group.group_id in baseline_group.source_group_ids]
+    if len(source_groups) != len(baseline_group.source_group_ids):
         return None
-    overlap = len(baseline_members.intersection(ranked[0].member_student_ids))
-    return ranked[0] if overlap >= 2 else None
+    matched: list[MisconceptionGroup] = []
+    for source in source_groups:
+        source_members = set(source.member_student_ids)
+        ranked = sorted(
+            same_question,
+            key=lambda candidate: (
+                len(source_members.intersection(candidate.member_student_ids)),
+                candidate.coherence,
+                candidate.support_count,
+            ),
+            reverse=True,
+        )
+        if not ranked or len(source_members.intersection(ranked[0].member_student_ids)) < 2:
+            return None
+        matched.append(ranked[0])
+    unique = {group.group_id: group for group in matched}
+    members = sorted({student for group in unique.values() for student in group.member_student_ids})
+    return _MatchedFollowUpGroup(
+        group_id=next(iter(unique)) if len(unique) == 1 else None,
+        support_count=len(members),
+        member_student_ids=members,
+    )
 
 
 def _calculate_metrics(
     baseline_responses: list[NormalizedResponse],
     follow_up_responses: list[NormalizedResponse],
     baseline_group: MisconceptionGroup,
-    follow_up_group: MisconceptionGroup,
+    follow_up_group: _MatchedFollowUpGroup,
     *,
     baseline_analysis_id: str,
     follow_up_analysis_id: str,

@@ -15,7 +15,7 @@ from app.providers.remediation_store import InMemoryRemediationStore, get_remedi
 from app.providers.group_review_store import InMemoryGroupReviewStore, get_group_review_store
 from app.providers.results_store import InMemoryResultsStore, get_results_store
 from app.schemas.remediations import FollowUpQuestion, RemediationContent, RemediationRecord
-from app.schemas.results import FollowUpComparisonLink
+from app.schemas.results import FollowUpComparisonLink, ResultsTrace
 from app.schemas.group_reviews import GroupReviewActionRequest
 from app.services.group_reviews import apply_group_review, get_group_reviews
 from app.services.assessment_intake import parse_assessment_csv_full
@@ -225,12 +225,74 @@ def test_merged_review_uses_union_members_and_preserves_source_ids_in_trace() ->
         remediation_store=remediation_store, results_store=InMemoryResultsStore(), review_store=review_store,
     )
 
-    assert result.metrics is not None
-    assert result.metrics.before.affected_students == 6
+    assert result.status == "insufficient_data"
+    assert result.metrics is None
     assert result.trace is not None
     assert result.trace.baseline_group_id == merged.reviewed_group_id
     assert result.trace.baseline_source_group_ids == merged.source_group_ids
     assert analysis_store.get(analysis.analysis_id).result.model_dump_json() == original_json
+
+
+def test_merged_review_counts_all_unchanged_source_patterns_after_follow_up() -> None:
+    embedding = KeywordEmbeddingService()
+    settings = analysis_settings()
+    rows = [
+        row("S1", "sun-food one", False), row("S2", "sun-food two", False),
+        row("S3", "sun-food three", False), row("S4", "soil-food one", False),
+        row("S5", "soil-food two", False), row("S6", "soil-food three", False),
+        row("S7", "correct response", True),
+    ]
+    baseline = parsed(rows, filename="merged-identical-baseline.csv")
+    analysis = analyze_assessment(baseline, embedding, settings)
+    analysis_store = InMemoryAnalysisStore()
+    analysis_store.save(baseline, analysis)
+    review_store = InMemoryGroupReviewStore()
+    initial = get_group_reviews(analysis.analysis_id, analysis_store, review_store)
+    merged = apply_group_review(
+        analysis.analysis_id,
+        GroupReviewActionRequest(
+            action="merge", group_ids=[group.reviewed_group_id for group in initial.active_groups],
+            label="Food source confusion", expected_revision=0,
+        ),
+        analysis_store, review_store, None,
+    ).active_groups[0]
+    remediation_store = InMemoryRemediationStore()
+    record = remediation(merged.reviewed_group_id, analysis_id=analysis.analysis_id)
+    record.source_group_ids = merged.source_group_ids
+    remediation_store.save(record)
+
+    result = create_follow_up_comparison(
+        FollowUpComparisonLink(
+            baseline_analysis_id=analysis.analysis_id,
+            group_id=merged.reviewed_group_id,
+            remediation_id=record.remediation_id,
+        ),
+        parsed(rows, filename="merged-identical-follow-up.csv"),
+        embedding_service=embedding, settings=settings, analysis_store=analysis_store,
+        remediation_store=remediation_store, results_store=InMemoryResultsStore(), review_store=review_store,
+    )
+
+    assert result.metrics is not None
+    assert result.metrics.before.affected_students == 6
+    assert result.metrics.after.affected_students == 6
+    assert result.metrics.percentage_point_reduction == 0.0
+    assert result.metrics.transitions.still_struggling == 6
+
+
+def test_legacy_results_trace_restores_original_source_group_provenance() -> None:
+    trace = ResultsTrace.model_validate({
+        "baseline_assessment_id": "assessment_old",
+        "follow_up_assessment_id": "assessment_follow_up",
+        "baseline_analysis_id": "analysis_old",
+        "follow_up_analysis_id": "analysis_follow_up",
+        "baseline_group_id": "grp_original",
+        "follow_up_group_id": "grp_follow_up",
+        "remediation_id": "remediation_old",
+        "remediation_status": "approved",
+        "comparison_method": "same_question_member_overlap_v1",
+    })
+
+    assert trace.baseline_source_group_ids == ["grp_original"]
 
 
 def test_demo_follow_up_fixture_uses_existing_parser_and_expected_counts() -> None:

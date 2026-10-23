@@ -91,7 +91,7 @@ const reviewedGroup = {
 }
 const groupReviews = {
   analysis_id: analysis.analysis_id, revision: 0,
-  active_groups: [reviewedGroup], dismissed_groups: [], events: [],
+  active_groups: [reviewedGroup], dismissed_groups: [], locked_group_ids: [], events: [],
 }
 
 const material = {
@@ -226,6 +226,7 @@ async function json(route: Route, body: unknown, status = 200) {
 
 async function installApi(page: Page) {
   let generationAttempts = 0
+  let remediationExists = false
   let approvedRemediation = { ...remediation, content: { ...generatedContent } }
 
   await page.route('http://api.classlens.test/**', async (route) => {
@@ -239,7 +240,10 @@ async function installApi(page: Page) {
       return json(route, analysis)
     }
     if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}`) return json(route, analysis)
-    if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}/group-reviews`) return json(route, groupReviews)
+    if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}/group-reviews`) return json(route, {
+      ...groupReviews,
+      locked_group_ids: remediationExists ? [reviewedGroup.reviewed_group_id] : [],
+    })
     if (pathname === '/api/v1/learning-materials/ingest') {
       return json(route, { status: 'ready', material, message: 'Teaching material is ready.' })
     }
@@ -252,6 +256,7 @@ async function installApi(page: Page) {
         }, 503)
       }
       await new Promise((resolve) => setTimeout(resolve, 1_500))
+      remediationExists = true
       return json(route, { status: 'generated', remediation, message: null })
     }
     if (pathname === `/api/v1/remediations/${remediation.remediation_id}` && request.method() === 'PATCH') {
@@ -332,7 +337,7 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await expect(page.getByText('13.9 pp reduction')).toBeVisible()
 
   await page.getByRole('button', { name: '03 Learning gaps' }).click()
-  await expect(page.getByText('Review controls are locked because remediation has already been generated from this evidence.')).toBeVisible()
+  await expect(page.getByText('Groups used by a remediation are locked; unrelated evidence remains reviewable.')).toBeVisible()
   await page.getByRole('button', { name: 'Review groups' }).click()
   await expect(page.getByRole('button', { name: `Rename ${reviewedGroup.display_label}` })).toBeDisabled()
 })

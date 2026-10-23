@@ -114,11 +114,14 @@ def test_postgres_workflow_survives_new_repository_instances() -> None:
     retrieval = retrieve_for_misconception(
         material.material_id,
         MisconceptionRetrievalContext(
-            group_id=group.group_id, question_id=group.question_id, question=group.question,
+                analysis_id=baseline_result.analysis_id, group_id=group.group_id,
+                question_id=group.question_id, question=group.question,
             correct_answer=group.correct_answer,
             representative_answers=[item.answer for item in group.representative_responses],
         ),
-        embedding_service=MaterialEmbeddings(), material_index=reloaded_index, settings=material_settings,
+            embedding_service=MaterialEmbeddings(), material_index=reloaded_index, settings=material_settings,
+            analysis_store=PostgresAnalysisStore(Database(DATABASE_URL)),
+            review_store=PostgresGroupReviewStore(Database(DATABASE_URL)),
     )
     assert retrieval.status == "retrieved"
 

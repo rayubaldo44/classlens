@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from threading import Lock, RLock
 from typing import Any
@@ -35,6 +36,12 @@ def _lock_for(analysis_id: str) -> RLock:
         return _analysis_locks.setdefault(analysis_id, RLock())
 
 
+@contextmanager
+def group_review_lock(analysis_id: str):
+    with _lock_for(analysis_id):
+        yield
+
+
 def _from_detected(group: MisconceptionGroup) -> ReviewedMisconceptionGroup:
     return ReviewedMisconceptionGroup(
         reviewed_group_id=group.group_id,
@@ -66,12 +73,27 @@ def _initial_state(analysis_id: str, analysis_store: AnalysisStore) -> GroupRevi
     )
 
 
-def _response(state: GroupReviewState, events: list[GroupReviewEvent]) -> GroupReviewResponse:
+def _response(
+    state: GroupReviewState,
+    events: list[GroupReviewEvent],
+    remediation_store: RemediationStore | None = None,
+) -> GroupReviewResponse:
+    remediations = remediation_store.list_for_analysis(state.analysis_id) if remediation_store else []
+    locked_group_ids = [
+        group.reviewed_group_id
+        for group in state.groups
+        if any(
+            remediation.group_id == group.reviewed_group_id
+            or bool(set(remediation.source_group_ids).intersection(group.source_group_ids))
+            for remediation in remediations
+        )
+    ]
     return GroupReviewResponse(
         analysis_id=state.analysis_id,
         revision=state.revision,
         active_groups=[group for group in state.groups if group.status == "active"],
         dismissed_groups=[group for group in state.groups if group.status == "dismissed"],
+        locked_group_ids=locked_group_ids,
         events=sorted(events, key=lambda event: event.sequence),
     )
 
@@ -80,10 +102,11 @@ def get_group_reviews(
     analysis_id: str,
     analysis_store: AnalysisStore,
     review_store: GroupReviewStore,
+    remediation_store: RemediationStore | None = None,
 ) -> GroupReviewResponse:
     initial = _initial_state(analysis_id, analysis_store)
     stored = review_store.get(analysis_id)
-    return _response(stored.state, stored.events) if stored else _response(initial, [])
+    return _response(stored.state, stored.events, remediation_store) if stored else _response(initial, [], remediation_store)
 
 
 def _validate_shape(request: GroupReviewActionRequest) -> None:
@@ -115,11 +138,17 @@ def apply_group_review(
     remediation_store: RemediationStore | None,
 ) -> GroupReviewResponse:
     _validate_shape(request)
-    with _lock_for(analysis_id):
+    with group_review_lock(analysis_id):
         initial = _initial_state(analysis_id, analysis_store)
         stored = review_store.get(analysis_id)
         previous = stored.state if stored else initial
         events = stored.events if stored else []
+        if request.expected_revision != previous.revision:
+            raise GroupReviewError(
+                "group_review_stale",
+                "The group review changed before this action could be saved.",
+                details={"expected_revision": request.expected_revision, "current_revision": previous.revision},
+            )
         groups_by_id = {group.reviewed_group_id: group for group in previous.groups}
         selected: list[ReviewedMisconceptionGroup] = []
         for group_id in request.group_ids:
@@ -156,6 +185,8 @@ def apply_group_review(
         next_groups = [group.model_copy(deep=True) for group in previous.groups]
         if request.action == "rename":
             target = next(group for group in next_groups if group.reviewed_group_id == selected[0].reviewed_group_id)
+            if request.label == target.display_label:
+                raise GroupReviewError("group_review_no_change", "The group already uses this label.")
             target.display_label = request.label or target.display_label
             resulting_id = target.reviewed_group_id
         elif request.action in {"dismiss", "restore"}:
@@ -216,7 +247,7 @@ def apply_group_review(
             raise GroupReviewError(
                 "group_review_stale", "The group review changed before this action could be saved."
             ) from error
-        return _response(next_state, [*events, event])
+        return _response(next_state, [*events, event], remediation_store)
 
 
 def resolve_reviewed_group(

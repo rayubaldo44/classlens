@@ -9,7 +9,7 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 - **Status:** Accepted and implemented
 - **Decision:** Keep detected misconception groups and memberships immutable. Persist the current teacher-reviewed view as a revisioned per-analysis state plus append-only rename, same-question merge, dismiss, and restore events. A merge unions exact source-group/member evidence and reports `coherence: null`; interventions and comparisons carry both the reviewed identity and original source-group IDs. Reject any review action affecting evidence once remediation exists.
 - **Reason:** Teachers need authority to organize machine proposals without rewriting the evidence the model produced or invalidating downstream retrieval, remediation, and outcome provenance.
-- **Consequence:** The UI can recover review state and history after reload, stale concurrent writes fail safely, and downstream records remain auditable. Review actions are deliberately locked after remediation rather than silently retargeting an existing intervention.
+- **Consequence:** The UI can recover review state and history after reload, stale client revisions and no-op renames fail without history, and downstream records remain auditable. Locks are reported per reviewed group. Generation and review share an atomic finalization boundary, and merged outcome comparison requires every original source pattern to be re-identified before calculating change.
 
 ### D-027 — Bound and idempotently retry remediation generation
 

@@ -1295,3 +1295,19 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: complete the final branch review, address any important findings, then integrate `feature/teacher-group-review` using the repository's normal branch workflow.
 
 ---
+
+## Session / Milestone: Teacher group review final-review hardening
+
+**Date:** 2026-10-23 (Asia/Manila)
+
+**Status:** Important whole-branch review findings fixed with regressions
+
+- Attempted and completed: ran the required fresh whole-branch review and one consolidated fix pass for all seven Important findings. Added client revision checks and no-op rejection, atomic generation/review finalization, mandatory retrieval analysis context, legacy comparison provenance normalization, complete merged-source follow-up matching, per-group remediation locks, and retry-safe restored review loading.
+- Files significantly modified: group-review/material/results schemas and services, remediation generation, review API, React review state and controls, backend/frontend regression tests, and authoritative API/AI/database/decision/status/backlog documentation.
+- Verified/tested: each backend issue was reproduced by a failing focused regression before its fix. The final gate recreated disposable PostgreSQL 17, applied migrations 001+002, passed the enabled integration test (`1 passed`), backend suite (`110 passed, 1 skipped`), 14 frontend unit tests, ESLint, production build, and all six Chromium tests covering accessibility, review actions, controlled conflict, restored review retry, per-group locks, and the ordinary golden path. Diff and relative documentation-link checks also passed.
+- Problems encountered: React development effects can issue and cancel duplicate review reads, so the browser retry fixture was changed from a brittle request ordinal to a controlled failure window. The earlier global-lock copy also required an expected-text update after locks became group-specific.
+- Important decisions: require every merged source pattern to be re-identified before calculating improvement; return `insufficient_data` for partial merged matches. Normalize legacy single-group comparison JSON at the schema boundary rather than rewriting historical records.
+- Remaining work: prepare branch integration options. The hardened milestone is synchronized to the existing Obsidian dashboard and Kanban; the minor review request to surface notes/provenance in additional UI locations remains deferred.
+- Recommended next step: integrate the reviewed feature branch after the final gate, then treat the extra review-history presentation detail as a separate polish task.
+
+---

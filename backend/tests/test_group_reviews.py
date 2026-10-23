@@ -194,18 +194,57 @@ def test_rename_dismiss_restore_and_history_are_deterministic() -> None:
     assert renamed.active_groups[0].display_label == "Energy confusion"
     dismissed = apply_group_review(
         analysis_id,
-        GroupReviewActionRequest(action="dismiss", group_ids=[original.reviewed_group_id], review_note="Duplicate"),
+        GroupReviewActionRequest(action="dismiss", group_ids=[original.reviewed_group_id], review_note="Duplicate", expected_revision=1),
         analysis_store, review_store, None,
     )
     assert [group.reviewed_group_id for group in dismissed.dismissed_groups] == [original.reviewed_group_id]
     restored = apply_group_review(
         analysis_id,
-        GroupReviewActionRequest(action="restore", group_ids=[original.reviewed_group_id]),
+        GroupReviewActionRequest(action="restore", group_ids=[original.reviewed_group_id], expected_revision=2),
         analysis_store, review_store, None,
     )
     assert len(restored.active_groups) == 3
     assert [event.action for event in restored.events] == ["rename", "dismiss", "restore"]
     assert [event.sequence for event in restored.events] == [1, 2, 3]
+
+
+def test_review_rejects_stale_revision_and_no_op_rename_without_history() -> None:
+    analysis_store, analysis_id = _analysis_store()
+    review_store = InMemoryGroupReviewStore()
+    original = get_group_reviews(analysis_id, analysis_store, review_store).active_groups[0]
+
+    first = apply_group_review(
+        analysis_id,
+        GroupReviewActionRequest(
+            action="rename", group_ids=[original.reviewed_group_id], label="Teacher label", expected_revision=0
+        ),
+        analysis_store, review_store, None,
+    )
+    assert first.revision == 1
+
+    with pytest.raises(GroupReviewError) as stale:
+        apply_group_review(
+            analysis_id,
+            GroupReviewActionRequest(
+                action="rename", group_ids=[original.reviewed_group_id], label="Stale overwrite", expected_revision=0
+            ),
+            analysis_store, review_store, None,
+        )
+    assert stale.value.code == "group_review_stale"
+
+    with pytest.raises(GroupReviewError) as no_change:
+        apply_group_review(
+            analysis_id,
+            GroupReviewActionRequest(
+                action="rename", group_ids=[original.reviewed_group_id], label="Teacher label", expected_revision=1
+            ),
+            analysis_store, review_store, None,
+        )
+    assert no_change.value.code == "group_review_no_change"
+    stored = review_store.get(analysis_id)
+    assert stored is not None
+    assert stored.state.revision == 1
+    assert len(stored.events) == 1
 
 
 def test_merge_unions_exact_evidence_and_uses_label_independent_id() -> None:
@@ -259,7 +298,7 @@ def test_invalid_or_stale_actions_leave_state_and_history_unchanged(case: str) -
             analysis_id, GroupReviewActionRequest(action="dismiss", group_ids=[q1[0].reviewed_group_id]),
             analysis_store, review_store, None,
         )
-        request = GroupReviewActionRequest(action="dismiss", group_ids=[q1[0].reviewed_group_id])
+        request = GroupReviewActionRequest(action="dismiss", group_ids=[q1[0].reviewed_group_id], expected_revision=1)
     else:
         merged = apply_group_review(
             analysis_id,
@@ -268,7 +307,7 @@ def test_invalid_or_stale_actions_leave_state_and_history_unchanged(case: str) -
             ),
             analysis_store, review_store, None,
         )
-        request = GroupReviewActionRequest(action="rename", group_ids=[q1[0].reviewed_group_id], label="Stale")
+        request = GroupReviewActionRequest(action="rename", group_ids=[q1[0].reviewed_group_id], label="Stale", expected_revision=1)
         assert len(merged.events) == 1
 
     before = review_store.get(analysis_id)
@@ -330,15 +369,15 @@ def test_group_review_api_supports_all_actions_and_ordered_history() -> None:
     })
     assert renamed.status_code == 200
     dismissed = _api_request(analysis_store, review_store, "POST", path, {
-        "action": "dismiss", "group_ids": [q1[0]["reviewed_group_id"]], "review_note": "Duplicate"
+        "action": "dismiss", "group_ids": [q1[0]["reviewed_group_id"]], "review_note": "Duplicate", "expected_revision": 1
     })
     assert dismissed.status_code == 200
     restored = _api_request(analysis_store, review_store, "POST", path, {
-        "action": "restore", "group_ids": [q1[0]["reviewed_group_id"]]
+        "action": "restore", "group_ids": [q1[0]["reviewed_group_id"]], "expected_revision": 2
     })
     assert restored.status_code == 200
     merged = _api_request(analysis_store, review_store, "POST", path, {
-        "action": "merge", "group_ids": [group["reviewed_group_id"] for group in q1], "label": "Combined"
+        "action": "merge", "group_ids": [group["reviewed_group_id"] for group in q1], "label": "Combined", "expected_revision": 3
     })
     assert merged.status_code == 200
     assert [event["action"] for event in merged.json()["events"]] == ["rename", "dismiss", "restore", "merge"]

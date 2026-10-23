@@ -26,10 +26,12 @@ async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
 
-async function installApi(page: Page) {
+async function installApi(page: Page, options: { lockedGroupIds?: string[] } = {}) {
   let active = structuredClone(reviewed)
   let dismissed: typeof active = []
   const events: unknown[] = []
+  let reviewGets = 0
+  let reviewFailuresRemaining = 0
 
   await page.route('http://api.classlens.test/**', async (route) => {
     const request = route.request()
@@ -37,7 +39,14 @@ async function installApi(page: Page) {
     if (pathname === '/health') return json(route, { status: 'ok', service: 'classlens-api' })
     if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}`) return json(route, analysis)
     if (pathname === `/api/v1/assessments/analyses/${analysis.analysis_id}/group-reviews`) {
-      if (request.method() === 'GET') return json(route, { analysis_id: analysis.analysis_id, revision: events.length, active_groups: active, dismissed_groups: dismissed, events })
+      if (request.method() === 'GET') {
+        reviewGets += 1
+        if (reviewFailuresRemaining > 0) {
+          reviewFailuresRemaining -= 1
+          return json(route, { error: { code: 'review_unavailable', message: 'Review state unavailable.', retryable: true } }, 503)
+        }
+        return json(route, { analysis_id: analysis.analysis_id, revision: events.length, active_groups: active, dismissed_groups: dismissed, locked_group_ids: options.lockedGroupIds ?? [], events })
+      }
       const body = request.postDataJSON()
       if (body.label === 'Conflict label') return json(route, { error: { code: 'group_review_stale', message: 'Another review changed this evidence.', retryable: false } }, 409)
       const previous = { analysis_id: analysis.analysis_id, revision: events.length, groups: [...active, ...dismissed] }
@@ -61,10 +70,11 @@ async function installApi(page: Page) {
       }
       const next = { analysis_id: analysis.analysis_id, revision: events.length + 1, groups: [...active, ...dismissed] }
       events.push({ event_id: `grev_${events.length + 1}`, analysis_id: analysis.analysis_id, sequence: events.length + 1, action: body.action, source_group_ids: body.group_ids, resulting_reviewed_group_id: resultingId, previous_state: events.length ? previous : null, next_state: next, review_note: body.review_note ?? null, created_at: `2026-10-14T00:00:0${events.length + 1}Z` })
-      return json(route, { analysis_id: analysis.analysis_id, revision: events.length, active_groups: active, dismissed_groups: dismissed, events })
+      return json(route, { analysis_id: analysis.analysis_id, revision: events.length, active_groups: active, dismissed_groups: dismissed, locked_group_ids: options.lockedGroupIds ?? [], events })
     }
     return json(route, { error: { code: 'unexpected', message: `${request.method()} ${pathname}` } }, 500)
   })
+  return { failNextReviewMount: () => { reviewFailuresRemaining = 2 }, getReviewCount: () => reviewGets }
 }
 
 test('teacher renames, merges, dismisses, restores, and sees ordered history', async ({ page }) => {
@@ -106,4 +116,19 @@ test('a controlled conflict preserves visible review state and explains recovery
   await page.getByRole('button', { name: 'Save label' }).click()
   await expect(page.getByText('Another review changed this evidence.')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Potential .*Pattern 1/ })).toBeVisible()
+})
+
+test('review locks only affected groups and restored review fetch can be retried', async ({ page }) => {
+  const api = await installApi(page, { lockedGroupIds: ['grp_light'] })
+  await page.addInitScript((analysisId) => localStorage.setItem('classlens.workflow.v1', JSON.stringify({ analysis_id: analysisId })), analysis.analysis_id)
+  await page.goto('/analysis')
+  await expect(page.getByRole('region', { name: 'Teacher group review' })).toBeVisible()
+  await page.getByRole('button', { name: '01 Dashboard' }).click()
+  api.failNextReviewMount()
+  await page.getByRole('button', { name: '03 Learning gaps' }).click()
+  await expect(page.getByText('Review state unavailable.')).toBeVisible()
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await page.getByRole('button', { name: 'Review groups' }).click()
+  await expect(page.getByRole('button', { name: 'Rename Pattern 1' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Rename Pattern 2' })).toBeEnabled()
 })

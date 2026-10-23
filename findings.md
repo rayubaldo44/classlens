@@ -9,6 +9,8 @@
 - Migration 002 enables RLS on both review tables and keeps React behind the FastAPI/psycopg boundary with no browser database policies.
 - The first Playwright launch failed only because the sandbox denied the local test-server port; the unchanged full suite passed with local-port permission.
 - Verified totals: backend `105 passed, 1 skipped`; opt-in PostgreSQL integration `1 passed`; frontend unit suites, lint, build, and Playwright `5 passed`.
+- Fresh review reproduced seven Important edge cases. The fix pass now rejects stale/no-op actions, closes the generation/review race, prevents incomplete merged-result claims, restores legacy provenance, removes the retrieval bypass, scopes locks per group, and makes restored review reads retryable.
+- Minor deferred: show saved review notes and reviewed/source-provenance indicators in additional UI locations; current history and merged analysis controls retain the underlying data.
 
 ## Current P0 Findings — 2026-10-08
 

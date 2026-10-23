@@ -12,6 +12,8 @@ from app.providers.material_index import InMemoryMaterialIndex, get_material_ind
 from app.providers.analysis_store import InMemoryAnalysisStore, get_analysis_store
 from app.providers.group_review_store import InMemoryGroupReviewStore, get_group_review_store
 from app.schemas.materials import MisconceptionRetrievalContext
+from app.schemas.analysis import MisconceptionGroup
+from pydantic import ValidationError
 from app.services.material_ingestion import MaterialError, _chunk_text, ingest_learning_material
 from app.services.material_retrieval import retrieve_for_misconception
 
@@ -41,6 +43,7 @@ def settings(*, chunk_size: int = 900, overlap: int = 120, top_k: int = 3, thres
 
 def context(**overrides: object) -> MisconceptionRetrievalContext:
     values: dict[str, object] = {
+        "analysis_id": "analysis_demo",
         "group_id": "grp_demo",
         "question_id": "Q1",
         "question": "How do plants make food?",
@@ -49,6 +52,35 @@ def context(**overrides: object) -> MisconceptionRetrievalContext:
     }
     values.update(overrides)
     return MisconceptionRetrievalContext(**values)
+
+
+class StaticAnalysisStore:
+    def get(self, analysis_id: str):
+        if analysis_id != "analysis_demo":
+            return None
+        group = MisconceptionGroup(
+            group_id="grp_demo", provisional_label="Potential misconception pattern 1",
+            interpretation_status="not_requested", question_id="Q1",
+            question="How do plants make food?",
+            correct_answer="Plants make glucose from carbon dioxide and water using light energy.",
+            support_count=3, eligible_response_count=3,
+            member_student_ids=["S1", "S2", "S3"],
+            representative_responses=[
+                {"student_id": "S1", "answer": answer, "similarity_to_medoid": 0.9}
+                for answer in context().representative_answers
+            ],
+            coherence=0.9,
+        )
+        return type("Snapshot", (), {"result": type("Result", (), {"groups": [group]})()})()
+
+
+def review_stores() -> dict[str, object]:
+    return {"analysis_store": StaticAnalysisStore(), "review_store": InMemoryGroupReviewStore()}
+
+
+def test_retrieval_context_requires_analysis_id() -> None:
+    with pytest.raises(ValidationError):
+        context(analysis_id=None)
 
 
 def test_chunking_keeps_offsets_and_overlap_inside_normalized_source() -> None:
@@ -185,6 +217,7 @@ def test_retrieval_ranks_relevant_chunks_and_filters_below_threshold() -> None:
         embedding_service=FakeEmbeddingService([[1, 0]]),
         material_index=index,
         settings=settings(chunk_size=200, overlap=30, threshold=0.8),
+        **review_stores(),
     )
 
     assert result.status == "retrieved"
@@ -198,6 +231,7 @@ def test_retrieval_ranks_relevant_chunks_and_filters_below_threshold() -> None:
         embedding_service=FakeEmbeddingService([[0, 1]]),
         material_index=index,
         settings=settings(chunk_size=200, overlap=30, threshold=0.8),
+        **review_stores(),
     )
     assert no_match.status == "insufficient_relevant_context"
     assert no_match.results == []
@@ -211,6 +245,7 @@ def test_retrieval_requires_ingested_material_and_matching_model() -> None:
             embedding_service=FakeEmbeddingService(),
             material_index=InMemoryMaterialIndex(),
             settings=settings(),
+            **review_stores(),
         )
     assert caught.value.code == "material_not_found"
 
@@ -235,6 +270,7 @@ def test_retrieval_index_failure_is_reported_without_sources() -> None:
             embedding_service=FakeEmbeddingService(),
             material_index=index,
             settings=settings(),
+            **review_stores(),
         )
     assert caught.value.code == "material_retrieval_failed"
     assert "index detail" not in caught.value.message
@@ -252,7 +288,7 @@ def test_demo_material_api_returns_typed_ingestion_response() -> None:
 
     app.dependency_overrides[get_embedding_service] = override_embedding_service
     app.dependency_overrides[get_material_index] = override_material_index
-    app.dependency_overrides[get_analysis_store] = lambda: InMemoryAnalysisStore()
+    app.dependency_overrides[get_analysis_store] = lambda: StaticAnalysisStore()
     app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
 
     async def send() -> tuple[httpx.Response, httpx.Response]:

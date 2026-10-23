@@ -22,8 +22,9 @@ async def read_group_reviews(
     analysis_id: str,
     analysis_store: Annotated[AnalysisStore, Depends(get_analysis_store)],
     review_store: Annotated[GroupReviewStore, Depends(get_group_review_store)],
+    remediation_store: Annotated[RemediationStore, Depends(get_remediation_store)],
 ) -> GroupReviewResponse:
-    return await run_in_worker(get_group_reviews, analysis_id, analysis_store, review_store)
+    return await run_in_worker(get_group_reviews, analysis_id, analysis_store, review_store, remediation_store)
 
 
 @router.post(
