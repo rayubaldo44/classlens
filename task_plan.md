@@ -8,9 +8,9 @@
 - [complete] Implement and verify the pinned wrapper, official project skill, code-only graph, and isolated Obsidian export (Tasks 1–3).
 - [complete] Document the verified integration (Task 4); relative Markdown links, whitespace, ignored artifacts, and current Canvas targets verified.
 - [complete] Synchronize the dashboard and Kanban; verify the Canvas link and read back both notes (Task 5).
-- [pending] Complete whole-branch review (Task 5).
+- [complete] Complete whole-branch review (Task 5): independent scoped review found one important nested-hyperedge provenance gap; the TDD fix and final clean refresh are verified.
 - [complete] Implement and verify final review fixes: recoverable clean rebuilds, complete source-scope checks, safe generated report guidance, and recursive symlink rejection (78 wrapper tests; real fixture and external refresh).
-- [pending] Scoped re-review of final fixes.
+- [complete] Scoped re-review of final fixes; no critical findings, one important nested-hyperedge finding fixed, and one optional real-CLI test recommendation retained as non-blocking future hardening.
 
 The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-design.md`. The plan-only stage ended with user approval; implementation evidence and deviations follow below. Earlier P0 campaign history remains unchanged.
 
@@ -18,9 +18,9 @@ The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-desi
 
 - Clean rebuilds archive prior inputs/cache under ignored `graphify-out/recovery/`, because forced code-only extraction still merges old document nodes. Validation gates clustering and exports, including explicit node/link/hyperedge source paths and narrowly proven upstream reference stubs.
 - Recursive symlink preflight protects HTML, notes, Canvas, manifests, and generated configuration before upstream writes. Generated report guidance now uses the wrapper.
-- Current graph: 980 nodes / 2,973 links / 47 communities; 1,027 notes; 980/980 Canvas targets resolve. The earlier 929-node graph/counts below are historical. Final changes add indexed tooling/tests.
-- Fresh regression checks pass: 78 wrapper cases; backend 86 passed / 1 opt-in integration skipped; three frontend test files, lint/build. A separate real-CLI contaminated graph recovered cleanly. All 108 protected vault files remained unchanged during generated refresh; earlier missing-baseline limitations are not rewritten.
-- Dashboard sync is complete; final scoped re-review remains.
+- Current graph: 982 nodes / 2,983 links / 53 communities; 1,035 notes; 982/982 Canvas targets resolve. Earlier graph/counts below are historical. Final changes add indexed tooling/tests.
+- Fresh regression checks pass: 80 wrapper cases; backend 86 passed / 1 opt-in integration skipped and three frontend test files plus lint/build remain passing from the preceding tooling cycle. A separate real-CLI contaminated graph recovered cleanly. All 140 vault files outside the generated subtree remained unchanged during the final refresh; earlier missing-baseline limitations are not rewritten.
+- Dashboard sync and final scoped re-review are complete.
 
 ## Graphify implementation update — verified 2026-10-18, documented 2026-10-19
 
@@ -28,7 +28,7 @@ The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-desi
 - [complete] Real build and explicit full code-only refresh: 929 nodes / 2,828 links / 53 communities, no LLM; local JSON/report/HTML and 982 external notes plus Canvas.
 - [complete] Source-backed queries, excluded-source inspection, and 929/929 Canvas file targets resolving from Vault-EN.
 - [complete] Task 5 dashboard link/status sync and final integration checks.
-- [pending] Task 5 whole-branch review.
+- [complete] Task 5 whole-branch review and verified review fixes.
 
 ### Graphify errors and resolutions
 
@@ -46,6 +46,8 @@ The approved design is `docs/superpowers/specs/2026-10-16-graphify-obsidian-desi
 | Final review found forced code-only extraction preserves old document nodes | Archive prior graph inputs/cache and validate the complete clean graph before clustering/export. |
 | Final review found child symlinks reach upstream exporters | Reject all symlinks recursively in generated destinations before writers run. |
 | Generated report recommended unsafe native refresh | Replace freshness guidance with `./scripts/graphify.sh update`. |
+| Scoped re-review found nested `graph.hyperedges` bypassed provenance checks | Added failing nested-only and dual-slot cases; validate both supported hyperedge slots and their shapes (80 wrapper tests pass). |
+| Server restart interrupted final re-review handoff | Recovered the tracked diff and planning state before continuing; no completed action was repeated. |
 
 ## Goal
 Complete the unchecked P0 tasks in `TASKS.md` in dependency order, preserving the verified local golden path and recording any external blocker honestly.

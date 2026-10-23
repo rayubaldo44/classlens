@@ -1,5 +1,14 @@
 # Golden Path Reliability Progress
 
+## 2026-10-23 — Graphify scoped re-review completed
+
+- Independent read-only review of `83438d6..254304e` found no critical issues and one important provenance gap: nested `graph.hyperedges` was not validated although pinned Graphify 0.9.77 consumes it.
+- Verified the upstream dual-slot behavior from the installed pinned package. Added nested-only and divergent dual-slot regressions first; RED was 78 passed / 2 failed.
+- Updated the validator to inspect both hyperedge slots, require array/object shapes, and validate every source path. GREEN is 80 passed / 0 failed.
+- A server restart interrupted the final re-review handoff. Recovered the two-file implementation diff and planning state without repeating completed actions.
+- Final checks passed: Bash syntax, Python compilation, 80 wrapper tests, saved-graph source validation, and whitespace checks. The safe wrapper refreshed code only with no LLM to 982 nodes / 2,983 links / 53 communities and 1,035 notes; all 982 Canvas targets resolve, generated output contains no symlinks, and all 140 files outside the generated vault subtree remained byte-identical.
+- Updated authoritative status, backlog, README, D-032, reconciled design, planning memory, session history, and the existing Obsidian dashboard. The review task is closed; the optional real-CLI canary remains non-blocking future hardening.
+
 ## 2026-10-19 — Graphify final-review safety fixes verified
 
 - Added failing regressions for retained document nodes, source exclusions/provenance, safe report guidance, and child symlink writes. Initial RED: 49 passed / 26 failed; final GREEN: 78 passed / 0 failed. Follow-up RED cases independently caught docs-code scope and pre-clustering validation gaps before their fixes.

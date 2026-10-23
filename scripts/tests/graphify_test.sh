@@ -364,6 +364,14 @@ check_hyperedge_source() {
   graph_fixture '{"graph":{},"nodes":[{"id":"example","source_file":"example.py"}],"links":[],"hyperedges":[{"source_file":"README.md"}],"built_at_commit":"abc123"}'
   run_wrapper check; assert_failure; assert_diagnostic 'source scope'
 }
+check_nested_hyperedge_source() {
+  graph_fixture '{"graph":{"hyperedges":[{"source_file":"README.md"}]},"nodes":[{"id":"example","source_file":"example.py"}],"links":[],"built_at_commit":"abc123"}'
+  run_wrapper check; assert_failure; assert_diagnostic 'source scope'
+}
+check_conflicting_hyperedge_sources() {
+  graph_fixture '{"graph":{"hyperedges":[{"source_file":"README.md"}]},"nodes":[{"id":"example","source_file":"example.py"}],"links":[],"hyperedges":[{"source_file":"example.py"}],"built_at_commit":"abc123"}'
+  run_wrapper check; assert_failure; assert_diagnostic 'source scope'
+}
 check_stub() {
   graph_fixture "$1"
   run_wrapper check
@@ -493,6 +501,8 @@ run_case check_rejects_absolute_source check_absolute_source
 run_case check_rejects_source_symlink check_symlink_source
 run_case check_validates_every_link_source check_link_source
 run_case check_validates_hyperedge_source check_hyperedge_source
+run_case check_validates_nested_hyperedge_source check_nested_hyperedge_source
+run_case check_validates_both_hyperedge_slots check_conflicting_hyperedge_sources
 run_case check_accepts_code_proven_reference_stub valid_reference_stub
 run_case check_accepts_code_proven_external_reference valid_external_stub
 run_case check_rejects_isolated_source_empty_stub isolated_stub

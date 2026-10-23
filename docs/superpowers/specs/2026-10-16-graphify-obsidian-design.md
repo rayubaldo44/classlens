@@ -1,8 +1,8 @@
 # Graphify and Obsidian Integration Design
 
-**Status:** Approved on 2026-10-18; code graph/export and dashboard synchronization implemented and verified. Final review safety fixes implemented and verified on 2026-10-19; scoped re-review remains.
+**Status:** Approved on 2026-10-18; code graph/export, dashboard synchronization, final safety fixes, and scoped re-review implemented and verified by 2026-10-23.
 
-**Implementation evidence:** 78 wrapper contract tests; successful real clean refresh with Graphify 0.9.77; 980 nodes / 2,973 links / 47 communities; 1,027 generated Markdown notes; all 980 Canvas file targets resolve from the containing Vault-EN root; saved-graph source checks and source-backed queries pass. A separate real-CLI document-contamination fixture rebuilt cleanly while preserving the prior graph in recovery. See [current state](../../../STATUS.md) and [D-032](../../DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export). The following behavior is reconciled with the pinned release rather than the original implementation-plan assumptions.
+**Implementation evidence:** 80 wrapper contract tests; successful real clean refresh with Graphify 0.9.77; 982 nodes / 2,983 links / 53 communities; 1,035 generated Markdown notes; all 982 Canvas file targets resolve from the containing Vault-EN root; saved-graph source checks and source-backed queries pass. A separate real-CLI document-contamination fixture rebuilt cleanly while preserving the prior graph in recovery. The final scoped review additionally verified both supported hyperedge provenance slots. See [current state](../../../STATUS.md) and [D-032](../../DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export). The following behavior is reconciled with the pinned release rather than the original implementation-plan assumptions.
 
 ## Goal
 

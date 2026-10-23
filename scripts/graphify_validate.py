@@ -87,8 +87,19 @@ def check_sources() -> None:
                 raise ValueError(f"source-empty node lacks code reference provenance: {node_id}")
         else:
             source_path(node)
-    for hyperedge in graph.get("hyperedges", []):
-        source_path(hyperedge)
+    nested_graph = graph.get("graph", {})
+    if not isinstance(nested_graph, dict):
+        raise ValueError("graph must be an object")
+    for location, hyperedges in (
+        ("top-level", graph.get("hyperedges", [])),
+        ("nested graph", nested_graph.get("hyperedges", [])),
+    ):
+        if not isinstance(hyperedges, list):
+            raise ValueError(f"{location} hyperedges must be an array")
+        for hyperedge in hyperedges:
+            if not isinstance(hyperedge, dict):
+                raise ValueError(f"{location} hyperedges must contain objects")
+            source_path(hyperedge)
     paths = sorted(sources)
     # Run the repository's actual ignore rules, including nested .gitignore,
     # independently of .graphifyignore so a Git negation cannot undo the latter.

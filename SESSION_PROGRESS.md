@@ -1329,3 +1329,20 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: re-review these fixes, then complete final branch handoff.
 
 ---
+
+## Session / Milestone: Graphify scoped re-review completed
+
+**Date:** 2026-10-23 (Asia/Manila)
+
+**Status:** Final Graphify review complete; important provenance finding fixed and verified
+
+- Attempted and completed: independently re-reviewed the final Graphify safety changes, verified the one important finding against installed `graphifyy==0.9.77`, and closed its nested-hyperedge provenance bypass with test-first changes.
+- Files created or significantly modified: `scripts/graphify_validate.py`, `scripts/tests/graphify_test.sh`, `README.md`, D-032, the reconciled Graphify design, `STATUS.md`, `TASKS.md`, root planning files, the existing Obsidian `ClassLens.md`, and this log. Generated graph/export artifacts remain ignored or external.
+- Verified/tested: the new nested-only and divergent dual-slot cases first produced 78 passed / 2 failed, then the complete wrapper suite passed 80/80. Bash syntax, Python compilation, saved-graph checks, and `git diff --check` passed. The safe code-only refresh used no LLM and produced 982 nodes / 2,983 links / 53 communities plus 1,035 notes; all 982 Canvas file targets resolve from Vault-EN and generated output contains no symlinks.
+- Preservation evidence: all 140 files outside the generated `ClassLens/Graphify/` subtree remained byte-identical across the final refresh. This current-cycle evidence does not rewrite the earlier unavailable historical checksum baseline.
+- Problems encountered: the scoped reviewer found that local validation covered top-level `hyperedges` but not the nested `graph.hyperedges` form consumed by 0.9.77. A server restart interrupted the final handoff after the fix reached 80 passing tests; the tracked diff and planning records recovered cleanly.
+- Important decisions: validate the union of both supported hyperedge slots and fail closed on malformed slot/item shapes. Retain the suggested opt-in real-CLI canary as non-blocking future hardening because the committed suite already covers the safety behavior and a separate real 0.9.77 contaminated-graph run remains recorded.
+- Remaining work: none for the Graphify review. Optional SQL parsing, broad-query truncation, and GUI rendering remain documented limitations. Hosted deployment and educator review remain external blockers; the next unblocked product task is the planned teacher group-review workflow.
+- Recommended next step: execute Task 1 of the teacher group-review plan with migration/store tests first, unless the Render capacity or educator-review blockers change.
+
+---
