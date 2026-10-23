@@ -1,5 +1,15 @@
 # Golden Path Reliability Findings
 
+## Teacher Group Review Findings — 2026-10-23
+
+- Detected analysis groups remain immutable; teacher decisions are stored as a revisioned overlay and append-only events.
+- Same-question merges union exact original source-group IDs and student members. Because response vectors are not persisted or recomputed, merged coherence is intentionally `null`.
+- Retrieval, remediation, and comparison resolve the active reviewed identity server-side while preserving original source-group provenance.
+- Review actions affecting evidence already used by a remediation fail with `group_review_locked`, preventing silent downstream retargeting.
+- Migration 002 enables RLS on both review tables and keeps React behind the FastAPI/psycopg boundary with no browser database policies.
+- The first Playwright launch failed only because the sandbox denied the local test-server port; the unchanged full suite passed with local-port permission.
+- Verified totals: backend `105 passed, 1 skipped`; opt-in PostgreSQL integration `1 passed`; frontend unit suites, lint, build, and Playwright `5 passed`.
+
 ## Current P0 Findings — 2026-10-08
 
 - Vercel SPA routing is deployed from commit `593e475`; production `/dashboard`, `/upload`, and `/analysis` return HTTP 200.

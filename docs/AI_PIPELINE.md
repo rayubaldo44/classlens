@@ -119,7 +119,20 @@ For each proposed group, return evidence before interpretation:
 
 The implementation returns every member student identifier plus up to three exact responses nearest the group medoid, their similarity to the medoid, and mean pairwise coherence. Representation must not become cherry-picking; the UI shows the full member list alongside the representative responses.
 
-## 7. LLM misconception interpretation — proposed, not implemented
+## 7. Teacher group review — implemented with PostgreSQL persistence
+
+Detected groups, memberships, representative responses, and coherence remain immutable analysis evidence. The backend derives a revision-zero reviewed view from those groups, then persists teacher actions as a current overlay plus ordered, append-only events. The teacher can:
+
+- rename one active reviewed group;
+- merge two or more active groups only when they belong to the same question;
+- dismiss one active group; or
+- restore one dismissed group.
+
+Every action retains the exact original source-group IDs, members, representative responses, counts, and question context. A merge unions source groups and student members, creates a stable reviewed-group identity, and sets coherence to `null`: it does not re-embed responses or invent a numeric claim about the merged evidence. Each event records before/after state, its source IDs, resulting reviewed ID, optional teacher note, timestamp, and monotonically increasing sequence.
+
+The PostgreSQL writer locks the current state row and rejects stale concurrent updates before atomically saving the next revision and event. Retrieval, remediation, and results use the active reviewed identity while preserving original source-group provenance. Once any remediation refers to an affected reviewed or source group, rename, merge, dismiss, and restore actions for that evidence return `group_review_locked`; existing downstream records are never silently retargeted.
+
+## 8. LLM misconception interpretation — proposed, not implemented
 
 Provide the LLM only the question context, expected concept, aggregate evidence, and selected exact responses. Request structured output with:
 
@@ -131,7 +144,7 @@ Provide the LLM only the question context, expected concept, aggregate evidence,
 
 Validate output against a schema. Reject evidence IDs that were not supplied and descriptions that contain invented quotes. The UI should still display deterministic group evidence if the LLM fails; the interpretation should be marked unavailable.
 
-## 8. Teacher-material extraction and chunking — implemented
+## 9. Teacher-material extraction and chunking — implemented
 
 The MVP accepts UTF-8 `.txt` files up to 1 MB. It rejects unsupported extensions, decoding errors, null characters, empty content, and text that produces no chunks. PDF, DOCX, and scanned-page extraction are not implemented.
 
@@ -141,9 +154,9 @@ Chunking uses configurable sliding character windows with defaults `CLASSLENS_MA
 
 Chunks reuse the existing `EmbeddingService` and local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` model. The adapter is shared with response analysis; no second provider implementation is added. Embeddings are normalized and checked before indexing.
 
-## 9. Vector retrieval and relevance checks — implemented
+## 10. Vector retrieval and relevance checks — implemented
 
-Retrieval accepts a selected group's question, correct answer, and exact representative answers. It embeds that context as one query and searches only the selected material. Generic provisional labels are excluded from the query because they do not communicate an interpreted concept.
+Retrieval accepts a selected active reviewed group's question, correct answer, and exact representative answers. It embeds that context as one query and searches only the selected material. Generic provisional labels are excluded from the query because they do not communicate an interpreted concept. The reviewed ID and original source-group IDs continue downstream as provenance.
 
 The runtime `MaterialIndex` persists material metadata and exact chunks in PostgreSQL while retaining normalized vectors in a process-local cache. It ranks by the existing exact cosine implementation, returns the configured top-k (default `3`), and filters below the configured score (default `0.42`).
 
@@ -151,9 +164,9 @@ When the cache is empty after startup, stored chunks are re-embedded with their 
 
 Ingestion and retrieval remain synchronous and CPU-bound. Chunks are durable and shared through PostgreSQL; each worker has its own rebuildable vector cache, so first retrieval per material/worker incurs embedding work.
 
-## 10. Grounded remediation generation — implemented
+## 11. Grounded remediation generation — implemented
 
-The backend uses the isolated Gemini adapter with stable free-tier `gemini-3.1-flash-lite`. Central prompt version `grounded_remediation_v1` receives only the selected group context and an enumerated list of retrieved passages, including:
+The backend uses the isolated Gemini adapter with stable free-tier `gemini-3.1-flash-lite`. Central prompt version `grounded_remediation_v1` receives only the selected reviewed-group context and an enumerated list of retrieved passages, including:
 
 - grade, subject, and topic;
 - group/question identifiers and the current provisional label;
@@ -161,7 +174,7 @@ The backend uses the isolated Gemini adapter with stable free-tier `gemini-3.1-f
 - affected/eligible response counts and exact representative answers;
 - exact material/document metadata, chunk IDs, and chunk text.
 
-Before building the prompt, the service reloads the requested analysis/group and material/chunks from server-side persistence. It requires the browser's class context, group evidence, material metadata, chunk IDs, indexes, text, and offsets to match the canonical records exactly. Missing context returns `remediation_context_not_found`; altered or cross-linked context returns `remediation_context_mismatch`. Both stop before Gemini and save nothing. The prompt and saved source snapshots are rebuilt from the canonical records. Browser-supplied similarity scores remain provenance metadata and are excluded from the prompt.
+Before building the prompt, the service reloads the requested analysis, active reviewed group, and material/chunks from server-side persistence. It requires the browser's class context, reviewed identity, source-group provenance, group evidence, material metadata, chunk IDs, indexes, text, and offsets to match the canonical records exactly. Missing context returns `remediation_context_not_found`; altered or cross-linked context returns `remediation_context_mismatch`. Both stop before Gemini and save nothing. The prompt and saved source snapshots are rebuilt from the canonical records. Browser-supplied similarity scores remain provenance metadata and are excluded from the prompt.
 
 The prompt explicitly says the group is already detected, treats student/source text as untrusted data, forbids unsupported claims, and requests concise age-appropriate teacher content. Gemini structured JSON is parsed into Pydantic fields:
 
@@ -176,7 +189,7 @@ Generation is synchronous for the demo, with temperature `0.2`, a 2,200-token ou
 
 The browser aborts its generation request after 70 seconds and retains the selected group and source evidence. It keeps a pending `generation_request_id` in session storage until a valid response arrives. Manual retries reuse that identifier. The backend derives a deterministic remediation ID from the identifier plus canonical analysis/group/material/chunk IDs, checks persistence, and serializes identical in-process requests, preventing a timed-out retry from creating another persisted draft.
 
-## 11. Teacher review — implemented with PostgreSQL persistence
+## 12. Intervention review — implemented with PostgreSQL persistence
 
 Generation creates status `generated`, never `approved`. The teacher can:
 
@@ -188,9 +201,9 @@ Generation creates status `generated`, never `approved`. The teacher can:
 
 PostgreSQL preserves immutable `generated_content` separately from teacher-edited `content`, exact source snapshots, provider/model/prompt version, status, notes, and timestamps. Approval and rejection remain terminal.
 
-## 12. Follow-up re-analysis and comparison — implemented
+## 13. Follow-up re-analysis and comparison — implemented
 
-Follow-up CSVs use the same schema, validation, normalization, correctness boundary, embedding adapter, and grouping service as baseline assessments. A comparison loads its baseline analysis and explicitly approved linked remediation from persistence.
+Follow-up CSVs use the same schema, validation, normalization, correctness boundary, embedding adapter, and grouping service as baseline assessments. A comparison loads its baseline analysis, active reviewed-group provenance, and explicitly approved linked remediation from persistence.
 
 The service validates that subject, grade level, topic, question ID, prompt, and correct answer still correspond. Follow-up student IDs must be members of the baseline cohort; absent and blank answers remain missing rather than becoming incorrect or resolved.
 

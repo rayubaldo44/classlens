@@ -246,11 +246,11 @@ Accepts:
 
 Rename, dismiss, and restore require exactly one applicable current reviewed group. Merge requires at least two distinct active groups from the same question. Rename/merge labels are trimmed and limited to 120 characters; dismiss/restore reject a label. Every successful action increments the revision and appends an event containing the action, source IDs, resulting reviewed ID, before/after state snapshots, optional note, and timestamp.
 
-Missing analyses return `404 analysis_not_found`. Unknown, stale, inactive, duplicate-state, or cross-question selections return a structured `409` and do not change state or history. Framework-level malformed request validation retains FastAPI's HTTP 422 body.
+Missing analyses return `404 analysis_not_found`. Unknown, stale, inactive, duplicate-state, or cross-question selections return a structured `409` and do not change state or history. If any remediation already refers to a selected reviewed group or one of its source groups, the endpoint returns `409 group_review_locked`; existing downstream evidence is not retargeted. Framework-level malformed request validation retains FastAPI's HTTP 422 body.
 
 ## Misconception details
 
-There is no standalone misconception-group endpoint in the MVP. The persisted analysis response contains every group, complete member identifiers, representative evidence, question context, support counts, and coherence. The frontend selects a group from that canonical response and carries its `analysis_id`/`group_id` linkage into retrieval and remediation. The 100-eligible-response-per-question intake limit bounds the returned membership list; a future larger-data contract would need pagination or an explicit group-detail resource.
+There is no standalone misconception-group endpoint in the MVP. The persisted analysis response contains every immutable detected group, complete member identifiers, representative evidence, question context, support counts, and coherence. The group-review resource derives the active teacher-reviewed view and carries its `analysis_id`/`reviewed_group_id` plus `source_group_ids` into retrieval, remediation, and comparison. The 100-eligible-response-per-question intake limit bounds the returned membership list; a future larger-data contract would need pagination or an explicit group-detail resource.
 
 ## Learning-material ingestion and retrieval — implemented MVP contract
 

@@ -1278,3 +1278,20 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: review the spec and choose native or subagent-driven execution for the next session. Native execution is recommended because downstream service and frontend tasks depend closely on the same reviewed-group contract.
 
 ---
+
+## Session / Milestone: Teacher group review workflow implemented
+
+**Date:** 2026-10-23 (Asia/Manila)
+
+**Status:** Rename, merge, dismiss, restore, persistence, provenance, and browser recovery verified
+
+- Attempted and completed: implemented the planned teacher review workflow as a revisioned overlay over immutable detected groups, including append-only action history, safe same-question merges, downstream reviewed/source-group provenance, remediation-aware locking, typed FastAPI contracts, runtime-validated React integration, and accessible analysis-screen controls.
+- Files created or significantly modified: `database/migrations/002_teacher_group_reviews.sql`; group-review schemas, store, service, route, and PostgreSQL adapter files under `backend/app/`; remediation/results provenance schemas and services; `frontend/src/App.tsx`, API contracts/client, styles, and tests; `.github/workflows/ci.yml`; authoritative product, architecture, AI, database, API, decision, status, and backlog documentation.
+- What was completed: teachers can rename, merge, dismiss, and restore proposed groups; review state/history survives repository recreation and browser reload; merges retain the exact source-group/member union and report no fabricated coherence; retrieval, remediation, and comparison use the reviewed identity while retaining original source IDs; actions affecting evidence with an existing remediation return a controlled lock error.
+- Verified/tested: migrations 001 and 002 applied to disposable PostgreSQL 17 and the opt-in integration test passed (`1 passed`). The full backend suite passed (`105 passed, 1 skipped`); all three frontend unit suites, ESLint, and the production build passed; the full Chromium suite passed (`5 passed`), including reload persistence, controlled 409 state preservation, and disabled review controls after remediation.
+- Problems encountered: the first local Playwright launch failed with `listen EPERM` on `127.0.0.1:4173` because the sandbox denied binding the test web server. Re-running the same suite with local-port permission passed without an application change.
+- Important decisions: preserve machine-detected evidence instead of mutating it; store reviewed state and history separately; set merged coherence to `null`; use optimistic state comparison plus a row lock for atomic writes; and freeze affected group review once remediation establishes downstream provenance.
+- Remaining work: the feature branch still needs final whole-branch review and integration choice. Hosted deployment/reload verification remains separate because Render capacity is unchanged.
+- Recommended next step: complete the final branch review, address any important findings, then integrate `feature/teacher-group-review` using the repository's normal branch workflow.
+
+---

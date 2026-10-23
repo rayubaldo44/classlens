@@ -1,5 +1,14 @@
 # Golden Path Reliability Progress
 
+## 2026-10-23 — Teacher group review workflow
+
+- Implemented migration, persistence adapters, deterministic review service, GET/POST API, downstream provenance, frontend contracts/recovery, teacher controls, and browser coverage in the isolated `feature/teacher-group-review` worktree.
+- Applied migrations 001+002 to disposable PostgreSQL 17; the enabled fresh-repository integration passed.
+- Verified backend `105 passed, 1 skipped`; frontend tests, lint, production build, and all five Chromium tests passed.
+- Updated PRODUCT, ARCHITECTURE, AI_PIPELINE, DATABASE, API, DECISIONS, STATUS, TASKS, and SESSION_PROGRESS with the verified behavior.
+- Synced the completion, D-033 decision, and next state to the existing ClassLens Obsidian dashboard and Kanban while preserving the Graphify milestone.
+- Remaining: complete the required fresh whole-branch review, make at most one important-finding fix pass, then present integration choices.
+
 ## 2026-10-08 — P0 task execution resumed
 - Re-read repository instructions, current status/backlog, recent development history, and planning files.
 - Set the active work order to hosted capacity verification, hosted golden path if available, then local warm-up/rehearsal/fallback work.

@@ -38,7 +38,7 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 ### React frontend
 
 - Collect files and teacher actions.
-- Show upload previews, analysis progress, evidence, retrieved passages, remediation drafts, review controls, and results.
+- Show upload previews, analysis progress, reviewable evidence groups and history, retrieved passages, remediation drafts, review controls, and results.
 - Render structured errors and preserve safe unsent edits.
 - Never hold provider or database service-role secrets.
 - Avoid making educational conclusions independently of backend evidence.
@@ -46,15 +46,16 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 ### FastAPI application
 
 - Validate all input regardless of client-side checks.
-- Coordinate assessment ingestion, scoring, analysis, retrieval, generation, and review state.
+- Coordinate assessment ingestion, scoring, analysis, teacher group review, retrieval, generation, and intervention review state.
 - Enforce question-specific analysis and evidence provenance.
+- Keep detected groups immutable while validating revisioned rename, same-question merge, dismiss, and restore actions; lock affected actions once remediation exists.
 - Isolate model/provider calls behind adapters with timeouts and explicit failures.
 - Return stable API resources and structured errors.
 - Make retries idempotent where duplicate work or records would be harmful.
 
 ### PostgreSQL/Supabase
 
-- Stores assessments, questions, source responses, analysis results, material metadata/chunks, intervention revisions/state, and results.
+- Stores assessments, questions, source responses, immutable analysis results, reviewed-group state/events, material metadata/chunks, intervention revisions/state, and results.
 - Enforce relationships and uniqueness needed for reproducible runs.
 - Do not store vectors for the tiny MVP corpus; rebuild the per-process cache from durable chunks.
 - Apply the checked-in SQL migration with `psql` and keep future schema changes additive and reproducible.
@@ -80,16 +81,18 @@ The MVP remains one frontend and one modular backend. FastAPI services use repos
 3. After confirmation, the backend identifies eligible incorrect responses per question using the explicit validated correctness field.
 4. The analysis module embeds and groups those responses synchronously, persists the normalized assessment plus group evidence, and returns the result.
 5. A future LLM adapter may draft a potential-misconception description from bounded evidence.
-6. The frontend displays groups and representative responses to the teacher.
-7. A teacher uploads a `.txt` material or selects the synthetic demo notes; the backend cleans, chunks, embeds, and indexes it through `MaterialIndex`.
-8. Retrieval queries only that material, ranks chunks by cosine similarity, filters by the configured threshold, and returns exact source text or an explicit insufficient-context result.
-9. Before generation, the remediation service reloads the analysis/group and material/chunks from PostgreSQL, rejects browser snapshots that do not match, and rebuilds the prompt from canonical evidence.
-10. The Gemini adapter drafts schema-validated remediation and follow-up questions constrained by those passages; unknown passage references reject the complete draft.
-11. PostgreSQL preserves both original generation and teacher-edited content; the teacher explicitly saves, approves, or rejects it.
-12. Each completed analysis is already persisted with its normalized input and detected evidence groups; stable IDs make fixture reruns safe.
-13. The teacher submits a follow-up CSV through the same validation pipeline and links it to the selected group and approved remediation.
-14. The existing analysis pipeline re-evaluates follow-up responses. A dedicated comparison service validates the linkage, matches recurring group membership for the same question, and calculates deterministic counts and percentages.
-15. The Results screen shows before/after values, transition counts, missing follow-up data, and the assessment → misconception → intervention → follow-up trace without claiming causation.
+6. The frontend loads the reviewed-group overlay. Before its first action, that view is derived from the immutable detected groups at revision zero.
+7. The teacher may rename, dismiss, restore, or merge active same-question groups. FastAPI atomically saves the next overlay revision and an append-only before/after event; merges union exact source groups and members and expose no fabricated coherence value.
+8. The teacher opens an active reviewed group. Its reviewed identity and original source-group IDs become downstream provenance, and review actions affecting that evidence lock after remediation exists.
+9. A teacher uploads a `.txt` material or selects the synthetic demo notes; the backend cleans, chunks, embeds, and indexes it through `MaterialIndex`.
+10. Retrieval queries only that material, ranks chunks by cosine similarity, filters by the configured threshold, and returns exact source text or an explicit insufficient-context result.
+11. Before generation, the remediation service reloads the analysis, reviewed group, and material/chunks from PostgreSQL, rejects browser snapshots that do not match, and rebuilds the prompt from canonical evidence.
+12. The Gemini adapter drafts schema-validated remediation and follow-up questions constrained by those passages; unknown passage references reject the complete draft.
+13. PostgreSQL preserves both original generation and teacher-edited content; the teacher explicitly saves, approves, or rejects it.
+14. Each completed analysis is already persisted with its normalized input and detected evidence groups; stable IDs make fixture reruns safe.
+15. The teacher submits a follow-up CSV through the same validation pipeline and links it to the reviewed group and approved remediation.
+16. The existing analysis pipeline re-evaluates follow-up responses. A dedicated comparison service validates the linkage, matches recurring group membership for the same question, and calculates deterministic counts and percentages.
+17. The Results screen shows before/after values, transition counts, missing follow-up data, and the assessment → reviewed misconception/source evidence → intervention → follow-up trace without claiming causation.
 
 Long provider operations currently use a simple synchronous request/response path. Gemini retries one transient timeout/429/5xx response; continued failure remains explicit. If latency later requires job polling, add a small persisted job state within the FastAPI application rather than a new service.
 
