@@ -1,6 +1,7 @@
 from typing import Protocol
 
 from app.schemas.remediations import GeneratedRemediationDraft
+from app.schemas.interpretation import GroupLabelBatch
 
 
 class LLMProviderError(Exception):
@@ -19,3 +20,5 @@ class LLMService(Protocol):
     def model_id(self) -> str: ...
 
     async def generate_remediation(self, prompt: str) -> GeneratedRemediationDraft: ...
+
+    async def generate_group_labels(self, prompt: str) -> GroupLabelBatch: ...

@@ -4,6 +4,7 @@ from time import perf_counter
 from pydantic import ValidationError
 
 from app.config import get_llm_settings
+from app.schemas.interpretation import GroupLabelBatch
 from app.schemas.remediations import GeneratedRemediationDraft
 
 from .base import LLMProviderError
@@ -25,11 +26,13 @@ class GeminiLLMService:
         model_id: str,
         timeout_ms: int,
         total_budget_ms: int = 60_000,
+        label_total_budget_ms: int = 12_000,
     ) -> None:
         self._api_key = api_key
         self._model_id = model_id
         self._timeout_ms = timeout_ms
         self._total_budget_ms = total_budget_ms
+        self._label_total_budget_ms = label_total_budget_ms
         self._types = None
         self._client = None
 
@@ -38,6 +41,78 @@ class GeminiLLMService:
         return self._model_id
 
     async def generate_remediation(self, prompt: str) -> GeneratedRemediationDraft:
+        self._ensure_client()
+
+        try:
+            async with asyncio.timeout(self._total_budget_ms / 1000):
+                return await self._generate_with_retries(prompt)
+        except TimeoutError as error:
+            raise LLMProviderError(
+                "llm_timeout",
+                "Gemini did not respond within the total generation time budget. Try again.",
+                retryable=True,
+            ) from error
+
+    async def generate_group_labels(self, prompt: str) -> GroupLabelBatch:
+        self._ensure_client()
+        started = perf_counter()
+        try:
+            async with asyncio.timeout(self._label_total_budget_ms / 1000):
+                response = await self._client.aio.models.generate_content(
+                    model=self._model_id,
+                    contents=prompt,
+                    config=self._types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=_gemini_json_schema(GroupLabelBatch),
+                        temperature=0.1,
+                        max_output_tokens=1_024,
+                    ),
+                )
+        except TimeoutError as error:
+            log_error("gemini_label_call", "llm_timeout", model=self._model_id)
+            raise LLMProviderError(
+                "llm_timeout",
+                "Gemini did not return misconception labels within the interpretation budget.",
+                retryable=True,
+            ) from error
+        except Exception as error:
+            log_error(
+                "gemini_label_call",
+                "llm_provider_error",
+                model=self._model_id,
+                error_type=type(error).__name__,
+            )
+            raise LLMProviderError(
+                "llm_provider_unavailable",
+                "Gemini could not draft misconception labels.",
+                retryable=_is_retryable_provider_error(error),
+            ) from error
+
+        usage = getattr(response, "usage_metadata", None)
+        log_stage(
+            "gemini_label_call",
+            (perf_counter() - started) * 1000,
+            model=self._model_id,
+            prompt_tokens=getattr(usage, "prompt_token_count", None),
+            output_tokens=getattr(usage, "candidates_token_count", None),
+            total_tokens=getattr(usage, "total_token_count", None),
+        )
+        try:
+            if isinstance(response.parsed, GroupLabelBatch):
+                return response.parsed
+            if response.parsed is not None:
+                return GroupLabelBatch.model_validate(response.parsed)
+            if not response.text:
+                raise ValueError("empty model output")
+            return GroupLabelBatch.model_validate_json(response.text)
+        except (ValidationError, ValueError, TypeError) as error:
+            raise LLMProviderError(
+                "llm_malformed_output",
+                "Gemini returned an invalid misconception-label structure.",
+                retryable=True,
+            ) from error
+
+    def _ensure_client(self) -> None:
         if not self._api_key:
             raise LLMProviderError(
                 "llm_not_configured",
@@ -53,16 +128,6 @@ class GeminiLLMService:
                 api_key=self._api_key,
                 http_options=types.HttpOptions(timeout=self._timeout_ms),
             )
-
-        try:
-            async with asyncio.timeout(self._total_budget_ms / 1000):
-                return await self._generate_with_retries(prompt)
-        except TimeoutError as error:
-            raise LLMProviderError(
-                "llm_timeout",
-                "Gemini did not respond within the total generation time budget. Try again.",
-                retryable=True,
-            ) from error
 
     async def _generate_with_retries(self, prompt: str) -> GeneratedRemediationDraft:
         response = None
@@ -137,12 +202,13 @@ async def get_llm_service() -> GeminiLLMService:
         model_id=settings.model,
         timeout_ms=settings.timeout_ms,
         total_budget_ms=settings.total_budget_ms,
+        label_total_budget_ms=settings.label_total_budget_ms,
     )
 
 
-def _gemini_json_schema() -> dict:
+def _gemini_json_schema(model=GeneratedRemediationDraft) -> dict:
     """Return Pydantic's schema without metadata rejected by Gemini's schema endpoint."""
-    return _remove_unsupported_schema_fields(GeneratedRemediationDraft.model_json_schema())
+    return _remove_unsupported_schema_fields(model.model_json_schema())
 
 
 def _is_timeout(error: Exception) -> bool:
