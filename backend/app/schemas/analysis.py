@@ -26,7 +26,7 @@ class RepresentativeResponse(BaseModel):
 class MisconceptionGroup(BaseModel):
     group_id: str
     provisional_label: str
-    interpretation_status: Literal["not_requested"]
+    interpretation_status: Literal["not_requested", "completed", "fallback"]
     question_id: str
     question: str
     correct_answer: str
