@@ -16,6 +16,14 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 - **Decision:** Keep detected misconception groups and memberships immutable. Persist the current teacher-reviewed view as a revisioned per-analysis state plus append-only rename, same-question merge, dismiss, and restore events. A merge unions exact source-group/member evidence and reports `coherence: null`; interventions and comparisons carry both the reviewed identity and original source-group IDs. Reject any review action affecting evidence once remediation exists.
 - **Reason:** Teachers need authority to organize machine proposals without rewriting the evidence the model produced or invalidating downstream retrieval, remediation, and outcome provenance.
 - **Consequence:** The UI can recover review state and history after reload, stale client revisions and no-op renames fail without history, and downstream records remain auditable. Locks are reported per reviewed group. Generation and review share an atomic finalization boundary, and merged outcome comparison requires every original source pattern to be re-identified before calculating change.
+
+### D-034 — Export approved evidence as self-contained browser HTML
+
+- **Status:** Accepted and implemented on 2026-10-26
+- **Decision:** Build the teacher-facing intervention export in the browser from the already runtime-validated assessment, reviewed group, and approved remediation record. Emit a self-contained printable HTML file with approved content, exact representative answers, persisted source snapshots, provenance, teacher notes, and evidence-limit language. Omit student IDs, escape every dynamic value, and include no script or remote resource.
+- **Reason:** Teachers need a portable, readable handoff that preserves the approval and evidence chain. Browser-native HTML also supports Print to PDF without adding a PDF renderer, backend endpoint, database state, dependency, or deployment failure mode.
+- **Consequence:** Export is available only from the approved intervention state and fails closed on mismatched analysis, reviewed-group, source-group, or cited-chunk provenance. The artifact is a point-in-time download with no server-side export history or sharing workflow. See the [approved design](superpowers/specs/2026-10-23-approved-intervention-export-design.md) and [implementation plan](superpowers/plans/2026-10-23-approved-intervention-export.md).
+
 ### D-027 — Bound and idempotently retry remediation generation
 
 - **Status:** Accepted and implemented on 2026-10-13

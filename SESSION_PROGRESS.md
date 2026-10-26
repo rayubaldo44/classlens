@@ -1375,3 +1375,20 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Remaining work: prepare branch integration options. The hardened milestone is synchronized to the existing Obsidian dashboard and Kanban; the minor review request to surface notes/provenance in additional UI locations remains deferred.
 - Recommended next step: integrate the reviewed feature branch after the final gate, then treat the extra review-history presentation detail as a separate polish task.
 ---
+
+## Session / Milestone: Approved intervention evidence export implemented
+
+**Date:** 2026-10-26 (Asia/Manila)
+
+**Status:** Printable, privacy-limited approved-intervention export implemented and verified; final branch review remains
+
+- Attempted and completed: added an approved-only browser download that produces one self-contained printable HTML summary from runtime-validated assessment, reviewed-group, and remediation state. The artifact includes teacher-approved content, exact representative answer text, persisted grounding passages, teacher notes, audit identifiers, timestamps, synthetic-data labeling, and evidence/causality limits while excluding student IDs.
+- Files created or significantly modified: `frontend/src/interventionExport.ts`, `frontend/src/App.tsx`, focused unit and golden-path browser tests, the approved design/implementation plan, `docs/PRODUCT.md`, D-034, `STATUS.md`, `TASKS.md`, and this log.
+- What was completed: pending and rejected drafts expose no export action; approved records must match active analysis, reviewed-group, source-group, and cited-chunk provenance; every dynamic HTML value is escaped; the output contains no script or remote resource; browser download leaves the workflow on the intervention screen and continuing to results still works.
+- Verified/tested: the exporter and browser action were developed RED→GREEN. Four frontend unit test files pass, ESLint passes, the Vite production build succeeds, and all six Playwright Chromium scenarios pass, including inspecting the downloaded filename/content, privacy omission, and uninterrupted results navigation.
+- Problems encountered: the first post-implementation browser run exposed a test-fixture error that read source provenance from the immutable detected-group fixture instead of the reviewed-group fixture. The stack trace and fixture shapes identified the cause; correcting that test reference made the focused and full browser suites pass without changing application behavior.
+- Important decisions: use dependency-free browser HTML plus native Print to PDF instead of server-side PDF generation; export only teacher-approved content; omit portable student identifiers while retaining exact evidence text and provenance; fail closed on stale or incomplete evidence chains.
+- Remaining work: complete the fresh whole-branch review and integrate the feature branch. Hosted verification, deployment-model reproducibility, and educator review of the real-embedding evaluation remain separately blocked or pending.
+- Recommended next step: perform the final export-focused review, address any Important findings with regressions, then integrate the branch through the normal local workflow.
+
+---

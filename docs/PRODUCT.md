@@ -74,6 +74,7 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 - Associate generated claims and source references with the retrieved content.
 - Allow the teacher to edit, approve, or reject the draft.
 - Never deliver or mark an intervention approved without an explicit teacher action.
+- After approval, allow the teacher to download a self-contained, printable HTML summary of the approved content, exact representative response text, grounded source snapshots, and audit provenance. Exclude student identifiers from the portable artifact and clearly state that the evidence is not a diagnosis or causal claim.
 
 ### Results
 

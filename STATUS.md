@@ -1,6 +1,6 @@
 # ClassLens Status
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-26
 
 **Current phase:** Final P0 golden path verified locally; local demo selected while the paid Render upgrade is deferred
 
@@ -23,6 +23,7 @@
 - Local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` embeddings and deterministic complete-link cosine grouping run on real response text. With the configured `0.70` threshold and minimum support `3`, the baseline produced 4 groups, 18 grouped responses, and 11 outliers.
 - The strongest group contained 9 of 29 eligible incorrect responses (students S001, S005, S009, S017, S021, S025, S033, S037, and S045). Representative responses are exact uploaded answers; unrelated answers remain separate or outliers.
 - Teachers can now rename, merge, dismiss, and restore proposed groups from the analysis screen. Detected evidence remains immutable; PostgreSQL stores a revisioned reviewed-group overlay and append-only history. Same-question merges union exact source groups and members with `coherence: null`, downstream remediation/results preserve both reviewed and original source IDs, and affected review controls lock once remediation exists.
+- Teachers can download a self-contained printable HTML evidence summary after approving an intervention. The artifact contains the teacher-approved content, exact representative answer text, persisted grounding passages, review notes, and analysis/group/source/remediation provenance while omitting student IDs. Export validation fails closed on stale provenance or missing cited snapshots; all dynamic content is HTML-escaped, and the file contains no scripts or remote resources. Four frontend unit test files, lint, production build, and all six Chromium scenarios pass; backend behavior and dependencies are unchanged.
 - UTF-8 teacher material ingestion validates, normalizes, chunks, embeds, and persists the material. The verified photosynthesis text produced 3 chunks. Retrieval ranked exact source slices at cosine scores `0.7840`, `0.5693`, and `0.5417`; unrelated tectonics material returned `insufficient_relevant_context` with no fabricated source.
 - Gemini `gemini-3.1-flash-lite` receives the detected group plus retrieved teacher passages through prompt `grounded_remediation_v1`. Structured output and chunk references are validated. One bounded retry is attempted for timeouts and transient 429/5xx responses; continued failure returns a controlled error and stores no draft.
 - Remediation generation has a 60-second backend budget across both Gemini attempts and the retry delay, plus a 70-second browser limit. Browser timeouts keep the selected evidence and reuse a session-scoped request ID on manual retry; identical backend requests return one deterministically identified persisted draft instead of calling Gemini twice in the API process.
