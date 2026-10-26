@@ -193,8 +193,8 @@ Both endpoints return `200 OK` with a stable `assessment_id` plus the existing a
   "groups": [
     {
       "group_id": "grp_704762a85fd8",
-      "provisional_label": "Potential misconception pattern 1",
-      "interpretation_status": "not_requested",
+      "provisional_label": "Incorrectly identifies sunlight as the food source for the plant.",
+      "interpretation_status": "completed",
       "question_id": "Q1",
       "question": "Explain how plants make food during photosynthesis.",
       "correct_answer": "Plants use light energy to convert carbon dioxide and water into glucose and oxygen.",
@@ -220,6 +220,8 @@ Both endpoints return `200 OK` with a stable `assessment_id` plus the existing a
 Reconstructs a persisted analysis response and its evidence groups. Missing IDs return `404 initial_assessment_not_found`.
 
 The member list above is abbreviated only in this documentation example. Runtime responses contain every member identifier. When no group has at least the configured support, the endpoint returns `status: "insufficient_data"`, an empty `groups` list, and an explanatory `message`. Embedding failures return the standard error envelope with `503`, a safe `embedding_failed` or `embedding_invalid_response` code, and no fabricated group.
+
+For a new non-empty baseline analysis, all groups are submitted in one bounded label request. A completely valid response stores every group as `completed`; any provider or batch-validation failure preserves deterministic generic labels and stores every group as `fallback`. Empty-group, legacy, and follow-up analyses can remain `not_requested`. The analysis identity includes the `misconception_labels_v1` contract version, while group identities and evidence remain deterministic. Repeated or concurrent identical requests reload the first canonical stored analysis and do not automatically call the label provider again.
 
 ## Teacher group review — implemented overlay contract
 

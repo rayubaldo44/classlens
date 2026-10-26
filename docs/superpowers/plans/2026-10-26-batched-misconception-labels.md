@@ -46,33 +46,33 @@
 - Produces: `async interpret_misconception_groups(result: AnalysisResponse, llm_service: LLMService) -> AnalysisResponse`
 - `interpret_misconception_groups` returns a deep copy with every group `completed` or every group `fallback`; it never mutates evidence fields.
 
-- [ ] **Step 1: Write failing schema and prompt tests**
+- [x] **Step 1: Write failing schema and prompt tests**
 
 Add focused tests proving strict extra-field rejection; trimmed single-line 5–120 character labels; one-to-three unique evidence IDs; exact question/correct-answer/group/representative content; the `misconception_labels_v1` instruction; and explicit treatment of student answers as untrusted data.
 
-- [ ] **Step 2: Run the focused tests and confirm RED**
+- [x] **Step 2: Run the focused tests and confirm RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_misconception_interpretation.py -q`
 
 Expected: collection/import failures because the contract, prompt, and service do not exist.
 
-- [ ] **Step 3: Implement strict schemas and prompt construction**
+- [x] **Step 3: Implement strict schemas and prompt construction**
 
 Use Pydantic `extra="forbid"` and field/model validators. Serialize a packet containing only analysis/group context required by the spec; do not include non-representative member answers.
 
-- [ ] **Step 4: Add failing all-or-nothing service tests**
+- [x] **Step 4: Add failing all-or-nothing service tests**
 
 Cover valid reordered output, missing group, duplicate group, unknown group, cross-group representative ID, duplicate evidence ID, malformed label, provider-not-configured, provider timeout, and proof that group IDs/members/responses/scores/counts are unchanged.
 
-- [ ] **Step 5: Implement the interpretation service minimally**
+- [x] **Step 5: Implement the interpretation service minimally**
 
 Validate exact group coverage and per-group representative references after the provider returns. Catch only `LLMProviderError` and interpretation-output validation errors; log sanitized codes and convert all source groups to fallback. Let unrelated programming and database errors propagate.
 
-- [ ] **Step 6: Run focused tests and confirm GREEN**
+- [x] **Step 6: Run focused tests and confirm GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_misconception_interpretation.py -q`
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 git add backend/app/schemas/analysis.py backend/app/schemas/interpretation.py backend/app/prompts/misconception_labels.py backend/app/services/misconception_interpretation.py backend/tests/test_misconception_interpretation.py
@@ -94,23 +94,23 @@ git commit -m "feat: validate batched misconception labels"
 - `LLMService.generate_group_labels(prompt: str) -> GroupLabelBatch`
 - `GeminiLLMService(..., label_total_budget_ms: int = 12_000)`
 
-- [ ] **Step 1: Write failing config and provider tests**
+- [x] **Step 1: Write failing config and provider tests**
 
 Assert the default and 1,000–30,000 ms bounds; one Gemini SDK call; `GroupLabelBatch` response schema; temperature `0.1`; max output `1_024`; outer timeout; no retry on transient errors; malformed output normalization to `LLMProviderError`; and unchanged remediation retry/budget behavior.
 
-- [ ] **Step 2: Run the focused tests and confirm RED**
+- [x] **Step 2: Run the focused tests and confirm RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_misconception_interpretation.py tests/test_remediation.py -q`
 
-- [ ] **Step 3: Implement the provider method and minimal shared helpers**
+- [x] **Step 3: Implement the provider method and minimal shared helpers**
 
 Share client initialization and unsupported-schema-field cleanup. Keep remediation generation on its existing two-attempt path; the label method uses a separate one-attempt path under `asyncio.timeout(label_total_budget_ms / 1000)`.
 
-- [ ] **Step 4: Run focused tests and confirm GREEN**
+- [x] **Step 4: Run focused tests and confirm GREEN**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_misconception_interpretation.py tests/test_remediation.py -q`
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add backend/app/config.py backend/.env.example backend/app/providers/llm/base.py backend/app/providers/llm/gemini.py backend/tests/test_remediation.py backend/tests/test_misconception_interpretation.py
@@ -133,29 +133,29 @@ git commit -m "feat: generate misconception labels with Gemini"
 - Both baseline routes depend on `get_llm_service` and share one private async orchestration helper.
 - `InMemoryAnalysisStore.save` preserves create-if-absent behavior to match PostgreSQL for canonical-winner tests.
 
-- [ ] **Step 1: Write failing identity and route tests**
+- [x] **Step 1: Write failing identity and route tests**
 
 Assert the version changes the analysis ID but not group IDs/evidence; no-group analysis skips Gemini; existing canonical analysis skips Gemini; valid output persists `completed`; provider failure persists and returns `fallback`; and post-save reload returns the canonical winner.
 
-- [ ] **Step 2: Run the focused tests and confirm RED**
+- [x] **Step 2: Run the focused tests and confirm RED**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_misconception_analysis.py tests/test_concurrency.py tests/test_persistence.py -q`
 
-- [ ] **Step 3: Implement shared baseline orchestration**
+- [x] **Step 3: Implement shared baseline orchestration**
 
 Keep parse/embedding/grouping in the worker pool, perform canonical lookup outside the optional-fallback boundary, call interpretation only for non-empty new baseline analyses, save, reload, and fail closed if persistence unexpectedly cannot reload.
 
-- [ ] **Step 4: Add and pass concurrent/repeated canonical tests**
+- [x] **Step 4: Add and pass concurrent/repeated canonical tests**
 
 Use a create-if-absent in-memory fake with two different valid label batches. Assert both responses converge on the stored winner and later requests do not invoke the provider.
 
-- [ ] **Step 5: Run backend persistence coverage**
+- [x] **Step 5: Run backend persistence coverage**
 
 Run: `cd backend && .venv/bin/python -m pytest tests/test_misconception_analysis.py tests/test_concurrency.py tests/test_persistence.py -q`
 
 If `CLASSLENS_TEST_DATABASE_URL` is configured, also run: `cd backend && CLASSLENS_RUN_DB_TESTS=1 .venv/bin/python -m pytest tests/test_postgres_integration.py -q`
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add backend/app/services/misconception_analysis.py backend/app/api/routes/analysis.py backend/app/providers/analysis_store.py backend/tests/test_misconception_analysis.py backend/tests/test_concurrency.py backend/tests/test_persistence.py backend/tests/test_postgres_integration.py
@@ -176,31 +176,31 @@ git commit -m "feat: persist canonical interpreted analyses"
 - `MisconceptionGroup.interpretation_status: 'not_requested' | 'completed' | 'fallback'`
 - Add a pure label-provenance helper local to `App.tsx` or a focused module if tests require direct import.
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 Accept all three known statuses, reject unknown statuses, and retain recursive validation of group content.
 
-- [ ] **Step 2: Write failing browser assertions**
+- [x] **Step 2: Write failing browser assertions**
 
 Verify `completed` renders `AI-drafted label · teacher review needed`, `fallback` renders `Detected pattern · AI label unavailable`, legacy `not_requested` remains honest, and rename/merge renders `Teacher-reviewed label` rather than AI provenance.
 
-- [ ] **Step 3: Run frontend focused tests and confirm RED**
+- [x] **Step 3: Run frontend focused tests and confirm RED**
 
 Run: `cd frontend && npm test`
 
 Run the narrow Playwright specs with the repository's existing command/filter.
 
-- [ ] **Step 4: Implement status guards and provenance rendering**
+- [x] **Step 4: Implement status guards and provenance rendering**
 
 For a reviewed group, classify as teacher-reviewed when it merges multiple sources or its display label differs from its sole immutable source label. Otherwise map the immutable source's `interpretation_status` to the corresponding badge.
 
-- [ ] **Step 5: Run focused frontend tests and confirm GREEN**
+- [x] **Step 5: Run focused frontend tests and confirm GREEN**
 
 Run: `cd frontend && npm test`
 
 Run: `cd frontend && npx playwright test tests/e2e/golden-path.spec.ts tests/e2e/group-review.spec.ts --project=chromium`
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add frontend/src/api/client.ts frontend/src/api/contracts.ts frontend/src/App.tsx frontend/tests/contracts.test.ts frontend/tests/e2e/golden-path.spec.ts frontend/tests/e2e/group-review.spec.ts
@@ -222,7 +222,7 @@ git commit -m "feat: show misconception label provenance"
 
 **Interfaces:** None; documentation must describe only verified behavior.
 
-- [ ] **Step 1: Run the complete affected verification gate**
+- [x] **Step 1: Run the complete affected verification gate**
 
 Run:
 
@@ -237,19 +237,19 @@ git diff --check
 
 Run the PostgreSQL integration separately when its disposable/configured URL is available. Do not use production data for destructive tests.
 
-- [ ] **Step 2: Perform one live local analysis check**
+- [x] **Step 2: Perform one live local analysis check**
 
 With the restored server-side configuration, reset the runner, verify `/ready`, request the synthetic baseline, confirm all four groups are either a fully valid `completed` batch or a fully deterministic `fallback` batch, reload group reviews, and confirm exact evidence remains unchanged. Record provider behavior honestly; do not require live Gemini success for deterministic-path correctness.
 
-- [ ] **Step 3: Update authoritative documentation**
+- [x] **Step 3: Update authoritative documentation**
 
 Record prompt version, one-call boundary, structured evidence-reference validation, 12-second no-retry budget, stable fallback, identity version, statuses, UI provenance, and verified checks. Add an accepted decision and check the P0 backlog item only after all acceptance criteria pass.
 
-- [ ] **Step 4: Append one milestone entry**
+- [x] **Step 4: Append one milestone entry**
 
 Append—not rewrite—a `SESSION_PROGRESS.md` entry containing attempts, significant files, completed behavior, verification, problems, decisions, remaining work, and recommended next step.
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 ```bash
 git add docs/AI_PIPELINE.md docs/API.md docs/PRODUCT.md docs/ARCHITECTURE.md docs/DECISIONS.md STATUS.md TASKS.md SESSION_PROGRESS.md docs/superpowers/specs/2026-10-26-batched-misconception-labels-design.md docs/superpowers/plans/2026-10-26-batched-misconception-labels.md

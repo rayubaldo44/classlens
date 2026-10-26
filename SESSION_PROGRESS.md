@@ -1392,3 +1392,20 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: integrate the reviewed export branch through the normal local workflow, then choose the next unblocked backlog item.
 
 ---
+
+## Session / Milestone: Batched misconception labels implemented
+
+**Date:** 2026-10-27 (Asia/Manila)
+
+**Status:** Single-request Gemini labels, deterministic fallback, canonical persistence, and UI provenance verified
+
+- Attempted and completed: added one structured Gemini request for all groups in each new non-empty baseline analysis, strict all-or-nothing group/evidence validation, deterministic persisted fallback, versioned analysis identity, create-if-absent canonical convergence, and honest label provenance through teacher review.
+- Files created or significantly modified: interpretation schemas, prompt, service, Gemini adapter/configuration, analysis orchestration/store behavior, backend tests, frontend contracts/provenance rendering/browser tests, and the authoritative product, architecture, AI, API, decision, status, backlog, and plan documents.
+- What was completed: valid batches preserve immutable evidence and mark every group `completed`; provider or validation failures retain generic deterministic labels and mark every group `fallback`; empty/legacy/follow-up records can remain `not_requested`; repeated or concurrent identical baselines return one canonical stored wording without automatic Gemini re-spend; teacher rename/merge replaces AI provenance with a teacher-reviewed label.
+- Verified/tested: backend `135 passed, 1 skipped` (the skipped PostgreSQL integration is opt-in and had no disposable URL configured), four frontend unit files, ESLint, production build, and all six Chromium scenarios passed. A live local run reported database/model readiness, generated four valid `completed` labels through real Gemini in 14.60 seconds, preserved exact support/member evidence in the review overlay, and returned the byte-identical canonical response on repeat in 1.44 seconds.
+- Problems encountered: two route-test fixtures initially used a hand-derived group hash and a threshold that differed from the route default; source tracing corrected the fixtures without changing product code. The configured logger emitted no label-specific telemetry line during the live run, so no provider-call count is inferred from logs; canonical behavior is instead covered by direct unit/concurrency assertions and the identical repeat response.
+- Important decisions: use prompt/version `misconception_labels_v1`; one attempt, 12-second default label budget, temperature `0.1`, and 1,024 output tokens; accept or fallback the entire batch; preserve database failures; keep persisted fallback stable until a future explicit refresh design; exclude all display labels from retrieval context.
+- Remaining work: final whole-branch review and integration. Hosted verification remains blocked by the documented Render memory limit, and educator review of broader real-embedding evaluation remains pending.
+- Recommended next step: complete the required fresh whole-branch review, address any Important findings, rerun affected checks, and integrate through the normal local branch workflow.
+
+---

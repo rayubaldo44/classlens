@@ -51,9 +51,9 @@ Depends on: hosted verification for the hosted rehearsal; the existing local run
 
 Depends on: persisted question-specific groups and exact representative evidence. Prioritize hosted verification and rehearsal before adding another provider-dependent step.
 
-- [ ] Use the LLM to draft concise potential-misconception labels from question context, expected answer, and supplied evidence; validate evidence references and keep deterministic groups visible when interpretation fails.
+- [x] Use the LLM to draft concise potential-misconception labels from question context, expected answer, and supplied evidence; validate evidence references and keep deterministic groups visible when interpretation fails. (2026-10-27)
 
-**Acceptance:** labels remain provisional and teacher-verifiable; failures invent no evidence. Current generic provisional labels remain the verified implementation until this task passes. See [docs/AI_PIPELINE.md](docs/AI_PIPELINE.md).
+**Acceptance:** labels remain provisional and teacher-verifiable; failures invent no evidence. Verified with an all-or-nothing structured batch, persisted deterministic fallback, canonical repeat behavior, UI provenance, the complete automated gate, and a live local four-group Gemini/Supabase run. See [docs/AI_PIPELINE.md](docs/AI_PIPELINE.md).
 
 ## P1 — reliability and improvements after P0
 

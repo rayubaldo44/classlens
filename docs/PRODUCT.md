@@ -49,7 +49,7 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 - Identify eligible incorrect responses per question using an answer key, rubric, or explicit correctness field.
 - Use embeddings to represent response meaning and propose recurring semantic groups within the same question.
 - Permit outliers and an insufficient-data outcome; do not force every response into a group.
-- **Planned after the current golden path:** use an LLM to draft concise, teacher-readable interpretations using only provided question context and group evidence. The implemented MVP uses generic provisional group labels.
+- Draft concise, provisional teacher-readable labels in one bounded LLM request using only the question, expected answer, and exact representative evidence. Validate every group and evidence reference as one batch; if any provider or validation failure occurs, persist deterministic fallback labels while keeping the complete evidence visible.
 - Record enough model, prompt, and analysis metadata to explain and reproduce the demo result.
 
 ### Evidence review
@@ -89,7 +89,7 @@ Students benefit from teacher-approved targeted remediation and follow-up assess
 2. The backend validates and normalizes the input.
 3. An embedding model converts relevant student responses into semantic vectors.
 4. Similar incorrect responses are grouped into potential recurring misconceptions.
-5. The current MVP assigns generic provisional labels and displays exact group evidence. LLM-authored group descriptions remain a proposed post-demo step.
+5. One bounded LLM request drafts provisional labels for all detected groups and cites supplied representative evidence. The complete batch is accepted or deterministic fallback labels are persisted; exact group evidence remains authoritative in either case.
 6. The teacher reviews the proposals and may rename, merge, dismiss, or restore them while retaining exact source evidence and history.
 7. The teacher opens an active reviewed group and sees representative responses and supporting evidence.
 8. The teacher uploads or selects relevant instructional material.

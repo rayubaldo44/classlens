@@ -4,6 +4,13 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-035 — Interpret baseline misconception groups in one optional batch
+
+- **Status:** Accepted, implemented, and live-verified on 2026-10-27
+- **Decision:** Send every deterministic group in a new non-empty baseline analysis to Gemini in one `misconception_labels_v1` structured request containing only question context, the correct answer, and exact representative responses. Require exact group coverage and group-local evidence references. Use one attempt with a 12-second default total budget, temperature `0.1`, and 1,024 output tokens. Accept the whole batch or persist deterministic fallback labels for every group. Include the interpretation contract version in the analysis identity, preserve group identities, and return the first canonical persisted snapshot for repeated or concurrent requests.
+- **Reason:** A single batch gives labels consistent context and bounds latency and quota, while strict references prevent generated wording from altering or inventing evidence. Persisted fallback keeps analysis usable during provider failure and makes retries stable rather than silently spending quota again.
+- **Consequence:** `completed`, `fallback`, and legacy/follow-up `not_requested` are explicit states. Database failures remain visible rather than becoming fallback. The UI identifies unchanged completed labels as AI-drafted, fallback as unavailable, and renamed or merged labels as teacher-reviewed. A persisted fallback is not automatically upgraded on a later request; that would require a separately designed explicit refresh action. See the [approved design](superpowers/specs/2026-10-26-batched-misconception-labels-design.md) and [implementation plan](superpowers/plans/2026-10-26-batched-misconception-labels.md).
+
 ### D-032 — Local code graph with isolated Obsidian export
 
 - **Status:** Accepted on 2026-10-18; implementation, real export, and final review verified by 2026-10-23

@@ -1,8 +1,8 @@
 # AI Pipeline
 
-**Implementation status:** The complete golden-path AI pipeline and its PostgreSQL adapters were live-verified against Supabase on 2026-10-02, including restart recovery and real Gemini generation. Standalone LLM misconception-label interpretation remains unimplemented.
+**Implementation status:** The complete golden-path AI pipeline and its PostgreSQL adapters were live-verified against Supabase, including restart recovery, batched misconception-label interpretation, and grounded remediation generation. The label path was live-verified with real Gemini on 2026-10-27.
 
-This document is the authority for the implemented AI workflow, its failure behavior, and the separately labeled interpretation step that remains proposed. Product requirements and safeguards are in [PRODUCT.md](PRODUCT.md); selected and pending technologies are in [TECH_STACK.md](TECH_STACK.md).
+This document is the authority for the implemented AI workflow and its failure behavior. Product requirements and safeguards are in [PRODUCT.md](PRODUCT.md); selected and pending technologies are in [TECH_STACK.md](TECH_STACK.md).
 
 ## Pipeline contract
 
@@ -132,17 +132,17 @@ Every action retains the exact original source-group IDs, members, representativ
 
 The client submits its expected overlay revision. The PostgreSQL writer locks the current state row and rejects stale concurrent updates before atomically saving the next revision and event; identical renames create no event. Retrieval, remediation, and results use the active reviewed identity while preserving original source-group provenance. Once any remediation refers to an affected reviewed or source group, rename, merge, dismiss, and restore actions for that evidence return `group_review_locked`; unrelated groups remain reviewable. Generation revalidates the reviewed evidence and saves the draft while holding the same per-analysis review lock, so a concurrent dismissal wins before generation or is blocked after the draft exists—never leaving a draft attached to dismissed evidence.
 
-## 8. LLM misconception interpretation — proposed, not implemented
+## 8. Batched LLM misconception labels — implemented
 
-Provide the LLM only the question context, expected concept, aggregate evidence, and selected exact responses. Request structured output with:
+For each new non-empty baseline analysis, prompt version `misconception_labels_v1` sends all deterministic groups to Gemini in one request. The packet contains only each group's identifier, question, correct answer, and exact representative responses with their student identifiers. Student answers are explicitly delimited as untrusted data. Full membership lists, non-representative answers, and provisional labels are not prompt input.
 
-- concise teacher-readable title;
-- explanation of the possible conceptual gap;
-- evidence references using supplied response IDs;
-- uncertainty/caveat;
-- optional teacher check to confirm the interpretation.
+The response schema requires one concise 5–120 character single-line label per group and one to three unique evidence student identifiers. The service validates exact group coverage, rejects duplicate or unknown group IDs, and requires every evidence identifier to belong to that group's supplied representative responses. Missing, extra, malformed, or cross-group references reject the complete batch; interpretation never changes group IDs, members, responses, scores, support, or coherence.
 
-Validate output against a schema. Reject evidence IDs that were not supplied and descriptions that contain invented quotes. The UI should still display deterministic group evidence if the LLM fails; the interpretation should be marked unavailable.
+Label generation uses `gemini-3.1-flash-lite`, temperature `0.1`, at most 1,024 output tokens, one attempt, and a total timeout from `CLASSLENS_LABEL_TOTAL_BUDGET_MS` (default 12 seconds, allowed 1–30 seconds). A valid whole batch is stored with `interpretation_status: "completed"`. Provider configuration, timeout, provider response, or interpretation-validation failures preserve the generic deterministic labels and store every group as `fallback`; no automatic retry occurs after that canonical snapshot is persisted. Empty group sets and legacy/follow-up paths remain `not_requested`.
+
+The analysis identity includes contract version `misconception_labels_v1`, while stable group identities remain based on deterministic evidence. Baseline orchestration checks persistence before interpretation, saves create-if-absent, and reloads the canonical winner. Repeated and concurrent identical requests therefore return stable stored wording and do not automatically spend provider quota again. Database errors remain normal structured failures and are never converted to label fallback.
+
+The UI marks unchanged completed labels as `AI-drafted label · teacher review needed`, fallback labels as `Detected pattern · AI label unavailable`, and legacy/not-requested labels as not yet interpreted. A teacher rename or merge always displays `Teacher-reviewed label`; the teacher remains the authority over the educational interpretation.
 
 ## 9. Teacher-material extraction and chunking — implemented
 
@@ -156,7 +156,7 @@ Chunks reuse the existing `EmbeddingService` and local `sentence-transformers/pa
 
 ## 10. Vector retrieval and relevance checks — implemented
 
-Retrieval accepts a selected active reviewed group's question, correct answer, and exact representative answers. It embeds that context as one query and searches only the selected material. Generic provisional labels are excluded from the query because they do not communicate an interpreted concept. The reviewed ID and original source-group IDs continue downstream as provenance.
+Retrieval accepts a selected active reviewed group's question, correct answer, and exact representative answers. It embeds that context as one query and searches only the selected material. Display labels are excluded from the query regardless of whether they are deterministic, AI-drafted, or teacher-reviewed. The reviewed ID and original source-group IDs continue downstream as provenance.
 
 The runtime `MaterialIndex` persists material metadata and exact chunks in PostgreSQL while retaining normalized vectors in a process-local cache. It ranks by the existing exact cosine implementation, returns the configured top-k (default `3`), and filters below the configured score (default `0.42`).
 
@@ -235,7 +235,7 @@ The versioned photosynthesis fixtures produce 9 of 43 answered students affected
 | Insufficient eligible responses | Complete with `insufficient_data`; show counts and do not call interpretation unnecessarily. |
 | Embedding timeout/error/malformed vectors | Mark the analysis failed or retryable; preserve inputs; create no synthetic groups. |
 | Unstable or low-coherence grouping | Return outliers/low-confidence or withhold the proposed group. |
-| LLM interpretation failure | Keep evidence; mark description unavailable; allow retry. |
+| LLM label provider or validation failure | Persist the complete deterministic evidence with every group marked `fallback`; do not retry automatically or fabricate prose. |
 | Extraction failure or empty text | Mark material failed with a useful cause; do not index it. |
 | No relevant passage | Return `insufficient_relevant_context` with no results; block claims of grounded remediation. |
 | Material embedding, index, or retrieval failure | Return a structured retryable material error; do not return sources as if retrieval succeeded. |
