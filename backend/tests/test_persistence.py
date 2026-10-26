@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.database import Database, DatabaseError
+from app.providers.analysis_store import InMemoryAnalysisStore
 from app.providers.postgres import PostgresAnalysisStore
 from app.services.misconception_analysis import analyze_assessment
 from app.providers.material_index.protocol import MaterialRecord
@@ -19,6 +20,27 @@ from test_misconception_analysis import (
 
 
 MIGRATION = Path(__file__).resolve().parents[2] / "database" / "migrations" / "001_golden_path_persistence.sql"
+
+
+def test_in_memory_analysis_store_preserves_first_canonical_snapshot() -> None:
+    parsed = parsed_assessment([
+        csv_row(f"S{i}", "Q1", "How do plants make food?", f"Similar answer {i}")
+        for i in range(1, 4)
+    ])
+    first = analyze_assessment(
+        parsed,
+        AnalysisEmbeddings([[1, 0], [0.99, 0.02], [0.98, -0.02]]),
+        analysis_settings(),
+    )
+    first.groups[0].provisional_label = "First canonical label"
+    second = first.model_copy(deep=True)
+    second.groups[0].provisional_label = "Competing label"
+    store = InMemoryAnalysisStore()
+
+    store.save(parsed, first)
+    store.save(parsed, second)
+
+    assert store.get(first.analysis_id).result.groups[0].provisional_label == "First canonical label"
 
 
 def test_migration_contains_only_implemented_golden_path_tables() -> None:

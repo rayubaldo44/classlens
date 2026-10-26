@@ -19,6 +19,7 @@ from app.services.assessment_intake import ParsedAssessment
 from app.telemetry import log_error, log_stage
 
 REPRESENTATIVE_LIMIT = 3
+ANALYSIS_CONTRACT_VERSION = "misconception_labels_v1"
 
 
 class AnalysisError(Exception):
@@ -300,6 +301,7 @@ def _build_group(
 
 def _analysis_id(parsed: ParsedAssessment, model_id: str, settings: AnalysisSettings) -> str:
     payload = {
+        "analysis_contract_version": ANALYSIS_CONTRACT_VERSION,
         "data_label": parsed.preview.data_label,
         "model": model_id,
         "threshold": settings.similarity_threshold,

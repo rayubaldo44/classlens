@@ -42,9 +42,12 @@ class InMemoryAnalysisStore:
         baseline_assessment_id: str | None = None,
     ) -> None:
         with self._lock:
-            self._snapshots[result.analysis_id] = AnalysisSnapshot(
-                parsed=deepcopy(parsed),
-                result=result.model_copy(deep=True),
+            self._snapshots.setdefault(
+                result.analysis_id,
+                AnalysisSnapshot(
+                    parsed=deepcopy(parsed),
+                    result=result.model_copy(deep=True),
+                ),
             )
 
     def get(self, analysis_id: str) -> AnalysisSnapshot | None:
