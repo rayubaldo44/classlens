@@ -46,6 +46,7 @@ import {
 } from './api/client'
 import { ArrowIcon, Badge, LongTaskProgress, Metric, PageHeader, StatePanel } from './components'
 import { GroupReviewPanel } from './GroupReviewPanel'
+import { buildApprovedInterventionExport } from './interventionExport'
 import { demoScenario, demoSteps } from './mockData'
 import type { RouteKey } from './types'
 
@@ -170,7 +171,7 @@ function App() {
     <ApiStatus />
   </aside><main className="main-content" id="main-content" ref={mainRef} tabIndex={-1}>
     {restoreMessage && <StatePanel kind="error" title="Saved workflow not fully restored" description={restoreMessage} action={<button className="text-button" onClick={() => { localStorage.removeItem(WORKFLOW_KEY); setRestoreMessage(''); navigate('upload') }}>Start a new workflow →</button>} />}
-    {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? selectedAnalysis?.analysis_id ?? 'none'} source={analysisSource} initialAnalysis={selectedAnalysis} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.reviewed_group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception key={`${selectedGroup?.reviewed_group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} initialRetrieval={retrievedSources} onBack={() => navigate('analysis')} onRetrieved={(sources) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: sources?.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.reviewed_group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}-${approvedRemediation?.remediation_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} assessment={selectedAssessment} sources={retrievedSources} initialRemediation={approvedRemediation} onBack={() => navigate('misconception')} onNext={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: retrievedSources?.material.material_id, remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: retrievedSources?.material.material_id, remediation_id: approvedRemediation?.remediation_id, comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
+    {route === 'dashboard' && <Dashboard onNext={() => navigate('upload')} />}{route === 'upload' && <Upload onNext={(source) => { localStorage.removeItem(WORKFLOW_KEY); setAnalysisSource(source); setSelectedGroup(null); setSelectedAssessment(null); setSelectedAnalysis(null); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('analysis') }} />}{route === 'analysis' && <Analysis key={analysisSource?.kind === 'upload' ? `${analysisSource.file.name}-${analysisSource.file.size}-${analysisSource.file.lastModified}` : analysisSource?.kind ?? selectedAnalysis?.analysis_id ?? 'none'} source={analysisSource} initialAnalysis={selectedAnalysis} onLoadDemo={() => setAnalysisSource({ kind: 'demo' })} onNext={(group, analysis) => { replaceWorkflow({ analysis_id: analysis.analysis_id, group_id: group.reviewed_group_id }); setSelectedGroup(group); setSelectedAssessment(analysis.assessment); setSelectedAnalysis(analysis); setRetrievedSources(null); setApprovedRemediation(null); setSavedComparison(null); navigate('misconception') }} />}{route === 'misconception' && <Misconception key={`${selectedGroup?.reviewed_group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} initialRetrieval={retrievedSources} onBack={() => navigate('analysis')} onRetrieved={(sources) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: sources?.material.material_id }); setRetrievedSources(sources) }} onNext={() => navigate('intervention')} />}{route === 'intervention' && <Intervention key={`${selectedGroup?.reviewed_group_id ?? 'none'}-${retrievedSources?.material.material_id ?? 'none'}-${approvedRemediation?.remediation_id ?? 'none'}`} group={selectedGroup} analysisId={selectedAnalysis?.analysis_id ?? null} dataLabel={selectedAnalysis?.data_label ?? null} assessment={selectedAssessment} sources={retrievedSources} initialRemediation={approvedRemediation} onBack={() => navigate('misconception')} onNext={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: retrievedSources?.material.material_id, remediation_id: record.remediation_id }); setApprovedRemediation(record); navigate('results') }} />}{route === 'results' && <Results key={savedComparison?.comparison_id ?? 'new'} baseline={selectedAnalysis} group={selectedGroup} remediation={approvedRemediation} initialResult={savedComparison} onResult={(record) => { replaceWorkflow({ analysis_id: selectedAnalysis?.analysis_id, group_id: selectedGroup?.reviewed_group_id, material_id: retrievedSources?.material.material_id, remediation_id: approvedRemediation?.remediation_id, comparison_id: record.comparison_id }); setSavedComparison(record) }} onNext={() => navigate('dashboard')} />}
   </main></div></>
 }
 
@@ -342,9 +343,10 @@ function getSessionStorage(): Storage | null {
   }
 }
 
-function Intervention({ group, analysisId, assessment, sources, initialRemediation, onBack, onNext }: {
+function Intervention({ group, analysisId, dataLabel, assessment, sources, initialRemediation, onBack, onNext }: {
   group: ReviewedMisconceptionGroup | null
   analysisId: string | null
+  dataLabel: AnalysisResponse['data_label'] | null
   assessment: AssessmentPreview['assessment'] | null
   sources: MaterialRetrievalResponse | null
   initialRemediation: RemediationRecord | null
@@ -443,6 +445,29 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
     } : current)
   }
 
+  const exportApprovedIntervention = () => {
+    if (!group || !analysisId || !dataLabel || !assessment || record?.status !== 'approved') return
+    const artifact = buildApprovedInterventionExport({
+      analysisId,
+      dataLabel,
+      assessment,
+      group,
+      remediation: record,
+      exportedAt: new Date().toISOString(),
+    })
+    const objectUrl = URL.createObjectURL(new Blob([artifact.html], { type: 'text/html;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    try {
+      anchor.href = objectUrl
+      anchor.download = artifact.filename
+      document.body.append(anchor)
+      anchor.click()
+    } finally {
+      anchor.remove()
+      URL.revokeObjectURL(objectUrl)
+    }
+  }
+
   if (!group || !assessment) return <><PageHeader eyebrow="Step 5 of 6" title="Review intervention" description="Select a detected learning gap before generating an intervention." /><StatePanel kind="empty" title="No misconception selected" description="Return to Learning Gaps and select a group with student evidence." action={<button className="text-button" onClick={onBack}>Back to misconception detail →</button>} /></>
   const hasGrounding = sources?.status === 'retrieved' && sources.results.length > 0
   const isTerminal = record?.status === 'approved' || record?.status === 'rejected'
@@ -471,7 +496,7 @@ function Intervention({ group, analysisId, assessment, sources, initialRemediati
         {!isTerminal && <label className="check-row"><input type="checkbox" checked={reviewed} disabled={status === 'saving'} onChange={(event) => setReviewed(event.target.checked)} />I reviewed the student evidence, source passages, and final intervention text.</label>}
         {status === 'saving' && <p className="save-status" role="status">Saving teacher decision…</p>}
         {!isTerminal && <div className="actions review-actions"><button className="button secondary danger-action" disabled={status === 'saving'} onClick={() => void submitReview('reject')}>Reject draft</button><button className="button secondary" disabled={status === 'saving'} onClick={() => void submitReview('save')}>Save edits</button><button className="button primary" disabled={!reviewed || status === 'saving'} onClick={() => void submitReview('approve')}>Approve intervention</button></div>}
-        {record.status === 'approved' && <div className="decision-state decision-state--approved"><div><strong>Approved by teacher</strong><p>The teacher-edited content above is the approved version. The original Gemini generation remains preserved in persistent storage.</p></div><button className="button primary" onClick={() => onNext(record)}>Continue to results <ArrowIcon /></button></div>}
+        {record.status === 'approved' && <div className="decision-state decision-state--approved"><div><strong>Approved by teacher</strong><p>The teacher-edited content above is the approved version. The original Gemini generation remains preserved in persistent storage.</p></div><div className="actions"><button className="button secondary" onClick={exportApprovedIntervention}>Download evidence summary</button><button className="button primary" onClick={() => onNext(record)}>Continue to results <ArrowIcon /></button></div></div>}
         {record.status === 'rejected' && <div className="decision-state decision-state--rejected"><div><strong>Rejected by teacher</strong><p>This draft will not be treated as an approved intervention.</p></div><button className="button secondary" onClick={onBack}>Return to misconception</button></div>}
       </div>
     </section>}

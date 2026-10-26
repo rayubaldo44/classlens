@@ -280,6 +280,7 @@ async function installApi(page: Page) {
 
 test('teacher completes and restores the evidence-backed workflow after a controlled provider failure', async ({ page }) => {
   const approvedExplanation = 'Light provides energy; plants use matter to manufacture glucose.'
+  const reviewNotes = 'Approved for export verification.'
   await installApi(page)
   await page.goto('/upload')
 
@@ -305,6 +306,7 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await page.getByRole('button', { name: 'Find supporting passages' }).click()
   await expect(page.getByText(/Sunlight supplies energy/)).toBeVisible()
   await page.getByRole('button', { name: /Continue to intervention review/ }).click()
+  await expect(page.getByRole('button', { name: 'Download evidence summary' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Generate remediation' }).click()
   await expect(page.getByRole('alert').getByText('Remediation action failed')).toBeVisible()
@@ -314,8 +316,30 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await expect(page.locator('.long-task-progress')).toContainText('1s elapsed')
 
   await page.getByLabel('Teacher explanation').fill(approvedExplanation)
+  await page.getByLabel('Teacher review notes').fill(reviewNotes)
   await page.getByLabel(/I reviewed the student evidence/).check()
   await page.getByRole('button', { name: 'Approve intervention' }).click()
+  await expect(page.getByText('Approved by teacher')).toBeVisible()
+
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download evidence summary' }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toBe('classlens-science-photosynthesis-remediation-approved.html')
+  const stream = await download.createReadStream()
+  let downloadedHtml = ''
+  for await (const chunk of stream) downloadedHtml += chunk.toString()
+  for (const expected of [
+    approvedExplanation,
+    group.representative_responses[0].answer,
+    retrieval.results[0].text,
+    analysis.analysis_id,
+    reviewedGroup.reviewed_group_id,
+    reviewedGroup.source_group_ids[0],
+    remediation.remediation_id,
+    reviewNotes,
+  ]) expect(downloadedHtml).toContain(expected)
+  for (const studentId of group.member_student_ids) expect(downloadedHtml).not.toContain(studentId)
+  await expect(page).toHaveURL(/\/intervention$/)
   await expect(page.getByText('Approved by teacher')).toBeVisible()
   await page.getByRole('button', { name: /Continue to results/ }).click()
 
