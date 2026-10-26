@@ -63,7 +63,7 @@ const isRepresentativeResponse = (value: unknown) => isObject(value)
 const isMisconceptionGroup = (value: unknown) => isObject(value)
   && isNonEmptyString(value.group_id)
   && isNonEmptyString(value.provisional_label)
-  && value.interpretation_status === 'not_requested'
+  && (value.interpretation_status === 'not_requested' || value.interpretation_status === 'completed' || value.interpretation_status === 'fallback')
   && isNonEmptyString(value.question_id)
   && isNonEmptyString(value.question)
   && isNonEmptyString(value.correct_answer)

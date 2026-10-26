@@ -97,6 +97,13 @@ test('analysis rejects malformed representative evidence', () => {
   assert.equal(isAnalysisResponse(malformed), false)
 })
 
+test('analysis accepts only known misconception interpretation statuses', () => {
+  for (const interpretation_status of ['not_requested', 'completed', 'fallback']) {
+    assert.equal(isAnalysisResponse({ ...analysis, groups: [{ ...group, interpretation_status }] }), true)
+  }
+  assert.equal(isAnalysisResponse({ ...analysis, groups: [{ ...group, interpretation_status: 'invented' }] }), false)
+})
+
 test('material responses reject malformed nested material and chunk fields', () => {
   assert.equal(isMaterialIngestionResponse({ status: 'ready', material, message: 'Ready.' }), true)
   assert.equal(isMaterialIngestionResponse({ status: 'ready', material: { ...material, chunk_count: '1' }, message: 'Ready.' }), false)

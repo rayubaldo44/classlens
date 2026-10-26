@@ -295,6 +295,7 @@ test('teacher completes and restores the evidence-backed workflow after a contro
   await expect(page.locator('.long-task-progress__pulse')).toHaveCSS('animation-name', 'none')
   await expect(page.locator('.long-task-progress')).toContainText('1s elapsed')
   await expect(page.getByRole('heading', { name: '1 recurring pattern to inspect' })).toBeVisible()
+  await expect(page.getByText('Detected pattern · not yet interpreted')).toBeVisible()
   await page.getByRole('button', { name: /Potential misconception pattern 1/ }).click()
   await expect(page.getByText('Student evidence · 9 affected responses')).toBeVisible()
 

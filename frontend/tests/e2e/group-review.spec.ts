@@ -3,8 +3,8 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 const assessment = { title: 'Review check', subject: 'Science', grade_level: '7', topic: 'Plants' }
 const representatives = (student: string, answer: string) => [{ student_id: student, answer, similarity_to_medoid: 0.9 }]
 const detected = [
-  { group_id: 'grp_light', provisional_label: 'Pattern 1', interpretation_status: 'not_requested', question_id: 'Q1', question: 'How do plants make food?', correct_answer: 'Plants make glucose.', support_count: 3, eligible_response_count: 8, member_student_ids: ['S1', 'S2', 'S3'], representative_responses: representatives('S1', 'Plants eat light.'), coherence: 0.9 },
-  { group_id: 'grp_soil', provisional_label: 'Pattern 2', interpretation_status: 'not_requested', question_id: 'Q1', question: 'How do plants make food?', correct_answer: 'Plants make glucose.', support_count: 2, eligible_response_count: 8, member_student_ids: ['S4', 'S5'], representative_responses: representatives('S4', 'Food comes from soil.'), coherence: 0.82 },
+  { group_id: 'grp_light', provisional_label: 'Pattern 1', interpretation_status: 'completed', question_id: 'Q1', question: 'How do plants make food?', correct_answer: 'Plants make glucose.', support_count: 3, eligible_response_count: 8, member_student_ids: ['S1', 'S2', 'S3'], representative_responses: representatives('S1', 'Plants eat light.'), coherence: 0.9 },
+  { group_id: 'grp_soil', provisional_label: 'Pattern 2', interpretation_status: 'fallback', question_id: 'Q1', question: 'How do plants make food?', correct_answer: 'Plants make glucose.', support_count: 2, eligible_response_count: 8, member_student_ids: ['S4', 'S5'], representative_responses: representatives('S4', 'Food comes from soil.'), coherence: 0.82 },
 ]
 const analysis = {
   assessment_id: 'assessment_review', analysis_id: 'analysis_review', status: 'completed', data_label: 'teacher_upload',
@@ -81,14 +81,16 @@ test('teacher renames, merges, dismisses, restores, and sees ordered history', a
   await installApi(page)
   await page.addInitScript((analysisId) => localStorage.setItem('classlens.workflow.v1', JSON.stringify({ analysis_id: analysisId })), analysis.analysis_id)
   await page.goto('/analysis')
+  await expect(page.getByText('AI-drafted label · teacher review needed')).toBeVisible()
+  await expect(page.getByText('Detected pattern · AI label unavailable')).toBeVisible()
 
   await page.getByRole('button', { name: 'Review groups' }).click()
   await page.getByRole('button', { name: 'Rename Pattern 1' }).click()
   await page.getByLabel('New label').fill('Light is energy, not food')
   await page.getByRole('button', { name: 'Save label' }).click()
-  await expect(page.getByRole('button', { name: /^Potential .*Light is energy, not food/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Teacher-reviewed label.*Light is energy, not food/ })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('button', { name: /^Potential .*Light is energy, not food/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Teacher-reviewed label.*Light is energy, not food/ })).toBeVisible()
 
   await page.getByRole('button', { name: 'Review groups' }).click()
   await page.getByLabel('Select Light is energy, not food').check()
@@ -98,6 +100,7 @@ test('teacher renames, merges, dismisses, restores, and sees ordered history', a
   await expect(page.getByText('5 affected responses in the merged group')).toBeVisible()
   await page.getByRole('button', { name: 'Confirm merge' }).click()
   await expect(page.getByText('Coherence not recalculated')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Teacher-reviewed label.*Sources of plant food/ })).toBeVisible()
 
   await page.getByRole('button', { name: 'Dismiss Sources of plant food' }).click()
   await page.getByRole('button', { name: 'Confirm dismiss' }).click()
@@ -115,7 +118,7 @@ test('a controlled conflict preserves visible review state and explains recovery
   await page.getByLabel('New label').fill('Conflict label')
   await page.getByRole('button', { name: 'Save label' }).click()
   await expect(page.getByText('Another review changed this evidence.')).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Potential .*Pattern 1/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^AI-drafted label .*Pattern 1/ })).toBeVisible()
 })
 
 test('review locks only affected groups and restored review fetch can be retried', async ({ page }) => {

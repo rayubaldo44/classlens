@@ -24,7 +24,7 @@ export type RepresentativeResponse = { student_id: string; answer: string; simil
 export type MisconceptionGroup = {
   group_id: string
   provisional_label: string
-  interpretation_status: 'not_requested'
+  interpretation_status: 'not_requested' | 'completed' | 'fallback'
   question_id: string
   question: string
   correct_answer: string
