@@ -49,7 +49,7 @@ const list = (values: string[]) => `<ul>${values.map((value) => `<li>${escapeHtm
 const field = (label: string, value: string) => `
   <section class="field">
     <h3>${label}</h3>
-    <p>${escapeHtml(value)}</p>
+    <p class="preserve-text">${escapeHtml(value)}</p>
   </section>`
 
 const filenameFor = (input: ApprovedInterventionExportInput) => {
@@ -89,7 +89,7 @@ export function buildApprovedInterventionExport(input: ApprovedInterventionExpor
   const reviewNotes = remediation.review_notes ? `
     <section>
       <h2>Teacher review notes</h2>
-      <p>${escapeHtml(remediation.review_notes)}</p>
+      <p class="preserve-text">${escapeHtml(remediation.review_notes)}</p>
     </section>` : ''
   const syntheticLabel = dataLabel === 'synthetic_demo'
     ? '<p class="label label-warning">Synthetic demo data</p>'
@@ -101,7 +101,7 @@ export function buildApprovedInterventionExport(input: ApprovedInterventionExpor
         <span class="label">${cited.has(source.chunk_id) ? 'Cited by approved intervention' : 'Persisted supporting source'}</span>
       </div>
       <p class="meta">${escapeHtml(source.filename)} · ${escapeHtml(source.chunk_id)} · Chunk ${source.chunk_index + 1} · Characters ${source.start_char}–${source.end_char}</p>
-      <blockquote>${escapeHtml(source.text)}</blockquote>
+      <blockquote class="preserve-text">${escapeHtml(source.text)}</blockquote>
       <dl class="audit compact">
         <div><dt>Material ID</dt><dd>${escapeHtml(source.material_id)}</dd></div>
         <div><dt>Retrieval similarity</dt><dd>${escapeHtml(source.similarity)}</dd></div>
@@ -124,16 +124,20 @@ export function buildApprovedInterventionExport(input: ApprovedInterventionExpor
     h2 { margin-top: 36px; font-size: 1.35rem; }
     h3 { margin: 0 0 6px; font-size: 1rem; }
     p, blockquote { margin: 6px 0 14px; }
+    h1, h2, h3, p, blockquote, li, strong, dd { overflow-wrap: anywhere; }
     blockquote { padding: 14px 18px; border-left: 3px solid #7c8f7d; background: #f5f7f3; }
-    .label { display: inline-block; margin: 0; padding: 4px 8px; border: 1px solid #78917d; color: #315c3c; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .preserve-text { white-space: pre-wrap; }
+    .label { display: inline-block; margin: 0; padding: 4px 8px; border: 1px solid #78917d; color: #315c3c; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; overflow-wrap: anywhere; }
     .label-warning { border-color: #a06b22; color: #74480d; }
     .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 24px; }
     .summary div, .field, .source { break-inside: avoid; }
+    .summary div, .source-heading > * { min-width: 0; }
     .summary span, .meta, dt { color: #5c655e; font-size: .82rem; }
     .summary strong { display: block; }
     .field { padding: 16px 0; border-bottom: 1px solid #e4e2db; }
     .source { margin: 16px 0; padding: 18px; border: 1px solid #d8d6cd; }
-    .source-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+    .source-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: start; }
+    .source-heading h3 { flex: 1 1 240px; }
     .audit { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .audit div { min-width: 0; }
     dt { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
@@ -166,7 +170,7 @@ export function buildApprovedInterventionExport(input: ApprovedInterventionExpor
     ${field('Expected answer', group.correct_answer)}
     <section class="field">
       <h3>Representative responses</h3>
-      ${group.representative_responses.map((response) => `<blockquote>${escapeHtml(response.answer)}</blockquote>`).join('')}
+      ${group.representative_responses.map((response) => `<blockquote class="preserve-text">${escapeHtml(response.answer)}</blockquote>`).join('')}
     </section>
   </section>
 
@@ -180,7 +184,7 @@ export function buildApprovedInterventionExport(input: ApprovedInterventionExpor
     ${optionalAnalogy}
     <section class="field">
       <h3>Checks for understanding</h3>
-      <ol>${content.follow_up_questions.map((question) => `<li><strong>${escapeHtml(question.prompt)}</strong><p>Expected answer: ${escapeHtml(question.expected_answer)}</p></li>`).join('')}</ol>
+      <ol>${content.follow_up_questions.map((question) => `<li><strong class="preserve-text">${escapeHtml(question.prompt)}</strong><p class="preserve-text">Expected answer: ${escapeHtml(question.expected_answer)}</p></li>`).join('')}</ol>
     </section>
     <section class="field"><h3>Validated source references</h3>${list(content.source_references)}</section>
   </section>

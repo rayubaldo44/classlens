@@ -118,6 +118,7 @@ Depends on: P0 gates; preserve the implemented workflow.
   - Approved interventions download as self-contained printable HTML with exact approved content, representative answers, grounded source snapshots, review notes, and audit provenance while omitting student IDs.
   - Spec: [`docs/superpowers/specs/2026-10-23-approved-intervention-export-design.md`](docs/superpowers/specs/2026-10-23-approved-intervention-export-design.md)
   - Execution plan: [`docs/superpowers/plans/2026-10-23-approved-intervention-export.md`](docs/superpowers/plans/2026-10-23-approved-intervention-export.md). Four frontend unit test files, lint/build, and all six Chromium scenarios pass.
+  - Fresh final review fixed multiline-content collapse and long unbroken screen/print overflow with a rendered-artifact RED→GREEN regression.
 - [x] Remove unused response/evidence examples from `frontend/src/mockData.ts`; retain scenario metadata and navigation definitions.
 - [x] Reconcile stale implementation wording in authoritative documentation with verified code/state; keep proposed features visibly separate. (2026-10-14)
 - [ ] Add more robust document format support only if required by the actual demo/pilot material; select extractors before implementation and preserve source locations.

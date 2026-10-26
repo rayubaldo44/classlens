@@ -134,7 +134,7 @@ const generatedContent = {
   learning_objective: 'Distinguish light energy from glucose matter.',
   teacher_explanation: 'Light provides energy; plants manufacture glucose.',
   corrected_concept: 'Plants use light energy to make and store energy in glucose.',
-  activity: 'Sort examples into energy inputs and matter products.',
+  activity: '1. Read the source passage.\n2. Explain where plant food comes from.\n\nCompare with a partner.',
   analogy: null,
   follow_up_questions: [{ prompt: 'What does sunlight provide?', expected_answer: 'Energy.' }],
   source_references: ['chunk_001'],
@@ -339,6 +339,37 @@ test('teacher completes and restores the evidence-backed workflow after a contro
     reviewNotes,
   ]) expect(downloadedHtml).toContain(expected)
   for (const studentId of group.member_student_ids) expect(downloadedHtml).not.toContain(studentId)
+
+  const artifactPage = await page.context().newPage()
+  await artifactPage.setViewportSize({ width: 900, height: 900 })
+  await artifactPage.setContent(downloadedHtml)
+  const activityParagraph = artifactPage.locator('.field').filter({
+    has: artifactPage.getByRole('heading', { name: 'Activity' }),
+  }).locator('p')
+  const activityLayout = await activityParagraph.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      height: element.getBoundingClientRect().height,
+      lineHeight: Number.parseFloat(style.lineHeight),
+    }
+  })
+  expect.soft(activityLayout.height).toBeGreaterThan(activityLayout.lineHeight * 3)
+
+  const longToken = 'UnbrokenMetadata'.repeat(80)
+  await artifactPage.locator('.summary strong').nth(1).evaluate((element, value) => { element.textContent = value }, longToken)
+  await artifactPage.locator('.source h3').evaluate((element, value) => { element.textContent = value }, longToken)
+  await artifactPage.locator('.source blockquote').evaluate((element, value) => { element.textContent = value }, longToken)
+  const documentWidth = async () => artifactPage.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }))
+  const screenWidth = await documentWidth()
+  expect.soft(screenWidth.scroll).toBeLessThanOrEqual(screenWidth.client)
+  await artifactPage.emulateMedia({ media: 'print' })
+  const printWidth = await documentWidth()
+  expect.soft(printWidth.scroll).toBeLessThanOrEqual(printWidth.client)
+  await artifactPage.close()
+
   await expect(page).toHaveURL(/\/intervention$/)
   await expect(page.getByText('Approved by teacher')).toBeVisible()
   await page.getByRole('button', { name: /Continue to results/ }).click()
