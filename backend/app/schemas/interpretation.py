@@ -11,7 +11,7 @@ class GroupLabelDraft(BaseModel):
     @field_validator("group_id", "label")
     @classmethod
     def require_trimmed_single_line_text(cls, value: str) -> str:
-        if value != value.strip() or "\n" in value or "\r" in value:
+        if value != value.strip() or "\x00" in value or len(value.splitlines()) != 1:
             raise ValueError("Text must be trimmed and single-line.")
         return value
 

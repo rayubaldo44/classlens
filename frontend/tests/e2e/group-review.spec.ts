@@ -93,7 +93,15 @@ test('teacher renames, merges, dismisses, restores, and sees ordered history', a
   await expect(page.getByRole('button', { name: /^Teacher-reviewed label.*Light is energy, not food/ })).toBeVisible()
 
   await page.getByRole('button', { name: 'Review groups' }).click()
-  await page.getByLabel('Select Light is energy, not food').check()
+  await page.getByRole('button', { name: 'Rename Light is energy, not food' }).click()
+  await page.getByLabel('New label').fill('Pattern 1')
+  await page.getByRole('button', { name: 'Save label' }).click()
+  await expect(page.getByRole('button', { name: /^Teacher-reviewed label.*Pattern 1/ })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: /^Teacher-reviewed label.*Pattern 1/ })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Review groups' }).click()
+  await page.getByLabel('Select Pattern 1').check()
   await page.getByLabel('Select Pattern 2').check()
   await page.getByLabel('Merged label').fill('Sources of plant food')
   await page.getByRole('button', { name: 'Merge 2 groups' }).click()
@@ -106,7 +114,7 @@ test('teacher renames, merges, dismisses, restores, and sees ordered history', a
   await page.getByRole('button', { name: 'Confirm dismiss' }).click()
   await page.getByText('Dismissed (1)').click()
   await page.getByRole('button', { name: 'Restore Sources of plant food' }).click()
-  await expect(page.getByText('4 review actions')).toBeVisible()
+  await expect(page.getByText('5 review actions')).toBeVisible()
 })
 
 test('a controlled conflict preserves visible review state and explains recovery', async ({ page }) => {

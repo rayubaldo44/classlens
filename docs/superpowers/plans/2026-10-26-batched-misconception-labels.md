@@ -256,6 +256,6 @@ git add docs/AI_PIPELINE.md docs/API.md docs/PRODUCT.md docs/ARCHITECTURE.md doc
 git commit -m "docs: record batched misconception labels"
 ```
 
-- [ ] **Step 6: Request final code review and address Important findings**
+- [x] **Step 6: Request final code review and address Important findings**
 
 Review the complete feature diff against this spec, rerun affected checks after any correction, and do not merge or claim completion with unresolved Important findings.

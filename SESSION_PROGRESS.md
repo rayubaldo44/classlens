@@ -1409,3 +1409,20 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: complete the required fresh whole-branch review, address any Important findings, rerun affected checks, and integrate through the normal local branch workflow.
 
 ---
+
+## Session / Milestone: Batched label final-review hardening
+
+**Date:** 2026-10-27 (Asia/Manila)
+
+**Status:** Fresh whole-branch review findings fixed and the final gate passed
+
+- Attempted and completed: independently reviewed the five-commit feature range, reproduced the review findings, and completed one test-first hardening pass for malformed provider labels, prompt serialization, teacher-review provenance, and concurrency documentation.
+- Files significantly modified: interpretation schema/tests, analysis-screen provenance rendering, group-review browser coverage, AI/architecture/API status documentation, the implementation plan, and this log.
+- What was completed: embedded NUL and Unicode line separators now invalidate the complete provider batch and trigger deterministic fallback; an adversarial representative answer containing instruction overrides, quotes, newlines, and a fake packet is proven to remain one JSON data value; rename history keeps a label teacher-reviewed even when its wording returns to the original; documentation now states that simultaneous uncached requests may each call Gemini while converging on one canonical record.
+- Verified/tested: both backend regressions and the provenance browser check failed before implementation. Focused checks then passed (`20 passed` backend interpretation tests and `3 passed` group-review Chromium scenarios). The final full gate passed backend `136 passed, 1 skipped`, 23 frontend unit tests across four files, ESLint, production build, all six Chromium scenarios, and `git diff --check`.
+- Problems encountered: the new rename-back browser scenario correctly increased persisted review history from four to five actions, so the stale count assertion was updated after provenance behavior passed. The first final-gate attempt before review had also inherited the temporary live `.env` link and a sandboxed browser-port restriction; removing the link and running Playwright with local-port permission restored the isolated gate.
+- Important decisions: reject provider text that PostgreSQL cannot persist before marking interpretation completed; verify prompt serialization isolation without claiming live-model immunity; use persisted rename events, not current label equality alone, for teacher provenance; distinguish canonical convergence from single-flight provider suppression.
+- Remaining work: integrate the reviewed branch. Hosted verification remains blocked by the documented Render memory limit, and educator review of broader real-embedding evaluation remains pending.
+- Recommended next step: finish the local branch workflow and integrate the reviewed changes without pushing unless explicitly requested.
+
+---
