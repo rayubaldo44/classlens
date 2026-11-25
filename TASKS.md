@@ -12,7 +12,7 @@ Tasks are grouped by priority, then category. Within each category, work from to
 | P1 | Reliability, testing, and optional product improvements | After the P0 demo gates pass |
 | P2 | Real-school pilot safeguards and later product work | After the demo; safeguards must pass before real student data |
 
-**Next action:** keep publication on hold until the Render owner can contain all workflow origins. Then review historical metadata and verify GitHub settings and CI on the hardened candidate.
+**Next action:** maintain the released local demo. Revisit the hosted and pilot requirements before operating a shared service.
 
 ## P0 — demo critical
 
@@ -57,7 +57,7 @@ Depends on: persisted question-specific groups and exact representative evidence
 
 ## P1 — reliability and improvements after P0
 
-### Open-source demo release — on hold after deep risk review
+### Open-source demo release — v0.1.0 published
 
 Accepted scope (2026-11-25): MIT for original work, runnable synthetic-data demo,
 existing repository/history, no pilot-feature expansion. See [release audit](docs/OPEN_SOURCE_RELEASE.md).
@@ -70,15 +70,21 @@ existing repository/history, no pilot-feature expansion. See [release audit](doc
 - [x] Finish the live synthetic browser workflow and final review: ordinary upload through real Gemini, teacher edit/approval, results (9/43 → 3/43), and reload passed; independent review found no Important or Critical issues.
 - [x] Commit and push reviewed preparation; all four GitHub CI jobs passed on `8edbd4d519478c7b42d877fcbf76b9130a7400f3`. See [the verified run](https://github.com/rayubaldo44/classlens/actions/runs/45547139136).
 - [x] Complete deep source/history/dependency/GitHub/exposure risk review and update the release plan with source-backed findings and explicit evidence limits. See [risk review](docs/OPEN_SOURCE_RISK_REVIEW.md).
-- [ ] Gate 1: obtain authorization for hosted containment and prove all connected API origins are suspended/access-restricted; verify retained hosted database/credential boundaries without reading student records.
+- [x] Gate 1 known-origin checks: Render confirms suspension, lists no API previews, and returns the suspension page for public health, OpenAPI, and a workflow read.
+- [x] Gate 1 deployment settings: Render confirms suspension and both auto-deploy and preview generation are off.
+- [x] Gate 1 custom domains: the maintainer confirmed the Render Custom Domains list is empty.
+- [x] The maintainer confirmed review of recent Gemini usage and whether hosted Gemini and database credentials are dedicated or shared.
+- [ ] Verify database access boundaries before resuming hosted operation.
 - [x] Gate 2 locally: patched hash-checked Python and npm locks, updated license inventory, zero current OSV/npm matches, and clean-install live rehearsal.
 - [x] Gate 3 locally: added failing-before/passing-after regressions for server-derived retrieval, request/edit/context bounds, worker admission, and cache/lock lifecycle.
 - [x] Gate 4 source changes: immutable CI pins, scheduled scans, CODEOWNERS, and portable wrapper-only Graphify guidance.
-- [ ] Gate 4 external checks: metadata/rights sign-off and verified repository/reporting controls.
-- [ ] Gate 5: verify all fixes on the exact candidate commit, obtain publication approval, and publish the local synthetic-only v0.1.0 source release.
+- [x] The maintainer confirmed contributor consent to publish existing history, including commit emails, local paths, and old deployment links.
+- [x] Gate 4 external checks completed. The maintainer approved MIT publication and the public repository controls were verified.
+- [x] Gate 5 candidate CI: all five jobs passed on private branch commit `c705d31`.
+- [x] Gate 5 publication completed. The public tag and anonymous source archive were verified.
 
 **Acceptance:** all five [revised risk gates](docs/superpowers/plans/2026-11-25-open-source-release.md)
-have evidence, not just green functional tests. Runtime remediation is verified locally. Hosted containment remains open. Visibility/release actions
+have evidence, not just green functional tests. Runtime remediation is verified locally. The known hosted API is suspended. Visibility/release actions
 and school/pilot operation remain separate authorization and readiness gates.
 
 ### Runtime and deployment reproducibility

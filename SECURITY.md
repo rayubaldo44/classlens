@@ -3,10 +3,7 @@
 ClassLens is an experimental demo. Only the current default branch is maintained;
 older snapshots have no security-support commitment.
 
-Public release is currently on hold following the
-[2026-11-25 risk review](docs/OPEN_SOURCE_RISK_REVIEW.md). The local hardening candidate passes functional and dependency checks.
-Public release still requires hosted containment and the remaining checks in the
-[release plan](docs/superpowers/plans/2026-11-25-open-source-release.md).
+The public v0.1.0 release supports a local synthetic-data demo. The hosted API is suspended.
 
 ## Report a vulnerability
 
