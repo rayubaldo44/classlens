@@ -1,5 +1,11 @@
 # Open-source release preparation
 
+> **PUBLICATION HOLD — deep review, 2026-11-25.** The functional preparation and
+> CI evidence below remain valid, but they do not establish security readiness.
+> Follow the [risk review](OPEN_SOURCE_RISK_REVIEW.md) and
+> [revised release plan](superpowers/plans/2026-11-25-open-source-release.md)
+> before any visibility change or tag. Mitigations are planned, not implemented.
+
 Target: `v0.1.0` runnable synthetic-data demo, MIT for original work, preserving
 `rayubaldo44/classlens` and its history. **Not published.** Source preparation has
 been committed and pushed; repository visibility, tags, and GitHub settings remain
@@ -100,20 +106,24 @@ any subsequent documentation-only verification record.
 
 ## Maintainer publication gate
 
-After reviewing the final diff and verification results:
+The previous preparation-only gate is superseded by the five gates in the
+[revised plan](superpowers/plans/2026-11-25-open-source-release.md):
 
-1. Confirm that publishing contributor identities, historical local paths, and
-   Vercel bot metadata is acceptable. Review external deployment access controls.
-2. Resolve remaining verification items above; do not claim hosted readiness.
-3. Preparation is on `main` with passing CI as recorded above. Confirm the exact
-   commit selected for release still has passing CI.
-   Re-run the history scan on the exact refs being exposed and confirm the
-   source archive excludes environment files, caches, dependencies, and raw logs.
-4. Approve changing the existing repository to public. Enable GitHub private
-   vulnerability reporting and secret scanning/push protection where available;
-   verify that the Security tab's reporting action works.
-5. Tag the reviewed commit `v0.1.0` and publish the [draft notes](releases/v0.1.0.md),
-   describing local synthetic-data verification and the remaining pilot gates.
+1. Contain the reachable hosted workflow and verify deployment/credential boundaries.
+2. Resolve dependency advisories and installation provenance with fresh evidence.
+3. Fix the reproduced grounding, request/edit-boundary, and admission weaknesses.
+4. Review metadata/rights exposure and strengthen repository/tooling controls.
+5. Verify the exact fixed candidate, obtain publication approval, and only then
+   change visibility and tag/publish the [source-only notes](releases/v0.1.0.md).
 
-No auth implementation, hosting purchase, provider migration, or package-registry
-publication is part of this source release.
+The review refreshed the scan to 52 commits, six CI log archives, and current PR
+discussion with no secret findings. It also found unresolved dependency advisories
+and reproduced application gaps. All four CI jobs passed again on verification
+record commit `1107ea7a9f0db604b3ac73ced1d53cb882a6ed28` in
+[run 45547489379](https://github.com/rayubaldo44/classlens/actions/runs/45547489379);
+these functional checks do not waive the new risk gates.
+
+The default remains a local, single-user, single-process synthetic demo. No hosting
+purchase, provider migration, package-registry publication, history rewrite, or
+operational security change is authorized by this documentation update. Shared
+hosted and real-student use require the separate safeguards in the revised plan.

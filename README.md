@@ -18,6 +18,11 @@ Semantic grouping is evidence for teacher review, not a diagnosis. Before/after 
 
 ## Release status
 
+**Public release is on hold after a [deep risk review](docs/OPEN_SOURCE_RISK_REVIEW.md).**
+The [revised release plan](docs/superpowers/plans/2026-11-25-open-source-release.md)
+requires hosted containment, dependency updates, and boundary fixes before
+publication. Those mitigations are planned and have not been applied yet.
+
 This is a runnable research/demo MVP. Use synthetic inputs only: authentication,
 record ownership checks, privacy/retention workflows, and generation spend controls
 are not implemented. Hosted analysis remains unverified because the current

@@ -12,7 +12,7 @@ Tasks are grouped by priority, then category. Within each category, work from to
 | P1 | Reliability, testing, and optional product improvements | After the P0 demo gates pass |
 | P2 | Real-school pilot safeguards and later product work | After the demo; safeguards must pass before real student data |
 
-**Next action:** finish the open-source demo release checks below and review the publication gate. Hosted analysis remains deferred until adequate memory is available; educator review of embedding regression cases remains pending.
+**Next action:** keep publication on hold; obtain authorization to contain hosted exposure, then execute the dependency and application-boundary fixes in the revised release plan. Functional CI is green but does not close the new security gates. Hosted capacity and school-pilot work remain separate.
 
 ## P0 — demo critical
 
@@ -57,7 +57,7 @@ Depends on: persisted question-specific groups and exact representative evidence
 
 ## P1 — reliability and improvements after P0
 
-### Open-source demo release
+### Open-source demo release — on hold after deep risk review
 
 Accepted scope (2026-11-25): MIT for original work, runnable synthetic-data demo,
 existing repository/history, no pilot-feature expansion. See [release audit](docs/OPEN_SOURCE_RELEASE.md).
@@ -69,11 +69,17 @@ existing repository/history, no pilot-feature expansion. See [release audit](doc
 - [x] Download and warm the pinned model from an empty cache.
 - [x] Finish the live synthetic browser workflow and final review: ordinary upload through real Gemini, teacher edit/approval, results (9/43 → 3/43), and reload passed; independent review found no Important or Critical issues.
 - [x] Commit and push reviewed preparation; all four GitHub CI jobs passed on `8edbd4d519478c7b42d877fcbf76b9130a7400f3`. See [the verified run](https://github.com/rayubaldo44/classlens/actions/runs/45547139136).
-- [ ] Obtain publication approval, review linked deployments and public metadata, enable/verify private reporting, and publish v0.1.0 from an exact CI-verified commit.
+- [x] Complete deep source/history/dependency/GitHub/exposure risk review and update the release plan with source-backed findings and explicit evidence limits. See [risk review](docs/OPEN_SOURCE_RISK_REVIEW.md).
+- [ ] Gate 1: obtain authorization for hosted containment and prove all connected API origins are suspended/access-restricted; verify retained hosted database/credential boundaries without reading student records.
+- [ ] Gate 2: fix or narrowly triage current npm/OSV advisories; regenerate compatible verified locks, artifact provenance, and license inventory.
+- [ ] Gate 3: implement and regression-test server-derived retrieval, streamed body/edit/context bounds, finite work admission, and safe cache/lock lifecycle.
+- [ ] Gate 4: complete metadata/rights sign-off, immutable CI/provenance hardening, wrapper-only agent guidance, and verified repository/reporting controls.
+- [ ] Gate 5: verify all fixes on the exact candidate commit, obtain publication approval, and publish the local synthetic-only v0.1.0 source release.
 
-**Acceptance:** clean-source local golden path and automated gates pass; exact
-publication content is reviewed; visibility and release changes remain explicit
-maintainer actions. School/pilot readiness is a separate milestone.
+**Acceptance:** all five [revised risk gates](docs/superpowers/plans/2026-11-25-open-source-release.md)
+have evidence, not just green functional tests. No runtime remediation or hosted
+containment is complete as a result of this review. Visibility/release actions
+and school/pilot operation remain separate authorization and readiness gates.
 
 ### Runtime and deployment reproducibility
 
