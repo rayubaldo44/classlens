@@ -3,7 +3,7 @@ name: Release security
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, chore/open-source-hardening]
   schedule:
     - cron: '23 4 * * 1'
   workflow_dispatch:
