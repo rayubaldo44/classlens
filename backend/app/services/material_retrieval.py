@@ -1,9 +1,11 @@
 import math
+from dataclasses import replace
 from time import perf_counter
 
 from app.config import MaterialSettings
 from app.providers.embeddings import EmbeddingService
 from app.providers.material_index import MaterialIndex
+from app.providers.material_index.protocol import score_material
 from app.providers.analysis_store import AnalysisStore
 from app.providers.group_review_store import GroupReviewStore
 from app.schemas.materials import (
@@ -65,7 +67,7 @@ def retrieve_for_misconception(
             setter = getattr(material_index, "set_embeddings", None)
             if setter is not None:
                 setter(material_id, cached)
-            record = material_index.get(material_id) or record
+            record = replace(record, embeddings=cached)
         except MaterialError:
             raise
         except Exception as error:
@@ -89,7 +91,7 @@ def retrieve_for_misconception(
                 "The query vector dimensions do not match the indexed material.",
                 retryable=True,
             )
-        hits = material_index.search(material_id, query_vector, settings.retrieval_top_k)
+        hits = score_material(record, query_vector, settings.retrieval_top_k)
     except MaterialError:
         raise
     except Exception as error:

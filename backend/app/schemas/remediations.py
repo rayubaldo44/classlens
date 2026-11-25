@@ -7,6 +7,9 @@ from .analysis import RepresentativeResponse
 from .materials import MaterialRetrievalResponse
 
 
+MAX_REMEDIATION_FIELD_CHARS = 4_000
+
+
 class FollowUpQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -24,6 +27,15 @@ class EditableRemediationContent(BaseModel):
     activity: str
     analogy: str | None = None
     follow_up_questions: list[FollowUpQuestion]
+
+    def validate_analogy_and_follow_up_lengths(self) -> None:
+        if self.analogy is not None and len(self.analogy) > MAX_REMEDIATION_FIELD_CHARS:
+            raise ValueError("analogy is too long.")
+        for item in self.follow_up_questions:
+            if len(item.prompt) > MAX_REMEDIATION_FIELD_CHARS:
+                raise ValueError("Follow-up prompt is too long.")
+            if len(item.expected_answer) > MAX_REMEDIATION_FIELD_CHARS:
+                raise ValueError("Follow-up expected answer is too long.")
 
 
 class GeneratedRemediationDraft(EditableRemediationContent):

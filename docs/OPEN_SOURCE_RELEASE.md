@@ -4,7 +4,8 @@
 > CI evidence below remain valid, but they do not establish security readiness.
 > Follow the [risk review](OPEN_SOURCE_RISK_REVIEW.md) and
 > [revised release plan](superpowers/plans/2026-11-25-open-source-release.md)
-> before any visibility change or tag. Mitigations are planned, not implemented.
+> before any visibility change or tag. The dependency and application fixes passed
+local verification. Hosting, metadata, repository settings, and remote CI remain open.
 
 Target: `v0.1.0` runnable synthetic-data demo, MIT for original work, preserving
 `rayubaldo44/classlens` and its history. **Not published.** Source preparation has

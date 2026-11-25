@@ -3,18 +3,26 @@ from datetime import UTC, datetime
 from hashlib import sha256
 import json
 from time import perf_counter
-from typing import Any
+from typing import Any, NoReturn
 
 from app.concurrency import run_in_worker
-
+from app.config import MaterialSettings
+from app.locks import AsyncKeyedLocks
 from app.prompts.remediation import PROMPT_VERSION, build_remediation_prompt
-from app.providers.analysis_store import AnalysisSnapshot, AnalysisStore
+from app.providers.analysis_store import AnalysisStore
+from app.providers.embeddings import EmbeddingService
 from app.providers.group_review_store import GroupReviewStore
 from app.providers.llm import LLMProviderError, LLMService
-from app.providers.material_index import MaterialIndex, MaterialRecord
+from app.providers.material_index import MaterialIndex
 from app.providers.remediation_store import RemediationStore
-from app.schemas.materials import MaterialRetrievalResponse, RetrievedChunk
+from app.schemas.materials import (
+    MaterialChunk,
+    MaterialRetrievalResponse,
+    MisconceptionRetrievalContext,
+    RetrievedChunk,
+)
 from app.schemas.remediations import (
+    MAX_REMEDIATION_FIELD_CHARS,
     EditableRemediationContent,
     GeneratedRemediationDraft,
     RemediationContent,
@@ -25,11 +33,14 @@ from app.schemas.remediations import (
     RemediationReviewRequest,
     RemediationSource,
 )
-from app.telemetry import log_stage
 from app.services.group_reviews import GroupReviewError, group_review_lock, resolve_reviewed_group
+from app.services.material_ingestion import MaterialError
+from app.services.material_retrieval import retrieve_for_misconception
+from app.telemetry import log_stage
 
 
-_GENERATION_LOCKS: dict[str, asyncio.Lock] = {}
+MAX_GENERATION_SOURCE_CHARS = 12_000
+_GENERATION_LOCKS = AsyncKeyedLocks()
 
 
 class RemediationError(Exception):
@@ -55,35 +66,43 @@ async def generate_grounded_remediation(
     store: RemediationStore,
     analysis_store: AnalysisStore,
     material_index: MaterialIndex,
-    review_store: GroupReviewStore | None = None,
+    review_store: GroupReviewStore,
+    embedding_service: EmbeddingService,
+    settings: MaterialSettings,
 ) -> RemediationGenerationResponse:
-    analysis = await run_in_worker(analysis_store.get, request.analysis_id)
-    if analysis is None:
-        raise RemediationError(
-            "remediation_context_not_found",
-            "The selected analysis is no longer available. Reload the analysis before generating an intervention.",
-            details={"resource": "analysis", "analysis_id": request.analysis_id},
-        )
-    material = await run_in_worker(material_index.get, request.retrieval.material.material_id)
-    if material is None:
-        raise RemediationError(
-            "remediation_context_not_found",
-            "The selected teacher material is no longer available. Retrieve passages again before generating an intervention.",
-            details={"resource": "material", "material_id": request.retrieval.material.material_id},
-        )
-    request = _canonical_generation_request(
-        request, analysis=analysis, material=material, review_store=review_store, analysis_store=analysis_store
+    retrieval = await run_in_worker(
+        _retrieve_generation_context,
+        request,
+        analysis_store=analysis_store,
+        material_index=material_index,
+        review_store=review_store,
+        embedding_service=embedding_service,
+        settings=settings,
     )
-
-    if request.retrieval.status != "retrieved" or not request.retrieval.results:
+    if retrieval.status != "retrieved":
         return RemediationGenerationResponse(
             status="insufficient_context",
             message="Insufficient teacher-provided material to generate grounded remediation.",
         )
 
+    if _chunk_ids(request.retrieval) != _chunk_ids(retrieval):
+        _raise_context_mismatch("retrieval.results")
+    if any(
+        _passage_snapshot(supplied) != _passage_snapshot(selected)
+        for supplied, selected in zip(request.retrieval.results, retrieval.results, strict=True)
+    ):
+        _raise_context_mismatch("retrieval.results.chunk")
+    source_chars = sum(len(item.text) for item in retrieval.results)
+    if source_chars > MAX_GENERATION_SOURCE_CHARS:
+        raise RemediationError(
+            "generation_context_too_large",
+            "The retrieved teacher-material passages are too long to generate an intervention.",
+            details={"source_chars": source_chars, "max_source_chars": MAX_GENERATION_SOURCE_CHARS},
+        )
+
+    request = request.model_copy(update={"retrieval": retrieval})
     remediation_id = _remediation_id(request)
-    lock = _GENERATION_LOCKS.setdefault(remediation_id, asyncio.Lock())
-    async with lock:
+    async with _GENERATION_LOCKS.hold(remediation_id):
         existing = await run_in_worker(store.get, remediation_id)
         if existing is not None:
             return RemediationGenerationResponse(status="generated", remediation=existing)
@@ -133,16 +152,29 @@ async def generate_grounded_remediation(
             updated_at=now,
         )
         started = perf_counter()
-        await run_in_worker(
+        save = asyncio.create_task(run_in_worker(
             _save_if_review_is_current,
             request,
             record,
-            analysis,
-            material,
             store,
             analysis_store,
+            material_index,
             review_store,
-        )
+        ))
+        try:
+            await asyncio.shield(save)
+        except asyncio.CancelledError:
+            # Preserve the generation lock until an admitted save settles.
+            while not save.done():
+                try:
+                    await asyncio.shield(save)
+                except asyncio.CancelledError:
+                    continue
+                except Exception:
+                    break
+            if not save.cancelled():
+                save.exception()
+            raise
         log_stage("database_persistence", (perf_counter() - started) * 1000, operation="remediation_save")
         return RemediationGenerationResponse(status="generated", remediation=record)
 
@@ -150,61 +182,112 @@ async def generate_grounded_remediation(
 def _save_if_review_is_current(
     request: RemediationGenerationRequest,
     record: RemediationRecord,
-    analysis: AnalysisSnapshot,
-    material: MaterialRecord,
     store: RemediationStore,
     analysis_store: AnalysisStore,
-    review_store: GroupReviewStore | None,
+    material_index: MaterialIndex,
+    review_store: GroupReviewStore,
 ) -> None:
     with group_review_lock(request.analysis_id):
-        _canonical_generation_request(
+        _validate_generation_context(
             request,
-            analysis=analysis,
-            material=material,
-            review_store=review_store,
             analysis_store=analysis_store,
+            material_index=material_index,
+            review_store=review_store,
         )
         store.save(record)
 
 
+def _chunk_ids(retrieval: MaterialRetrievalResponse) -> list[str]:
+    return [item.chunk_id for item in retrieval.results]
+
+
+def _passage_snapshot(chunk: MaterialChunk | RetrievedChunk) -> tuple[int, str, int, int]:
+    return chunk.chunk_index, chunk.text, chunk.start_char, chunk.end_char
+
+
 def _remediation_id(request: RemediationGenerationRequest) -> str:
     identity = {
+        "retrieval_identity": "server_v1",
         "generation_request_id": request.generation_request_id,
         "analysis_id": request.analysis_id,
         "group_id": request.misconception.group_id,
         "material_id": request.retrieval.material.material_id,
-        "chunk_ids": [item.chunk_id for item in request.retrieval.results],
+        "chunk_ids": _chunk_ids(request.retrieval),
     }
     digest = sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
     return f"rem_{digest[:32]}"
 
 
-def _canonical_generation_request(
+def _retrieve_generation_context(
     request: RemediationGenerationRequest,
     *,
-    analysis: AnalysisSnapshot,
-    material: MaterialRecord,
-    review_store: GroupReviewStore | None,
     analysis_store: AnalysisStore,
-) -> RemediationGenerationRequest:
+    material_index: MaterialIndex,
+    review_store: GroupReviewStore,
+    embedding_service: EmbeddingService,
+    settings: MaterialSettings,
+) -> MaterialRetrievalResponse:
+    context = _validate_generation_context(
+        request,
+        analysis_store=analysis_store,
+        material_index=material_index,
+        review_store=review_store,
+    )
+    material_id = request.retrieval.material.material_id
+    try:
+        retrieval = retrieve_for_misconception(
+            material_id,
+            context,
+            embedding_service=embedding_service,
+            material_index=material_index,
+            settings=settings,
+            analysis_store=analysis_store,
+            review_store=review_store,
+        )
+    except MaterialError as error:
+        if error.code == "material_not_found":
+            _raise_missing_material(material_id)
+        if error.code == "analysis_not_found":
+            _raise_missing_analysis(context.analysis_id)
+        if error.code == "group_review_context_mismatch":
+            _raise_context_mismatch("misconception")
+        if error.code == "reviewed_group_not_available":
+            raise RemediationError(error.code, error.message, details=error.details) from error
+        raise
+
+    if retrieval.material != request.retrieval.material:
+        _raise_context_mismatch("retrieval.material")
+    if retrieval.source_group_ids != request.misconception.source_group_ids:
+        _raise_context_mismatch("retrieval.source_group_ids")
+    return retrieval
+
+
+def _validate_generation_context(
+    request: RemediationGenerationRequest,
+    *,
+    analysis_store: AnalysisStore,
+    material_index: MaterialIndex,
+    review_store: GroupReviewStore,
+) -> MisconceptionRetrievalContext:
+    analysis = analysis_store.get(request.analysis_id)
+    if analysis is None:
+        _raise_missing_analysis(request.analysis_id)
+    material_id = request.retrieval.material.material_id
+    material = material_index.get(material_id)
+    if material is None:
+        _raise_missing_material(material_id)
+
     result = analysis.result
     if result.analysis_id != request.analysis_id:
         _raise_context_mismatch("analysis_id")
 
     try:
-        if review_store is None:
-            detected = next(
-                (item for item in result.groups if item.group_id == request.misconception.group_id), None
-            )
-            if detected is None:
-                _raise_context_mismatch("misconception.group_id")
-            from app.services.group_reviews import _from_detected
-            group = _from_detected(detected)
-        else:
-            group = resolve_reviewed_group(
-                request.analysis_id, request.misconception.group_id, analysis_store, review_store
-            )
+        group = resolve_reviewed_group(
+            request.analysis_id, request.misconception.group_id, analysis_store, review_store
+        )
     except GroupReviewError as error:
+        if error.code == "analysis_not_found":
+            _raise_missing_analysis(request.analysis_id)
         raise RemediationError(error.code, error.message, details=error.details) from error
 
     assessment = result.assessment
@@ -243,16 +326,10 @@ def _canonical_generation_request(
     if request.retrieval.retrieval.embedding_model != material.material.embedding_model:
         _raise_context_mismatch("retrieval.embedding_model")
 
-    if request.retrieval.status == "retrieved" and not request.retrieval.results:
-        _raise_context_mismatch("retrieval.results")
-    if request.retrieval.status == "insufficient_relevant_context" and request.retrieval.results:
-        _raise_context_mismatch("retrieval.status")
-
     chunks_by_id = {chunk.chunk_id: chunk for chunk in material.chunks}
     if len(chunks_by_id) != len(material.chunks):
         _raise_context_mismatch("material.chunks")
 
-    canonical_results: list[RetrievedChunk] = []
     seen_chunk_ids: set[str] = set()
     for supplied in request.retrieval.results:
         if supplied.chunk_id in seen_chunk_ids:
@@ -261,45 +338,35 @@ def _canonical_generation_request(
         chunk = chunks_by_id.get(supplied.chunk_id)
         if chunk is None:
             _raise_context_mismatch("retrieval.results.chunk_id")
-        if (
-            supplied.chunk_index != chunk.chunk_index
-            or supplied.text != chunk.text
-            or supplied.start_char != chunk.start_char
-            or supplied.end_char != chunk.end_char
-        ):
+        if _passage_snapshot(supplied) != _passage_snapshot(chunk):
             _raise_context_mismatch("retrieval.results.chunk")
-        canonical_results.append(
-            RetrievedChunk(
-                chunk_id=chunk.chunk_id,
-                chunk_index=chunk.chunk_index,
-                text=chunk.text,
-                similarity=supplied.similarity,
-                start_char=chunk.start_char,
-                end_char=chunk.end_char,
-            )
-        )
-
-    canonical_retrieval = MaterialRetrievalResponse(
-        status=request.retrieval.status,
-        group_id=group.reviewed_group_id,
-        source_group_ids=group.source_group_ids,
-        material=material.material.model_copy(deep=True),
-        retrieval=request.retrieval.retrieval.model_copy(deep=True),
-        results=canonical_results,
-        message=request.retrieval.message,
-    )
-    return RemediationGenerationRequest(
-        generation_request_id=request.generation_request_id,
+    return MisconceptionRetrievalContext(
         analysis_id=result.analysis_id,
-        grade_level=assessment.grade_level,
-        subject=assessment.subject,
-        topic=assessment.topic,
-        misconception=canonical_misconception,
-        retrieval=canonical_retrieval,
+        group_id=group.reviewed_group_id,
+        question_id=group.question_id,
+        question=group.question,
+        correct_answer=group.correct_answer,
+        representative_answers=[item.answer for item in group.representative_responses],
     )
 
 
-def _raise_context_mismatch(field: str) -> None:
+def _raise_missing_analysis(analysis_id: str) -> NoReturn:
+    raise RemediationError(
+        "remediation_context_not_found",
+        "The selected analysis is no longer available. Reload the analysis before generating an intervention.",
+        details={"resource": "analysis", "analysis_id": analysis_id},
+    )
+
+
+def _raise_missing_material(material_id: str) -> NoReturn:
+    raise RemediationError(
+        "remediation_context_not_found",
+        "The selected teacher material is no longer available. Retrieve passages again before generating an intervention.",
+        details={"resource": "material", "material_id": material_id},
+    )
+
+
+def _raise_context_mismatch(field: str) -> NoReturn:
     raise RemediationError(
         "remediation_context_mismatch",
         "The generation context no longer matches stored analysis or teacher-material evidence. Reload the workflow and retrieve passages again.",
@@ -374,9 +441,13 @@ def _validate_edit(content: EditableRemediationContent) -> EditableRemediationCo
         value = getattr(content, field_name).strip()
         if not value:
             raise RemediationError("remediation_invalid_content", f"{field_name} cannot be empty.")
-        if len(value) > 4_000:
+        if len(value) > MAX_REMEDIATION_FIELD_CHARS:
             raise RemediationError("remediation_invalid_content", f"{field_name} is too long.")
         setattr(content, field_name, value)
+    try:
+        content.validate_analogy_and_follow_up_lengths()
+    except ValueError as error:
+        raise RemediationError("remediation_invalid_content", str(error)) from error
     if content.analogy is not None:
         content.analogy = content.analogy.strip() or None
     if not 1 <= len(content.follow_up_questions) <= 3:

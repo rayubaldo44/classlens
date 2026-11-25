@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from app.concurrency import run_in_worker
+from app.request_limits import UploadRoute
 from app.config import get_analysis_settings
 from app.database import DatabaseError
 from app.providers.embeddings import EmbeddingService, get_embedding_service
@@ -17,7 +18,7 @@ from app.services.misconception_interpretation import interpret_misconception_gr
 from app.services.results import ResultsError
 from app.telemetry import log_stage
 
-router = APIRouter(prefix="/api/v1/assessments", tags=["analysis"])
+router = APIRouter(route_class=UploadRoute, prefix="/api/v1/assessments", tags=["analysis"])
 DEMO_CSV_PATH = Path(__file__).resolve().parents[4] / "data" / "demo" / "photosynthesis_responses.csv"
 
 

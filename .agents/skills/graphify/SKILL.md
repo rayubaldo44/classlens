@@ -5,6 +5,14 @@ description: "Use for any question about a codebase, its architecture, file rela
 
 # /graphify
 
+> ClassLens modification: use only the repository's `./scripts/graphify.sh`
+> wrapper for this project. For questions, use its `query` command. Use
+> `build`, `update`, or `check` for the corresponding explicit tasks.
+> If Graphify is missing, use the pinned, isolated setup in the root README.
+> Stop this skill's workflow here. The upstream instructions below are
+> retained for provenance and do not apply to ClassLens. Do not run their
+> installers, automatic provider selection, or semantic extraction here.
+
 Turn any folder of files into a navigable knowledge graph with community detection, an honest audit trail, and three outputs: interactive HTML, GraphRAG-ready JSON, and a plain-language GRAPH_REPORT.md.
 
 ## Usage

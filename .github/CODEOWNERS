@@ -1,0 +1,10 @@
+/.github/ @rayubaldo44
+/.agents/ @rayubaldo44
+/AGENTS.md @rayubaldo44
+/backend/requirements* @rayubaldo44
+/frontend/package*.json @rayubaldo44
+/scripts/ @rayubaldo44
+/database/migrations/ @rayubaldo44
+/SECURITY.md @rayubaldo44
+/docs/OPEN_SOURCE*.md @rayubaldo44
+/docs/releases/ @rayubaldo44

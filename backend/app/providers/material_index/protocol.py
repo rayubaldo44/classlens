@@ -17,14 +17,20 @@ class MaterialRecord:
     embeddings: tuple[tuple[float, ...], ...]
 
 
+def score_material(record: MaterialRecord, query: list[float], limit: int) -> list[MaterialSearchHit]:
+    """Score one snapshot so cache eviction cannot change an in-flight retrieval."""
+    hits = [
+        MaterialSearchHit(
+            chunk=chunk,
+            similarity=sum(a * b for a, b in zip(query, vector, strict=True)),
+        )
+        for chunk, vector in zip(record.chunks, record.embeddings, strict=True)
+    ]
+    hits.sort(key=lambda hit: (-hit.similarity, hit.chunk.chunk_index))
+    return hits[:limit]
+
+
 class MaterialIndex(Protocol):
     def upsert(self, record: MaterialRecord) -> None: ...
 
     def get(self, material_id: str) -> MaterialRecord | None: ...
-
-    def search(
-        self,
-        material_id: str,
-        query_embedding: list[float],
-        limit: int,
-    ) -> list[MaterialSearchHit]: ...

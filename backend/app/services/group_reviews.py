@@ -1,10 +1,10 @@
 import hashlib
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from threading import Lock, RLock
 from typing import Any
 
 from app.database import DatabaseError
+from app.locks import SyncKeyedLocks
 from app.providers.analysis_store import AnalysisStore
 from app.providers.group_review_store import GroupReviewStore
 from app.providers.remediation_store import RemediationStore
@@ -27,18 +27,12 @@ class GroupReviewError(Exception):
         self.details = details or {}
 
 
-_locks_guard = Lock()
-_analysis_locks: dict[str, RLock] = {}
-
-
-def _lock_for(analysis_id: str) -> RLock:
-    with _locks_guard:
-        return _analysis_locks.setdefault(analysis_id, RLock())
+_analysis_locks = SyncKeyedLocks()
 
 
 @contextmanager
 def group_review_lock(analysis_id: str):
-    with _lock_for(analysis_id):
+    with _analysis_locks.hold(analysis_id):
         yield
 
 

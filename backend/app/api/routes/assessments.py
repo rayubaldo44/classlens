@@ -3,11 +3,12 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, UploadFile
 from app.concurrency import run_in_worker
+from app.request_limits import UploadRoute
 
 from app.schemas.assessment import AssessmentPreview, ErrorResponse
 from app.services.assessment_intake import IntakeError, MAX_CSV_BYTES, parse_assessment_csv
 
-router = APIRouter(prefix="/api/v1/assessments", tags=["assessments"])
+router = APIRouter(route_class=UploadRoute, prefix="/api/v1/assessments", tags=["assessments"])
 DEMO_CSV_PATH = Path(__file__).resolve().parents[4] / "data" / "demo" / "photosynthesis_responses.csv"
 
 

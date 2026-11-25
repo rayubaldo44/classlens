@@ -250,7 +250,7 @@ def test_retrieval_requires_ingested_material_and_matching_model() -> None:
     assert caught.value.code == "material_not_found"
 
 
-def test_retrieval_index_failure_is_reported_without_sources() -> None:
+def test_retrieval_scoring_failure_is_reported_without_sources(monkeypatch) -> None:
     index = InMemoryMaterialIndex()
     ingestion = ingest_learning_material(
         b"Plants make glucose during photosynthesis.",
@@ -261,7 +261,10 @@ def test_retrieval_index_failure_is_reported_without_sources() -> None:
         material_index=index,
         settings=settings(),
     )
-    index.search = lambda *_args: (_ for _ in ()).throw(RuntimeError("index detail"))
+    def fail_scoring(*_args):
+        raise RuntimeError("index detail")
+
+    monkeypatch.setattr("app.services.material_retrieval.score_material", fail_scoring)
 
     with pytest.raises(MaterialError) as caught:
         retrieve_for_misconception(

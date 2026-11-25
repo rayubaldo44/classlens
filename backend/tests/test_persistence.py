@@ -150,7 +150,8 @@ def test_analysis_store_batches_response_and_member_inserts() -> None:
     assert len(member_batch[1]) == sum(len(group.member_student_ids) for group in result.groups) == 3
 
 
-def test_persisted_chunks_are_reembedded_when_vector_cache_is_empty() -> None:
+@pytest.mark.parametrize("evict_during_query", [False, True])
+def test_persisted_chunks_are_reembedded_when_vector_cache_is_empty(evict_during_query) -> None:
     class CacheableIndex(InMemoryMaterialIndex):
         def set_embeddings(self, material_id, embeddings):
             record = self.get(material_id)
@@ -169,7 +170,14 @@ def test_persisted_chunks_are_reembedded_when_vector_cache_is_empty() -> None:
         chunks=(MaterialChunk(chunk_id="chunk_001", chunk_index=0, text="Plants use light energy.", start_char=0, end_char=24),),
         embeddings=(),
     ))
-    embedding = FakeEmbeddingService()
+    class EvictingEmbeddings(FakeEmbeddingService):
+        def embed(self, texts):
+            if self.calls and evict_during_query:
+                record = index.get(material.material_id)
+                index.upsert(MaterialRecord(record.material, record.chunks, ()))
+            return super().embed(texts)
+
+    embedding = EvictingEmbeddings()
 
     result = retrieve_for_misconception(
         material.material_id,

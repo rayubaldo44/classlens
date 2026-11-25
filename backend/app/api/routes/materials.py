@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from app.concurrency import run_in_worker
+from app.request_limits import MaterialUploadRoute
 
 from app.config import get_material_settings
 from app.providers.embeddings import EmbeddingService, get_embedding_service
@@ -18,7 +19,7 @@ from app.schemas.materials import (
 from app.services.material_ingestion import MAX_MATERIAL_BYTES, MaterialError, ingest_learning_material
 from app.services.material_retrieval import retrieve_for_misconception
 
-router = APIRouter(prefix="/api/v1/learning-materials", tags=["learning-materials"])
+router = APIRouter(route_class=MaterialUploadRoute, prefix="/api/v1/learning-materials", tags=["learning-materials"])
 DEMO_MATERIAL_PATH = (
     Path(__file__).resolve().parents[4] / "data" / "demo" / "learning_materials" / "photosynthesis_grade7.txt"
 )

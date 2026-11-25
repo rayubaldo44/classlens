@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from app.concurrency import run_in_worker
+from app.request_limits import UploadRoute
 
 from app.config import get_analysis_settings
 from app.providers.analysis_store import AnalysisStore, get_analysis_store
@@ -17,7 +18,7 @@ from app.services.assessment_intake import MAX_CSV_BYTES, IntakeError, parse_ass
 from app.services.results import create_follow_up_comparison, get_follow_up_comparison
 from app.telemetry import log_stage
 
-router = APIRouter(prefix="/api/v1/results", tags=["results"])
+router = APIRouter(route_class=UploadRoute, prefix="/api/v1/results", tags=["results"])
 DEMO_FOLLOW_UP_PATH = (
     Path(__file__).resolve().parents[4] / "data" / "demo" / "photosynthesis_follow_up_responses.csv"
 )

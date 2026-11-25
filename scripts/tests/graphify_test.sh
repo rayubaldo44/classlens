@@ -148,9 +148,9 @@ empty_env() { export CLASSLENS_OBSIDIAN_GRAPH_DIR=''; reject_destination; }
 relative_dir() { export CLASSLENS_OBSIDIAN_GRAPH_DIR='relative/Graphify'; reject_destination; }
 filesystem_root() { export CLASSLENS_OBSIDIAN_GRAPH_DIR='/'; reject_destination; }
 repository_root() { export CLASSLENS_OBSIDIAN_GRAPH_DIR="$CASE_ROOT"; reject_destination; }
-vault_root() { export CLASSLENS_OBSIDIAN_GRAPH_DIR='/home/rayubaldo44/obsidian-developer-vault/Vault-EN/02_Projects/ClassLens'; reject_destination; }
+vault_root() { export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces"; reject_destination; }
 wrong_leaf() { export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/Notes"; reject_destination; }
-alias_vault_root() { export CLASSLENS_OBSIDIAN_GRAPH_DIR='/home/rayubaldo44/obsidian-developer-vault/Vault-EN/02_Projects/ClassLens/Graphify/..'; reject_destination; }
+alias_vault_root() { export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/Graphify/.."; reject_destination; }
 empty_config() { : > "${CASE_ROOT}/.graphify-obsidian-dir"; reject_destination; }
 symlink_destination() { ln -s "$CASE_ROOT" "${CASE_ROOT}/vault with spaces/Graphify"; export CLASSLENS_OBSIDIAN_GRAPH_DIR="${CASE_ROOT}/vault with spaces/Graphify"; reject_destination; }
 

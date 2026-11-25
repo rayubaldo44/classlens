@@ -6,7 +6,7 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ### D-037 — Gate source publication on the deep risk review
 
-- **Status:** Proposed mitigation policy recorded on 2026-11-25; public release held, operational changes and fixes unimplemented
+- **Status:** Local application and dependency hardening verified; operational gates and publication remain open
 - **Decision for the revised plan:** keep the private repository unchanged in visibility and target a local, single-user, single-process synthetic source release. Require hosted containment, dependency advisory remediation/triage, reproduced boundary fixes, metadata/rights sign-off, and verified repository controls before publication. Preserve the existing-history preference unless the maintainer explicitly chooses a sanitized public snapshot instead.
 - **Reason:** source-backed offline probes and current advisory/settings checks identified risks not established by the previous functional CI and preparation review. A public health endpoint is not proof of live record access or isolation; failed database metadata checks remain unresolved.
 - **Consequence:** no provider/auth library or infrastructure migration is selected. Runtime fixes and remote access/settings changes need implementation and verification separately. A shared hosted service or real-student pilot requires authentication/ownership, least-privilege database access, aggregate spend/usage policy, and privacy governance; multi-process operation additionally needs real PostgreSQL concurrency verification. See [risk review](OPEN_SOURCE_RISK_REVIEW.md) and [revised plan](superpowers/plans/2026-11-25-open-source-release.md).

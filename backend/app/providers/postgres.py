@@ -1,11 +1,13 @@
 import hashlib
 import json
+from collections import OrderedDict
 from functools import lru_cache
+from threading import Lock
 
 from app.database import Database, DatabaseError, get_database
 from app.providers.analysis_store import AnalysisSnapshot
 from app.providers.group_review_store import GroupReviewStore
-from app.providers.material_index.protocol import MaterialRecord, MaterialSearchHit
+from app.providers.material_index.protocol import MaterialRecord
 from app.schemas.analysis import AnalysisResponse
 from app.schemas.assessment import AssessmentPreview, NormalizedResponse
 from app.schemas.group_reviews import GroupReviewEvent, GroupReviewState, StoredGroupReviews
@@ -271,9 +273,12 @@ class PostgresGroupReviewStore(GroupReviewStore):
 
 
 class PostgresMaterialIndex:
+    VECTOR_CACHE_ENTRIES = 16
+
     def __init__(self, database: Database) -> None:
         self.database = database
-        self._vectors: dict[str, tuple[tuple[float, ...], ...]] = {}
+        self._vectors: OrderedDict[str, tuple[tuple[float, ...], ...]] = OrderedDict()
+        self._vector_lock = Lock()
 
     def upsert(self, record: MaterialRecord) -> None:
         material = record.material
@@ -306,7 +311,7 @@ class PostgresMaterialIndex:
                     (material.material_id, chunk.chunk_id, chunk.chunk_index, chunk.text,
                      chunk.start_char, chunk.end_char, digest),
                 )
-        self._vectors[material.material_id] = record.embeddings
+        self.set_embeddings(material.material_id, record.embeddings)
 
     def get(self, material_id: str) -> MaterialRecord | None:
         with self.database.connection() as connection:
@@ -327,6 +332,10 @@ class PostgresMaterialIndex:
                 """,
                 (material_id,),
             ).fetchall()
+        with self._vector_lock:
+            embeddings = self._vectors.get(material_id, ())
+            if material_id in self._vectors:
+                self._vectors.move_to_end(material_id)
         return MaterialRecord(
             material=LearningMaterial(
                 material_id=material[0], title=material[1], filename=material[2], source_kind=material[3],
@@ -334,21 +343,15 @@ class PostgresMaterialIndex:
                 chunk_overlap_chars=material[7], embedding_model=material[8], embedding_dimension=material[9],
             ),
             chunks=tuple(MaterialChunk(chunk_id=c[0], chunk_index=c[1], text=c[2], start_char=c[3], end_char=c[4]) for c in chunks),
-            embeddings=self._vectors.get(material_id, ()),
+            embeddings=embeddings,
         )
 
     def set_embeddings(self, material_id: str, embeddings: tuple[tuple[float, ...], ...]) -> None:
-        self._vectors[material_id] = embeddings
-
-    def search(self, material_id: str, query_embedding: list[float], limit: int) -> list[MaterialSearchHit]:
-        record = self.get(material_id)
-        if record is None or len(record.embeddings) != len(record.chunks):
-            return []
-        hits = [
-            MaterialSearchHit(chunk=chunk, similarity=sum(a*b for a,b in zip(query_embedding, vector, strict=True)))
-            for chunk, vector in zip(record.chunks, record.embeddings, strict=True)
-        ]
-        return sorted(hits, key=lambda hit: (-hit.similarity, hit.chunk.chunk_index))[:limit]
+        with self._vector_lock:
+            self._vectors[material_id] = embeddings
+            self._vectors.move_to_end(material_id)
+            while len(self._vectors) > self.VECTOR_CACHE_ENTRIES:
+                self._vectors.popitem(last=False)
 
 
 class PostgresRemediationStore:

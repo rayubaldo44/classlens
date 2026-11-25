@@ -39,10 +39,18 @@ Status mappings used by implemented application handlers:
 | `400` | Malformed request, CSV, or unsupported transition. |
 | `404` | Resource does not exist or is inaccessible. |
 | `409` | Duplicate/idempotency conflict or stale state. |
-| `413` | File or row limit exceeded. |
+| `413` | Request body, file, row, or generation source limit exceeded. |
 | `415` | Unsupported media/document type. |
 | `502` | Upstream embedding/LLM/extraction provider failure. |
-| `503` | Backend dependency unavailable or timed out. |
+| `503` | Backend dependency unavailable/timed out or local worker admission full. |
+
+The default request-body ceiling is 2 MiB before JSON or multipart parsing.
+`CLASSLENS_MAX_REQUEST_BYTES` overrides it with a positive integer. Multipart
+upload routes admit one file of up to 1,000,000 bytes and four ordinary fields.
+The worker pool admits ten running or queued jobs across five threads. Full
+admission returns retryable `503 work_capacity_exceeded`. If capacity fills
+during a generation request, a provider call may already have completed before
+the final persistence step is rejected.
 
 Expected domain outcomes such as `insufficient_data` or `insufficient_relevant_context` should usually be successful resource states, not fabricated successes or generic server errors.
 
@@ -354,6 +362,16 @@ Abbreviated request shape:
 ```
 
 The runtime request must include every required `material`, retrieval-metadata, chunk-index, and offset field from the retrieval contract; the example is abbreviated for readability.
+
+Generation reruns retrieval using stored evidence and current server settings.
+Only server-selected passages and scores are saved. If no passage meets the
+server threshold, generation returns insufficient context without invoking
+Gemini. A stale selection returns 409. More than 12,000 combined source
+characters returns `413 generation_context_too_large` without invoking Gemini.
+New generation identities include the server retrieval version. Previously saved
+drafts remain readable by their original IDs and retain their historical scores.
+Review edits limit analogy, follow-up prompt, and expected answer to 4,000
+characters each, using the structured `400 remediation_invalid_content` response.
 
 `generation_request_id` is an 8–100 character client-generated identifier containing letters, digits, `_`, or `-`. ClassLens combines it with canonical analysis, group, material, and chunk identifiers to derive the remediation ID. Identical retries first read that ID from persistence and share a process-local generation lock, so a browser retry returns the existing draft instead of calling Gemini again or creating a second record. A new intentional generation uses a new request ID.
 

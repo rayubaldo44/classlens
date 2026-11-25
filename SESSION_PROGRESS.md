@@ -1481,3 +1481,16 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: review docs/OPEN_SOURCE_RISK_REVIEW.md and the revised plan, then contain the existing hosted API before implementing the dependency and boundary fixes.
 
 ---
+
+## Session / Milestone: Test-first open-source hardening verified locally
+
+**Status:** Local candidate verified on `chore/open-source-hardening`. Public release remains on hold.
+
+- Added failing regression coverage before fixing request and multipart size checks, server-derived generation relevance and passage limits, review edit lengths, executor admission, and lock/cache lifecycle.
+- Independent review identified cancellation and legacy draft cases. Follow-up regressions confirmed that cancelled queue items hold their admission slot until dequeued, in-flight draft saves hold the generation key, and updated generation IDs bypass old client-scored drafts. Oversized edits preserve the structured 400 response. Existing saved drafts retain their historical scores.
+- Updated the CPU Python and frontend locks and license inventory. The Python lock now verifies each wheel by SHA-256 for CPython 3.11 on x86-64 Linux/WSL with glibc 2.28 or newer. The fresh retry installed successfully after earlier temporary disk quota errors. Pip check passed. npm and OSV reported zero current matches, with 71 distributions queried in OSV.
+- Verified 190 backend tests including both migrations and PostgreSQL persistence, four frontend unit suites, lint/build, six Chromium scenarios, 80 Graphify wrapper checks, and five Python audit helper tests. The loopback browser rehearsal with real Gemini and disposable PostgreSQL completed the synthetic baseline, evidence retrieval, generation, teacher approval, follow-up (9/43 to 3/43), and reload.
+- Added immutable CI action and image pins, CODEOWNERS, and a scheduled secret/advisory workflow. Removed the active Graphify wrapper's hardcoded vault path and marked its bundled skill as wrapper-only. CI configuration checks passed locally. GitHub execution of the hardened candidate remains pending.
+- Render service access remains the operational blocker. The connector was available but unconnected, and no Render API credential was configured. Hosted containment, metadata consent, public repository controls, and exact-candidate GitHub CI remain open. The disposable local processes and database were stopped.
+
+---

@@ -8,10 +8,13 @@ For the verified CPU-only local setup:
 
 ```bash
 python3.11 -m venv .venv
-.venv/bin/pip install -r requirements.lock
+.venv/bin/python -m pip --isolated install --require-hashes -r requirements.lock
 ```
 
-`requirements.lock` reproduces the exact verified development/test resolution and directs `torch==2.7.1+cpu` to PyTorch's CPU wheel index. `requirements.txt` and `requirements-dev.txt` remain the short dependency manifests to edit when intentionally updating packages; regenerate and verify the lock after such a change.
+The lock targets CPython 3.11 on x86-64 Linux/WSL with glibc 2.28 or newer.
+It verifies SHA-256 hashes for every wheel. PyPI supplies the ordinary packages
+and the CPU Torch 2.13.0 wheel uses an explicit PyTorch URL. Update the dependency
+manifests and reverify the lock when changing packages.
 
 Copy `.env.example` to `.env` and edit it with your own values:
 

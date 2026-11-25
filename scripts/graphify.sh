@@ -6,7 +6,6 @@ EXPECTED_GRAPHIFY_VERSION="0.9.77"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 GRAPHIFY_BIN="${CLASSLENS_GRAPHIFY_BIN:-graphify}"
 LOCAL_OBSIDIAN_DIR="${PROJECT_ROOT}/graphify-out/obsidian"
-CLASSLENS_VAULT_ROOT='/home/rayubaldo44/obsidian-developer-vault/Vault-EN/02_Projects/ClassLens'
 
 usage() {
   printf '%s\n' \
@@ -45,7 +44,7 @@ validate_obsidian_dir() {
   [[ "$path" == /* ]] || fail 'Obsidian destination must be a non-empty absolute path.'
   path="$(realpath -m -- "$path")" || fail 'Could not resolve the Obsidian destination.'
   case "$path" in
-    /|"$PROJECT_ROOT"|"$CLASSLENS_VAULT_ROOT")
+    /|"$PROJECT_ROOT")
       fail "Unsafe Obsidian destination: ${path}"
       ;;
   esac

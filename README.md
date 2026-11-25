@@ -20,8 +20,8 @@ Semantic grouping is evidence for teacher review, not a diagnosis. Before/after 
 
 **Public release is on hold after a [deep risk review](docs/OPEN_SOURCE_RISK_REVIEW.md).**
 The [revised release plan](docs/superpowers/plans/2026-11-25-open-source-release.md)
-requires hosted containment, dependency updates, and boundary fixes before
-publication. Those mitigations are planned and have not been applied yet.
+records the locally verified fixes and the remaining hosted containment,
+metadata, and publication gates.
 
 This is a runnable research/demo MVP. Use synthetic inputs only: authentication,
 record ownership checks, privacy/retention workflows, and generation spend controls
@@ -105,7 +105,9 @@ uv tool install graphifyy==0.9.77
 graphify --version
 ~~~
 
-The official project skill is committed at `.agents/skills/graphify/`. To regenerate it with this release, run `graphify install --platform agents --project` and review the diff. Use the `agents` platform: the `codex` installer in 0.9.77 also creates a hook. Keep the bounded Graphify guidance in `AGENTS.md` and the required start-of-task document reads.
+The bundled Graphify skill in `.agents/skills/graphify/` has a ClassLens-specific
+guard that directs project work through the pinned wrapper. If updating the
+upstream reference files, preserve that guard and the upstream notices.
 
 For an optional existing Obsidian vault, save a dedicated destination in the ignored local config (replace the example path and review any existing value before replacing it):
 

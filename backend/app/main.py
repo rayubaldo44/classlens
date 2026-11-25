@@ -17,6 +17,8 @@ from .api.routes.materials import router as materials_router
 from .api.routes.remediations import router as remediations_router
 from .api.routes.results import router as results_router
 from .config import get_cors_origins
+from .concurrency import WorkCapacityError
+from .request_limits import RequestBodyLimitMiddleware
 from .services.assessment_intake import IntakeError
 from .services.misconception_analysis import AnalysisError
 from .services.material_ingestion import MaterialError
@@ -81,6 +83,7 @@ class RequestTimingMiddleware:
         log_stage("request", (perf_counter() - started) * 1000, method=scope["method"], route=route_template, status=status_code)
 
 
+app.add_middleware(RequestBodyLimitMiddleware)
 app.add_middleware(RequestTimingMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -187,6 +190,7 @@ async def handle_remediation_error(_request: Request, error: RemediationError) -
         else 409 if error.code in {
             "remediation_invalid_transition", "remediation_context_mismatch", "reviewed_group_not_available"
         }
+        else 413 if error.code == "generation_context_too_large"
         else 502 if error.code in {"llm_malformed_output", "llm_ungrounded_output"}
         else 503 if error.retryable or error.code == "llm_not_configured"
         else 400
@@ -202,6 +206,15 @@ async def handle_remediation_error(_request: Request, error: RemediationError) -
                 "request_id": f"req_{uuid4().hex}",
             }
         },
+    )
+
+
+@app.exception_handler(WorkCapacityError)
+async def handle_work_capacity(_request: Request, error: WorkCapacityError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"error": {"code": error.code, "message": str(error), "details": {},
+                           "retryable": True, "request_id": f"req_{uuid4().hex}"}},
     )
 
 

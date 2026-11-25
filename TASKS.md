@@ -12,7 +12,7 @@ Tasks are grouped by priority, then category. Within each category, work from to
 | P1 | Reliability, testing, and optional product improvements | After the P0 demo gates pass |
 | P2 | Real-school pilot safeguards and later product work | After the demo; safeguards must pass before real student data |
 
-**Next action:** keep publication on hold; obtain authorization to contain hosted exposure, then execute the dependency and application-boundary fixes in the revised release plan. Functional CI is green but does not close the new security gates. Hosted capacity and school-pilot work remain separate.
+**Next action:** keep publication on hold until the Render owner can contain all workflow origins. Then review historical metadata and verify GitHub settings and CI on the hardened candidate.
 
 ## P0 — demo critical
 
@@ -71,14 +71,14 @@ existing repository/history, no pilot-feature expansion. See [release audit](doc
 - [x] Commit and push reviewed preparation; all four GitHub CI jobs passed on `8edbd4d519478c7b42d877fcbf76b9130a7400f3`. See [the verified run](https://github.com/rayubaldo44/classlens/actions/runs/45547139136).
 - [x] Complete deep source/history/dependency/GitHub/exposure risk review and update the release plan with source-backed findings and explicit evidence limits. See [risk review](docs/OPEN_SOURCE_RISK_REVIEW.md).
 - [ ] Gate 1: obtain authorization for hosted containment and prove all connected API origins are suspended/access-restricted; verify retained hosted database/credential boundaries without reading student records.
-- [ ] Gate 2: fix or narrowly triage current npm/OSV advisories; regenerate compatible verified locks, artifact provenance, and license inventory.
-- [ ] Gate 3: implement and regression-test server-derived retrieval, streamed body/edit/context bounds, finite work admission, and safe cache/lock lifecycle.
-- [ ] Gate 4: complete metadata/rights sign-off, immutable CI/provenance hardening, wrapper-only agent guidance, and verified repository/reporting controls.
+- [x] Gate 2 locally: patched hash-checked Python and npm locks, updated license inventory, zero current OSV/npm matches, and clean-install live rehearsal.
+- [x] Gate 3 locally: added failing-before/passing-after regressions for server-derived retrieval, request/edit/context bounds, worker admission, and cache/lock lifecycle.
+- [x] Gate 4 source changes: immutable CI pins, scheduled scans, CODEOWNERS, and portable wrapper-only Graphify guidance.
+- [ ] Gate 4 external checks: metadata/rights sign-off and verified repository/reporting controls.
 - [ ] Gate 5: verify all fixes on the exact candidate commit, obtain publication approval, and publish the local synthetic-only v0.1.0 source release.
 
 **Acceptance:** all five [revised risk gates](docs/superpowers/plans/2026-11-25-open-source-release.md)
-have evidence, not just green functional tests. No runtime remediation or hosted
-containment is complete as a result of this review. Visibility/release actions
+have evidence, not just green functional tests. Runtime remediation is verified locally. Hosted containment remains open. Visibility/release actions
 and school/pilot operation remain separate authorization and readiness gates.
 
 ### Runtime and deployment reproducibility

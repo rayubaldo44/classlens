@@ -2,11 +2,13 @@
 
 **Last updated:** 2026-11-25
 
-**Current phase:** Public release on hold after deep risk review; remediation plan updated, fixes and hosted containment unimplemented
+**Current phase:** Local release hardening verified. Publication held pending hosted containment, remote CI, and owner sign-off
 
 **Deadline context:** Original hackathon demo milestone completed locally; hosted memory constraint remains unresolved
 
 ## Verified working
+
+- The local open-source hardening candidate passes 190 backend tests including PostgreSQL, four frontend unit suites, lint/build, six Chromium scenarios, 80 Graphify checks, and five Python audit helper tests. A fresh SHA-256-checked CPU Python install passes `pip check`, OSV reported no matches across 71 locked distributions, and npm reported zero vulnerabilities. The live synthetic browser rehearsal with real Gemini and disposable PostgreSQL passed generation, teacher approval, follow-up (9/43 to 3/43), and reload. The backend now derives relevance and scores from server retrieval, bounds body/file/edit/source sizes, limits worker admission and vector-cache entries, and cleans idle lock entries safely. CI pins and scheduled scans are configured locally. Hosted containment, metadata consent, remote settings, exact-candidate GitHub CI, and publication remain open. See [release gates](docs/superpowers/plans/2026-11-25-open-source-release.md).
 
 - Deep open-source risk review of commit `1107ea7a9f0db604b3ac73ced1d53cb882a6ed28` is complete as a review/planning milestone, not a fix milestone. Offline synthetic probes confirmed unauthenticated reads/approval, distinct-ID provider re-spend, client-controlled retrieval relevance, multipart spooling before byte rejection, unbounded edit fields, and missing executor admission capacity. Independent challenge retained these findings and limited the multi-process race claim to static concern/injected ordering, not a concurrent PostgreSQL reproduction. Current npm audit reports 11 affected toolchain package entries (2 high / 9 moderate); OSV matched six Python distributions, including a critical certifi trust-bundle advisory. Read-only probes found the frontend and backend health/OpenAPI publicly reachable; actual record access, deployment isolation, and configured database privileges remain unverified. Refreshed Gitleaks scans found no secrets in 52 commits, all six CI log archives, or current PR discussion. See [risk findings and limits](docs/OPEN_SOURCE_RISK_REVIEW.md) and [revised gates](docs/superpowers/plans/2026-11-25-open-source-release.md). The earlier functional/CI verification below remains historical evidence and does not waive these gates. No runtime, dependency, database, GitHub-setting, or deployment change was made in this review.
 

@@ -18,7 +18,8 @@ Apache-2.0 and includes a notice for earlier MIT contributions. Its original
 [Apache license](licenses/Graphify-Apache-2.0.txt),
 [MIT license](licenses/Graphify-MIT.txt), and
 [NOTICE](licenses/Graphify-NOTICE.txt) are preserved verbatim here.
-ClassLens's wrapper and validation scripts are separate original project code.
+The installed skill includes a marked ClassLens wrapper-only guard. ClassLens's
+wrapper and validation scripts are separate original project code.
 
 ## Installed dependencies and downloaded models
 

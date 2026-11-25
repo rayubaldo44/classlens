@@ -1,11 +1,16 @@
 import asyncio
+import threading
+from hashlib import sha256
+import json
 
 import httpx
 from conftest import run_test_async
 import pytest
 
+from app.config import MaterialSettings, get_material_settings
 from app.main import app
 from app.providers.analysis_store import InMemoryAnalysisStore, get_analysis_store
+from app.providers.embeddings import get_embedding_service
 from app.providers.group_review_store import InMemoryGroupReviewStore, get_group_review_store
 from app.providers.llm import GeminiLLMService, LLMProviderError, get_llm_service
 from app.providers.material_index import InMemoryMaterialIndex, MaterialRecord, get_material_index
@@ -38,6 +43,25 @@ from app.schemas.group_reviews import GroupReviewActionRequest
 from app.services.group_reviews import apply_group_review, get_group_reviews
 from app.services.remediation import RemediationError, generate_grounded_remediation, review_remediation
 from app.services.assessment_intake import ParsedAssessment
+
+
+class FakeEmbeddingService:
+    model_id = "test-embedding"
+
+    def __init__(self) -> None:
+        self.batches: list[list[str]] = []
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        self.batches.append(texts)
+        return [[1.0, 0.0] for _ in texts]
+
+
+MATERIAL_SETTINGS = MaterialSettings(
+    chunk_size_chars=900,
+    chunk_overlap_chars=120,
+    retrieval_top_k=3,
+    minimum_relevance_score=0.42,
+)
 
 
 class FakeLLMService:
@@ -214,10 +238,178 @@ def canonical_context_stores() -> tuple[InMemoryAnalysisStore, InMemoryMaterialI
                     end_char=canonical_chunk.end_char,
                 ),
             ),
-            embeddings=(),
+            embeddings=((0.83, 0.5577633906953742),),
         )
     )
     return analysis_store, material_index
+
+
+@pytest.fixture
+def grounding_api(monkeypatch: pytest.MonkeyPatch):
+    analysis_store, material_index = canonical_context_stores()
+    review_store = InMemoryGroupReviewStore()
+    store = InMemoryRemediationStore()
+    llm = FakeLLMService()
+    embeddings = FakeEmbeddingService()
+    monkeypatch.setitem(app.dependency_overrides, get_analysis_store, lambda: analysis_store)
+    monkeypatch.setitem(app.dependency_overrides, get_group_review_store, lambda: review_store)
+    monkeypatch.setitem(app.dependency_overrides, get_material_index, lambda: material_index)
+    monkeypatch.setitem(app.dependency_overrides, get_remediation_store, lambda: store)
+    monkeypatch.setitem(app.dependency_overrides, get_embedding_service, lambda: embeddings)
+    monkeypatch.setitem(app.dependency_overrides, get_llm_service, lambda: llm)
+    monkeypatch.setitem(app.dependency_overrides, get_material_settings, lambda: MATERIAL_SETTINGS)
+
+    async def send(request: RemediationGenerationRequest) -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/v1/remediations", json=request.model_dump())
+
+    return send, material_index, store, llm, embeddings
+
+
+def with_material_chunks(
+    request: RemediationGenerationRequest,
+    material_index: InMemoryMaterialIndex,
+    passages: list[str],
+    vectors: tuple[tuple[float, ...], ...],
+) -> None:
+    chunks = [
+        MaterialChunk(chunk_id=f"chunk_{index + 1:03}", chunk_index=index, text=passage,
+                      start_char=0, end_char=len(passage))
+        for index, passage in enumerate(passages)
+    ]
+    request.retrieval.material = request.retrieval.material.model_copy(update={"chunk_count": len(chunks)})
+    request.retrieval.results = [
+        RetrievedChunk(**chunk.model_dump(), similarity=0.75) for chunk in chunks
+    ]
+    material_index.upsert(MaterialRecord(request.retrieval.material, tuple(chunks), vectors))
+
+
+def test_generation_requires_relevant_stored_passages(grounding_api) -> None:
+    send, index, store, llm, _ = grounding_api
+    request = generation_request()
+    with_material_chunks(request, index, ["A triangle has three sides."], ((0.0, 1.0),))
+
+    response = run_test_async(send(request))
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "insufficient_context"
+    assert response.json()["remediation"] is None
+    assert store.list_for_analysis(request.analysis_id) == []
+    assert llm.prompts == []
+
+
+def test_generation_uses_current_retrieval_metadata_and_stores_server_similarity(grounding_api) -> None:
+    send, _, store, llm, embeddings = grounding_api
+    request = generation_request()
+    request.retrieval.status = "insufficient_relevant_context"
+    request.retrieval.retrieval.top_k = 1
+    request.retrieval.retrieval.minimum_relevance_score = 0.9
+    request.retrieval.results[0].similarity = 0.25
+
+    response = run_test_async(send(request))
+
+    assert response.status_code == 200
+    saved = store.list_for_analysis(request.analysis_id)
+    assert len(saved) == len(llm.prompts) == 1
+    assert saved[0].sources[0].similarity == 0.83
+    assert response.json()["remediation"]["sources"][0]["similarity"] == 0.83
+    assert len(embeddings.batches) == 1
+    assert "Plants eat sunlight." in embeddings.batches[0][0]
+
+
+@pytest.mark.parametrize("selection", ["reversed", "extra", "different", "omitted"])
+def test_generation_requires_current_ranked_passage_selection(grounding_api, selection: str) -> None:
+    send, index, store, llm, _ = grounding_api
+    request = generation_request()
+    with_material_chunks(
+        request,
+        index,
+        ["Light provides energy.", "Water provides matter.", "Plants produce sugar.", "Chloroplasts contain chlorophyll."],
+        ((1.0, 0.0), (0.8, 0.6), (0.6, 0.8), (0.48, 0.8772684879784524)),
+    )
+    chunks = request.retrieval.results
+    request.retrieval.results = {
+        "reversed": chunks[2::-1],
+        "extra": chunks,
+        "different": [chunks[0], chunks[1], chunks[3]],
+        "omitted": chunks[:2],
+    }[selection]
+    request.retrieval.retrieval.top_k = 4
+
+    response = run_test_async(send(request))
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "remediation_context_mismatch"
+    assert response.json()["error"]["details"] == {"field": "retrieval.results"}
+    assert store.list_for_analysis(request.analysis_id) == []
+    assert llm.prompts == []
+
+
+@pytest.mark.parametrize("source_chars", [12000, 12001])
+def test_generation_bounds_combined_passage_length(grounding_api, source_chars: int) -> None:
+    send, index, store, llm, _ = grounding_api
+    request = generation_request()
+    with_material_chunks(
+        request, index, ["L" * 4000, "W" * 4000, "S" * (source_chars - 8000)],
+        ((1.0, 0.0), (1.0, 0.0), (1.0, 0.0)),
+    )
+
+    response = run_test_async(send(request))
+
+    if source_chars == 12000:
+        assert response.status_code == 200
+        assert len(llm.prompts) == 1
+        assert sum(len(item.text) for item in store.list_for_analysis(request.analysis_id)[0].sources) == 12000
+    else:
+        assert response.status_code == 413
+        assert response.json()["error"]["code"] == "generation_context_too_large"
+        assert store.list_for_analysis(request.analysis_id) == []
+        assert llm.prompts == []
+
+
+@pytest.mark.parametrize("field", ["analogy", "prompt", "expected_answer"])
+def test_review_route_preserves_existing_error_envelope(grounding_api, field):
+    send, _, store, _, _ = grounding_api
+
+    async def check():
+        generated = await send(generation_request())
+        remediation_id = generated.json()["remediation"]["remediation_id"]
+        original = store.get(remediation_id)
+        content = grounded_draft().model_dump(exclude={"source_references"})
+        target = content if field == "analogy" else content["follow_up_questions"][0]
+        target[field] = "x" * 4001
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.patch(
+                f"/api/v1/remediations/{remediation_id}", json={"action": "save", "edited_content": content},
+            )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "remediation_invalid_content"
+        assert store.get(remediation_id) == original
+
+    run_test_async(check())
+
+
+@pytest.mark.parametrize("field", ["analogy", "prompt", "expected_answer"])
+def test_review_service_rechecks_edited_field_length(field: str) -> None:
+    store = InMemoryRemediationStore()
+    generated = run_test_async(generate_with_canonical_context(
+        generation_request(), llm_service=FakeLLMService(), store=store,
+    ))
+    record = generated.remediation
+    assert record is not None
+    edited = EditableRemediationContent(**record.content.model_dump(exclude={"source_references"}))
+    review = RemediationReviewRequest(action="save", edited_content=edited)
+    edited_field = edited if field == "analogy" else edited.follow_up_questions[0]
+    setattr(edited_field, field, "x" * 4000)
+    saved = review_remediation(record.remediation_id, review, store=store)
+
+    setattr(edited_field, field, "y" * 4001)
+
+    with pytest.raises(RemediationError) as caught:
+        review_remediation(record.remediation_id, review, store=store)
+    assert caught.value.code == "remediation_invalid_content"
+    assert store.get(record.remediation_id) == saved
 
 
 async def generate_with_canonical_context(
@@ -228,6 +420,7 @@ async def generate_with_canonical_context(
     analysis_store: InMemoryAnalysisStore | None = None,
     material_index: InMemoryMaterialIndex | None = None,
     review_store: InMemoryGroupReviewStore | None = None,
+    embedding_service: FakeEmbeddingService | None = None,
 ):
     if analysis_store is None or material_index is None:
         analysis_store, material_index = canonical_context_stores()
@@ -237,7 +430,9 @@ async def generate_with_canonical_context(
         store=store,
         analysis_store=analysis_store,
         material_index=material_index,
-        review_store=review_store,
+        review_store=review_store or InMemoryGroupReviewStore(),
+        embedding_service=embedding_service or FakeEmbeddingService(),
+        settings=MATERIAL_SETTINGS,
     )
 
 
@@ -308,6 +503,7 @@ def test_altered_browser_snapshot_is_rejected_before_llm(alteration: str) -> Non
     request = generation_request()
     analysis_store, material_index = canonical_context_stores()
     fake = FakeLLMService()
+    embeddings = FakeEmbeddingService()
     store = InMemoryRemediationStore()
 
     if alteration == "class_context":
@@ -333,10 +529,12 @@ def test_altered_browser_snapshot_is_rejected_before_llm(alteration: str) -> Non
                 store=store,
                 analysis_store=analysis_store,
                 material_index=material_index,
+                embedding_service=embeddings,
             )
         )
 
     assert caught.value.code == "remediation_context_mismatch"
+    assert embeddings.batches == []
     assert fake.prompts == []
     assert store._records == {}
 
@@ -423,12 +621,19 @@ def test_generation_does_not_persist_if_group_is_dismissed_during_provider_call(
 def test_insufficient_context_does_not_call_llm_or_save_record() -> None:
     fake = FakeLLMService()
     store = InMemoryRemediationStore()
+    analysis_store, material_index = canonical_context_stores()
+    request = generation_request()
+    with_material_chunks(request, material_index, ["A triangle has three sides."], ((0.0, 1.0),))
+    request.retrieval.status = "insufficient_relevant_context"
+    request.retrieval.results = []
 
     result = run_test_async(
         generate_with_canonical_context(
-            generation_request(retrieval_status="insufficient_relevant_context"),
+            request,
             llm_service=fake,
             store=store,
+            analysis_store=analysis_store,
+            material_index=material_index,
         )
     )
 
@@ -534,6 +739,8 @@ def test_typed_api_generation_get_edit_and_reject_flow() -> None:
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_material_index] = override_material_index
     app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
+    app.dependency_overrides[get_embedding_service] = FakeEmbeddingService
+    app.dependency_overrides[get_material_settings] = lambda: MATERIAL_SETTINGS
 
     async def send() -> tuple[httpx.Response, httpx.Response, httpx.Response]:
         transport = httpx.ASGITransport(app=app)
@@ -581,6 +788,8 @@ def test_api_returns_controlled_provider_error_without_fabricated_remediation() 
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_material_index] = override_material_index
     app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
+    app.dependency_overrides[get_embedding_service] = FakeEmbeddingService
+    app.dependency_overrides[get_material_settings] = lambda: MATERIAL_SETTINGS
 
     async def send() -> httpx.Response:
         transport = httpx.ASGITransport(app=app)
@@ -620,6 +829,8 @@ def test_api_rejects_altered_context_with_conflict_before_llm() -> None:
     app.dependency_overrides[get_analysis_store] = override_analysis_store
     app.dependency_overrides[get_material_index] = override_material_index
     app.dependency_overrides[get_group_review_store] = lambda: InMemoryGroupReviewStore()
+    app.dependency_overrides[get_embedding_service] = FakeEmbeddingService
+    app.dependency_overrides[get_material_settings] = lambda: MATERIAL_SETTINGS
 
     async def send() -> httpx.Response:
         transport = httpx.ASGITransport(app=app)
@@ -746,3 +957,63 @@ def test_gemini_total_budget_includes_retry_delay(monkeypatch: pytest.MonkeyPatc
 
     assert caught.value.code == "llm_timeout"
     assert calls == 1
+
+
+def test_cancelled_generation_holds_key_until_already_started_save_finishes():
+    started = threading.Event()
+    release = threading.Event()
+
+    class BlockingStore(InMemoryRemediationStore):
+        def save(self, record):
+            started.set()
+            assert release.wait(3)
+            super().save(record)
+
+    async def check():
+        store = BlockingStore()
+        fake = FakeLLMService()
+        request = generation_request()
+        draft = asyncio.create_task(generate_with_canonical_context(request, llm_service=fake, store=store))
+        retry = None
+        try:
+            async with asyncio.timeout(2):
+                while not started.is_set():
+                    await asyncio.sleep(0.01)
+            draft.cancel()
+            retry = asyncio.create_task(generate_with_canonical_context(request, llm_service=fake, store=store))
+            done, _ = await asyncio.wait({draft}, timeout=0.05)
+            assert not done
+        finally:
+            release.set()
+            await asyncio.gather(draft, return_exceptions=True)
+            if retry is not None:
+                assert (await retry).status == "generated"
+        assert len(fake.prompts) == 1
+
+    run_test_async(check())
+
+
+def test_generation_retries_do_not_reuse_legacy_client_scored_records():
+    async def check():
+        request = generation_request()
+        store = InMemoryRemediationStore()
+        fake = FakeLLMService()
+        result = await generate_with_canonical_context(request, llm_service=fake, store=InMemoryRemediationStore())
+        identity = {
+            "generation_request_id": request.generation_request_id,
+            "analysis_id": request.analysis_id,
+            "group_id": request.misconception.group_id,
+            "material_id": request.retrieval.material.material_id,
+            "chunk_ids": [chunk.chunk_id for chunk in request.retrieval.results],
+        }
+        digest = sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        legacy = result.remediation.model_copy(deep=True, update={"remediation_id": "rem_" + digest[:32]})
+        legacy.sources[0].similarity = 0.12
+        store.save(legacy)
+
+        current = await generate_with_canonical_context(request, llm_service=fake, store=store)
+        assert current.remediation.remediation_id != legacy.remediation_id
+        assert current.remediation.sources[0].similarity == result.remediation.sources[0].similarity
+        assert store.get(legacy.remediation_id) == legacy
+
+    run_test_async(check())
