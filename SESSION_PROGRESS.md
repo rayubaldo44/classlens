@@ -1445,3 +1445,19 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: review docs/OPEN_SOURCE_RELEASE.md and the final diff before authorizing publication.
 
 ---
+
+## Session / Milestone: Release preparation pushed and GitHub CI verified
+
+**Date:** 2026-11-25 (Asia/Manila)
+
+**Status:** Preparation committed and pushed; all four exact-commit GitHub CI jobs passed; repository remains private
+
+- Attempted and completed: on the maintainer's instruction to proceed, committed the reviewed preparation as `8edbd4d519478c7b42d877fcbf76b9130a7400f3` and fast-forward pushed `main`. The push also included seven existing, locally verified misconception-label commits already in its ancestry; no history was rewritten.
+- Files created or significantly modified: the preparation commit contains the 28 reviewed release/license/documentation/metadata changes and three unused SVG deletions. This follow-up updates STATUS.md, TASKS.md, docs/OPEN_SOURCE_RELEASE.md, and this chronological log with the verified push/CI outcome.
+- Verified/tested: fresh local backend 136 tests passed; frontend four unit-test files, lint, build, and all six Chromium scenarios passed. Gitleaks scanned the exact staged source and all 51 committed-history entries with no findings. The committed source archive excludes environment files, installed dependencies, caches, and generated test reports. GitHub Actions run https://github.com/rayubaldo44/classlens/actions/runs/45547139136 passed Frontend, Backend, Browser smoke, and PostgreSQL integration on exact SHA `8edbd4d519478c7b42d877fcbf76b9130a7400f3`; remote main matched it after push.
+- Problems encountered: staging exposed upstream CRLF/trailing whitespace in two font licenses, which was normalized without changing wording before commit; the staged diff then passed whitespace checks. No application changes were needed.
+- Important decisions: treat this authorization as commit/push/CI only; keep public visibility, tagging, release publication, and GitHub security-settings changes pending explicit publication approval.
+- Remaining work: check CI on this documentation-only follow-up, review historical metadata and linked deployment access, approve publication, enable/verify private reporting and available secret protection, then tag/publish from an exact CI-verified commit. Hosted analysis and school-pilot safeguards remain open.
+- Recommended next step: review docs/OPEN_SOURCE_RELEASE.md before authorizing public publication.
+
+---

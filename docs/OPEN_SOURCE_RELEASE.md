@@ -1,8 +1,9 @@
 # Open-source release preparation
 
 Target: `v0.1.0` runnable synthetic-data demo, MIT for original work, preserving
-`rayubaldo44/classlens` and its history. **Not published.** Repository visibility,
-tags, GitHub settings, and remote content have not been changed by this preparation.
+`rayubaldo44/classlens` and its history. **Not published.** Source preparation has
+been committed and pushed; repository visibility, tags, and GitHub settings remain
+unchanged.
 
 ## Publication audit — 2026-11-25
 
@@ -13,7 +14,7 @@ tags, GitHub settings, and remote content have not been changed by this preparat
   its published SHA-256 manifest, scanned all locally available refs using
   `gitleaks git --log-opts=--all --redact`: **50 commits, no findings**. The two
   remote branches are `main` and `marodysis`; there are no remote tags at audit time.
-- GitHub has one PR (#1), two Vercel bot comments, no inline comments/reviews,
+- At the initial audit, GitHub had one PR (#1), two Vercel bot comments, no inline comments/reviews,
   four completed successful Actions runs, and no uploaded Actions artifacts.
   All four log archives and the discussion payloads were downloaded to `/tmp`
   and scanned with Gitleaks: **no findings**. This is detection evidence, not a
@@ -76,6 +77,27 @@ written to the existing hosted database.
 The browser smoke uses intercepted APIs. The PostgreSQL integration uses test
 embeddings. Neither substitutes for the live rehearsal checked separately above.
 
+## Committed source and GitHub verification — 2026-11-25
+
+Preparation commit [`8edbd4d519478c7b42d877fcbf76b9130a7400f3`](https://github.com/rayubaldo44/classlens/commit/8edbd4d519478c7b42d877fcbf76b9130a7400f3)
+was pushed normally to `main`, including seven existing local misconception-label
+commits that preceded it. No remote history was overwritten. The
+[exact-commit CI run](https://github.com/rayubaldo44/classlens/actions/runs/45547139136)
+completed successfully: **Frontend, Backend, Browser smoke, and PostgreSQL integration**.
+Fresh local checks also passed backend 136 tests, four frontend unit-test files,
+lint/build, and six Chromium scenarios.
+
+The preparation commit's source archive was inspected and excludes runtime
+environment files, virtual environments, dependencies, model caches, and generated
+test reports. Gitleaks scanned all 51 available commits after committing the
+preparation and reported no findings. Upstream font-license line endings and
+trailing spaces were normalized before commit; license wording is unchanged.
+
+This verification does not authorize public visibility or a release tag. GitHub
+confirmed the repository is still private. Follow the remaining publication gate
+below and ensure the exact commit selected for a tag has passing CI, including
+any subsequent documentation-only verification record.
+
 ## Maintainer publication gate
 
 After reviewing the final diff and verification results:
@@ -83,7 +105,8 @@ After reviewing the final diff and verification results:
 1. Confirm that publishing contributor identities, historical local paths, and
    Vercel bot metadata is acceptable. Review external deployment access controls.
 2. Resolve remaining verification items above; do not claim hosted readiness.
-3. Merge the reviewed preparation and verify CI on that exact release commit.
+3. Preparation is on `main` with passing CI as recorded above. Confirm the exact
+   commit selected for release still has passing CI.
    Re-run the history scan on the exact refs being exposed and confirm the
    source archive excludes environment files, caches, dependencies, and raw logs.
 4. Approve changing the existing repository to public. Enable GitHub private

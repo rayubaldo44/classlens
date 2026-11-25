@@ -68,7 +68,8 @@ existing repository/history, no pilot-feature expansion. See [release audit](doc
 - [x] Audit 50 commits, current release source, existing PR discussion, and four Actions log archives; record public-facing metadata for review.
 - [x] Download and warm the pinned model from an empty cache.
 - [x] Finish the live synthetic browser workflow and final review: ordinary upload through real Gemini, teacher edit/approval, results (9/43 → 3/43), and reload passed; independent review found no Important or Critical issues.
-- [ ] Obtain publication approval, verify CI on the exact release commit, review linked deployments and public metadata, enable/verify private reporting, and publish v0.1.0.
+- [x] Commit and push reviewed preparation; all four GitHub CI jobs passed on `8edbd4d519478c7b42d877fcbf76b9130a7400f3`. See [the verified run](https://github.com/rayubaldo44/classlens/actions/runs/45547139136).
+- [ ] Obtain publication approval, review linked deployments and public metadata, enable/verify private reporting, and publish v0.1.0 from an exact CI-verified commit.
 
 **Acceptance:** clean-source local golden path and automated gates pass; exact
 publication content is reviewed; visibility and release changes remain explicit
