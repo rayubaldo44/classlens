@@ -1,16 +1,6 @@
 # Open-source release preparation
 
-> **PUBLICATION HOLD — deep review, 2026-11-25.** The functional preparation and
-> CI evidence below remain valid, but they do not establish security readiness.
-> Follow the [risk review](OPEN_SOURCE_RISK_REVIEW.md) and
-> [revised release plan](superpowers/plans/2026-11-25-open-source-release.md)
-> before any visibility change or tag. The dependency and application fixes passed
-local verification. Hosting, metadata, repository settings, and remote CI remain open.
-
-Target: `v0.1.0` runnable synthetic-data demo, MIT for original work, preserving
-`rayubaldo44/classlens` and its history. **Not published.** Source preparation has
-been committed and pushed; repository visibility, tags, and GitHub settings remain
-unchanged.
+[ClassLens v0.1.0](https://github.com/rayubaldo44/classlens/releases/tag/v0.1.0) was published from commit `c705d31ba58d625475f3dd1983e5aa00db4cacff` with existing history and third-party notices preserved. All five checks passed on main. Anonymous tag lookup and source download succeeded. The sections below record the preparation and review history.
 
 ## Publication audit — 2026-11-25
 

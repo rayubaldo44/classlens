@@ -1494,3 +1494,39 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Render service access remains the operational blocker. The connector was available but unconnected, and no Render API credential was configured. Hosted containment, metadata consent, public repository controls, and exact-candidate GitHub CI remain open. The disposable local processes and database were stopped.
 
 ---
+
+## Session / Milestone: Hardened candidate passes private GitHub CI
+
+- Pushed `c705d31ba58d625475f3dd1983e5aa00db4cacff` to `chore/open-source-hardening` in the private repository. The commit opts the branch out of Vercel auto-deploy and carries Render's skip marker. GitHub returned zero deployment records for the commit.
+- All four functional CI jobs and the separate security scan job passed on that SHA. A local redacted Gitleaks scan also passed across 55 commits.
+- Render owner access is unavailable to this session. The read-only health request timed out, leaving containment unverified. Metadata sign-off, repository controls, and publication remain open. The verified SHA stays unchanged while this evidence is recorded locally.
+
+---
+
+## Session / Milestone: Render suspension verified
+
+- The maintainer suspended ClassLens in Render. The connected workspace reported the service as suspended, preview generation off, and no visible API preview services.
+- The production frontend bundle referenced the documented Render origin. Its health, OpenAPI, and deliberately nonexistent remediation routes returned HTTP 503 with Render's suspension page.
+- Render still reports automatic deploys enabled. Custom-domain settings, provider usage, credential scopes, and database-role privileges remain unverified. Candidate `c705d31` remains the passing private CI SHA. Publication approval and metadata/repository checks remain open.
+
+---
+
+## Session / Milestone: Render automatic deployment disabled
+
+- Render confirms auto-deploy and preview generation are off. The service remains suspended, and the public health endpoint still returns the HTTP 503 suspension page. The Render integration does not expose the custom-domain list.
+
+---
+
+## Session / Milestone: Render custom-domain inventory confirmed
+
+- The maintainer confirmed that the ClassLens Render service has no custom domains. Known-origin containment is verified. Hosted credential usage and release approval remain open.
+
+---
+
+## Release owner confirmations
+
+The maintainer confirmed completion of the Gemini usage and credential-sharing review and contributor consent for publishing existing Git history. STATUS.md and TASKS.md record these confirmations. GitHub controls, acceptance of MIT commercial reuse, and final publication approval remain open.
+
+## Public v0.1.0 source release
+
+The maintainer authorized MIT publication with existing history. Main advanced to c705d31 and all five GitHub checks passed. Final redacted scans found no secrets in 55 commits, the source archive, ten completed workflow runs or scanned PR metadata. The known hosted API returned HTTP 503. Published v0.1.0 and verified the tag commit and anonymous archive download. Enabled private reporting, secret scanning, push protection, external workflow approval, mandatory action pins and main branch protection. Updated release notes, README, security guidance and release records. Shared hosting and real-student use remain outside this release.

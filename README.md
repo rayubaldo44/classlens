@@ -18,15 +18,7 @@ Semantic grouping is evidence for teacher review, not a diagnosis. Before/after 
 
 ## Release status
 
-**Public release is on hold after a [deep risk review](docs/OPEN_SOURCE_RISK_REVIEW.md).**
-The [revised release plan](docs/superpowers/plans/2026-11-25-open-source-release.md)
-records the locally verified fixes and the remaining hosted containment,
-metadata, and publication gates.
-
-This is a runnable research/demo MVP. Use synthetic inputs only: authentication,
-record ownership checks, privacy/retention workflows, and generation spend controls
-are not implemented. Hosted analysis remains unverified because the current
-backend memory limit is too small for embeddings. See [security boundaries](SECURITY.md).
+[ClassLens v0.1.0](https://github.com/rayubaldo44/classlens/releases/tag/v0.1.0) is available under MIT for local use with synthetic data. The hosted API is suspended. Run the live workflow with your own Gemini key and PostgreSQL database. Review the [security boundaries](SECURITY.md) before running the demo.
 
 ![ClassLens evidence view using synthetic browser-test fixtures](docs/images/synthetic-evidence.png)
 
