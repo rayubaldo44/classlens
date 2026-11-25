@@ -1,12 +1,14 @@
 # ClassLens Status
 
-**Last updated:** 2026-10-27
+**Last updated:** 2026-11-25
 
-**Current phase:** Final P0 golden path verified locally; local demo selected while the paid Render upgrade is deferred
+**Current phase:** Open-source demo release preparation verified; repository remains private pending publication review
 
-**Deadline context:** Hackathon MVP intended to be demo-ready tomorrow
+**Deadline context:** Original hackathon demo milestone completed locally; hosted memory constraint remains unresolved
 
 ## Verified working
+
+- Open-source release preparation adds MIT licensing for original work, preserved Graphify Apache/MIT notices, font notices, a locked-dependency license inventory, contribution/security guidance, bug/PR templates, portable setup documentation with both migrations, and a labeled synthetic browser screenshot. A fresh source snapshot independently installed both dependency locks; backend unit tests passed `136`, frontend four unit-test files/lint/build passed, disposable PostgreSQL 17 applied both migrations and passed the persistence test, and all six Chromium scenarios passed. Gitleaks 8.30.1 found no secrets in 50 commits, the release-source snapshot, or the existing PR discussion/four Actions-log archives. Empty-cache startup downloaded and loaded the pinned model; the live local browser workflow passed through real Gemini, teacher edit/approval, follow-up results (9/43 → 3/43), and reload recovery. An independent final review found no Important or Critical issues. Temporary runtime processes were stopped and credentials removed. No visibility change, tag, release, push, or history rewrite has occurred. See [release audit and publication gate](docs/OPEN_SOURCE_RELEASE.md).
 
 - Graphify developer tooling is implemented with pinned `graphifyy==0.9.77`, an official project skill, exclusion rules, and a safe wrapper. Final review is complete. The wrapper archives prior graph inputs/cache recoverably, validates complete source provenance before clustering/export, replaces unsafe generated report guidance, and recursively rejects generated-destination symlinks before upstream writers. Scoped re-review closed a dual-slot provenance gap by validating both top-level and nested hyperedges. The refreshed graph scanned 83 code files, skipped 20 non-code files, used no LLM, and has 982 nodes / 2,983 links / 53 communities. Local JSON/report/HTML and 1,035 generated Markdown notes plus Canvas exist; all 982 Canvas targets resolve from Vault-EN. All 80 wrapper tests, saved-graph source checks, and source-backed queries pass. Backend regression remains 86 passed / 1 opt-in integration skipped; frontend remains three test files plus lint/build passing from the preceding safety-fix cycle because this scoped change affects only Graphify tooling. All 140 vault files outside the generated Graphify subtree remained byte-identical during the final refresh. Dashboard synchronization is complete. See [setup, usage, and removal](README.md#code-knowledge-graph) and [D-032](docs/DECISIONS.md#d-032--local-code-graph-with-isolated-obsidian-export).
 

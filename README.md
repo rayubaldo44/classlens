@@ -16,7 +16,40 @@ The local Grade 7 photosynthesis workflow is implemented:
 
 Semantic grouping is evidence for teacher review, not a diagnosis. Before/after results describe observed change, not causal proof.
 
+## Release status
+
+This is a runnable research/demo MVP. Use synthetic inputs only: authentication,
+record ownership checks, privacy/retention workflows, and generation spend controls
+are not implemented. Hosted analysis remains unverified because the current
+backend memory limit is too small for embeddings. See [security boundaries](SECURITY.md).
+
+![ClassLens evidence view using synthetic browser-test fixtures](docs/images/synthetic-evidence.png)
+
+*Screenshot: synthetic contract-fixture browser run, not live AI output. The
+browser smoke uses a reduced one-group fixture; the real baseline has four groups.*
+
 ## Local demo
+
+Prerequisites: Linux or WSL, Git, Node 22 (`frontend/.nvmrc`), Python 3.11,
+PostgreSQL 17 plus `psql`, and the runner utilities `curl`, `setsid`, and `ss`.
+The measured backend peak is about 1.11 GB RSS; allow at least 2 GB of available
+memory for the backend, plus capacity for the frontend and database. The initial
+model download needs internet access and local cache space.
+
+```bash
+git clone https://github.com/rayubaldo44/classlens.git
+cd classlens
+```
+
+Follow [backend setup](backend/README.md) to install locked CPU dependencies,
+configure your own Gemini key and database, and apply **both** migrations.
+Then install the frontend:
+
+```bash
+cd frontend
+npm ci
+cd ..
+```
 
 The verified backend runtime is Python 3.11. Complete the one-time backend setup and migration in [backend/README.md](backend/README.md), keep `GEMINI_API_KEY` and `SUPABASE_DB_URL` only in ignored `backend/.env`, and install frontend dependencies under `frontend/`.
 
@@ -69,10 +102,10 @@ graphify --version
 
 The official project skill is committed at `.agents/skills/graphify/`. To regenerate it with this release, run `graphify install --platform agents --project` and review the diff. Use the `agents` platform: the `codex` installer in 0.9.77 also creates a hook. Keep the bounded Graphify guidance in `AGENTS.md` and the required start-of-task document reads.
 
-For this machine's existing Obsidian vault, save the dedicated destination in the ignored local config (review any existing value before replacing it):
+For an optional existing Obsidian vault, save a dedicated destination in the ignored local config (replace the example path and review any existing value before replacing it):
 
 ~~~bash
-printf '%s\n' '/home/rayubaldo44/obsidian-developer-vault/Vault-EN/02_Projects/ClassLens/Graphify' > .graphify-obsidian-dir
+printf '%s\n' '/absolute/path/to/your-vault/Projects/ClassLens/Graphify' > .graphify-obsidian-dir
 ~~~
 
 Alternatively, set `CLASSLENS_OBSIDIAN_GRAPH_DIR` to an absolute dedicated `Graphify` leaf inside an existing Obsidian vault. The environment value takes precedence over the first non-empty config-file line. Without either setting, output goes to `graphify-out/obsidian`. An unavailable external parent produces a local fallback and a nonzero exit; create/open the intended vault before retrying. External Canvas paths are rewritten and checked relative to the containing vault root, so open the existing `Vault-EN` vault rather than treating the generated folder as a new vault.
@@ -154,3 +187,16 @@ npm run test:e2e
 The browser smoke intercepts API calls with contract-valid fixtures. It exercises the complete UI workflow and recovery behavior without contacting Gemini, Supabase, or Render.
 
 For exact current readiness and limitations, read [STATUS.md](STATUS.md). The authoritative product and technical documents are linked from [AGENTS.md](AGENTS.md).
+
+## Contributing and license
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development checks and contribution
+expectations, and [SECURITY.md](SECURITY.md) for private vulnerability reporting.
+Original ClassLens code, documentation, synthetic fixtures, and original images
+are [MIT licensed](LICENSE). Third-party material retains its own terms; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Automated tests use synthetic inputs and no hosted credentials. The live demo
+needs your own Gemini account/key and dedicated PostgreSQL database; provider
+charges may apply. The pinned embedding model downloads from Hugging Face.
+Our license does not grant model weights or provider service rights.

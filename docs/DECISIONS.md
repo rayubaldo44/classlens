@@ -4,6 +4,13 @@ This log records decisions explicitly supplied for ClassLens and the choices sti
 
 ## Accepted decisions
 
+### D-036 — Open-source the synthetic-data demo under MIT
+
+- **Status:** Accepted on 2026-11-25; local release verification passed, publication pending
+- **Decision:** License original ClassLens code, documentation, fixtures, and original imagery under MIT using `Copyright (c) 2026 ClassLens contributors`. Preserve upstream Graphify and other third-party terms. Publish the existing repository/history only after release verification and maintainer approval.
+- **Reason:** Developers should be able to inspect, reproduce, and extend the working MVP. The maintainer confirmed publication rights to the original code and assets.
+- **Consequence:** Keep the source release focused on synthetic local demos. Authentication, ownership, privacy workflows, rate/spend controls, and hosted reliability remain separate pilot gates. Existing APIs, schema, providers, and application workflow are unchanged. See [release audit](OPEN_SOURCE_RELEASE.md) and [third-party notices](../THIRD_PARTY_NOTICES.md).
+
 ### D-035 — Interpret baseline misconception groups in one optional batch
 
 - **Status:** Accepted, implemented, and live-verified on 2026-10-27

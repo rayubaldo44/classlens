@@ -1,0 +1,26 @@
+name: Bug report
+description: Report a reproducible ClassLens problem using synthetic data.
+body:
+  - type: markdown
+    attributes:
+      value: Do not include student data, secrets, environment files, or sensitive logs. Report vulnerabilities using SECURITY.md.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Describe steps and synthetic input that reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Commit, OS, Node/Python versions, and sanitized error code. Omit credentials and connection strings.
+    validations:
+      required: true

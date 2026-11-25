@@ -1426,3 +1426,22 @@ Manually walk the three-minute browser path from `http://127.0.0.1:5173` and `ht
 - Recommended next step: finish the local branch workflow and integrate the reviewed changes without pushing unless explicitly requested.
 
 ---
+
+## Session / Milestone: Open-source demo release prepared and locally verified
+
+**Date:** 2026-11-25 (Asia/Manila)
+
+**Status:** Release preparation verified; repository remains private and publication awaits maintainer review
+
+- Attempted: prepare the existing repository/history as a runnable MIT-licensed synthetic-data demo, audit publication content, and reproduce setup without the existing application environment.
+- Files created or significantly modified: root/backend/frontend READMEs, LICENSE, THIRD_PARTY_NOTICES.md, licenses/, CONTRIBUTING.md, SECURITY.md, GitHub issue/PR templates, frontend package/lock license metadata, docs/OPEN_SOURCE_RELEASE.md, docs/releases/ notes and dependency inventory, docs/images/synthetic-evidence.png, the release plan, STATUS/TASKS, and D-036. Removed three unused template SVG assets after checking they have no references.
+- Completed: standard MIT for original work; preserved installed Graphify 0.9.77 Apache/MIT licenses and NOTICE plus upstream font notices; portable setup with both migrations; explicit synthetic-only and missing-auth/ownership/privacy/spend-control limitations; labeled fixture screenshot; unpublished v0.1.0 notes and concrete publication gate.
+- Verified/tested: fresh Python 3.11 and Node 22 dependency installations; pip check clean; backend 136 passed; four frontend unit-test files, lint, and production build passed; all six Chromium scenarios passed; PostgreSQL 17 fresh migrations and persistence integration 1 passed. The README's exact Python/psql block also applied both migrations to a second empty database. Empty-cache startup downloaded/loaded the pinned embedding model. A real ordinary-upload browser run completed four-group analysis, retrieval, live Gemini generation, teacher edit/approval, follow-up results (9/43 before, 3/43 after), and results/approval reload recovery. Missing environment file and key return actionable runner guidance. Relative documentation links, package-license metadata, and git diff --check passed. Independent release review found no Important or Critical issues.
+- Publication audit: checksum-verified Gitleaks 8.30.1 scanned 50 commits across available refs, the source-only release snapshot, existing PR discussion, and all four Actions log archives with no findings. Remote branches match the audited tracking refs; no tags/artifacts existed at audit time. Historical contributor identities/local paths and Vercel bot metadata remain visible and are called out for review. No history rewrite or remote mutation occurred.
+- Problems encountered: sandbox network/local-port restrictions required permitted execution for dependency download, Chromium, and disposable database access. A documentation write hit a heredoc quoting error before changing tracked files; edits were reapplied safely. The system psql wrapper ignored PGDATABASE, so the documented migration runner now uses an explicit connection argument and was executed successfully. A temporary live verifier initially watched the wrong generation endpoint after successful provider generation; correcting that verifier completed the full run without an application change. One existing-environment backend run stalled and was stopped; the independent clean-environment suite passed completely.
+- Important decisions: release a local synthetic-data demo, not a school-ready deployment; keep existing history and upstream terms; use only disposable local databases and an isolated temporary runtime for this verification. No API/schema/provider or application-workflow behavior changed.
+- Cleanup: temporary demo processes and database container stopped; temporary server credential file removed. Existing backend environment and hosted database were preserved.
+- Remaining work: approve public exposure of historical metadata and review linked deployment access; merge preparation, verify CI and rescan the exact release commit/refs; enable and verify private vulnerability reporting and available secret protection; approve visibility change and publish v0.1.0. Hosted analysis and real-school pilot gates remain open.
+- Recommended next step: review docs/OPEN_SOURCE_RELEASE.md and the final diff before authorizing publication.
+
+---

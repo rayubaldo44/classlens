@@ -12,7 +12,7 @@ Tasks are grouped by priority, then category. Within each category, work from to
 | P1 | Reliability, testing, and optional product improvements | After the P0 demo gates pass |
 | P2 | Real-school pilot safeguards and later product work | After the demo; safeguards must pass before real student data |
 
-**Next action:** preserve the verified local presentation setup. Hosted analysis stays deferred until a 2 GB Render plan is affordable; after the demo, obtain educator review of the embedding regression cases before tuning grouping behavior.
+**Next action:** finish the open-source demo release checks below and review the publication gate. Hosted analysis remains deferred until adequate memory is available; educator review of embedding regression cases remains pending.
 
 ## P0 — demo critical
 
@@ -56,6 +56,23 @@ Depends on: persisted question-specific groups and exact representative evidence
 **Acceptance:** labels remain provisional and teacher-verifiable; failures invent no evidence. Verified with an all-or-nothing structured batch, persisted deterministic fallback, canonical repeat behavior, UI provenance, the complete automated gate, and a live local four-group Gemini/Supabase run. See [docs/AI_PIPELINE.md](docs/AI_PIPELINE.md).
 
 ## P1 — reliability and improvements after P0
+
+### Open-source demo release
+
+Accepted scope (2026-11-25): MIT for original work, runnable synthetic-data demo,
+existing repository/history, no pilot-feature expansion. See [release audit](docs/OPEN_SOURCE_RELEASE.md).
+
+- [x] Add licensing, third-party notices/inventory, contributor/security guidance, and issue/PR templates.
+- [x] Correct portable setup, both migrations, frontend documentation, and demo limitations; add a labeled synthetic screenshot and draft v0.1.0 notes.
+- [x] Independently install both locks and verify backend/frontend/browser checks plus disposable PostgreSQL persistence.
+- [x] Audit 50 commits, current release source, existing PR discussion, and four Actions log archives; record public-facing metadata for review.
+- [x] Download and warm the pinned model from an empty cache.
+- [x] Finish the live synthetic browser workflow and final review: ordinary upload through real Gemini, teacher edit/approval, results (9/43 → 3/43), and reload passed; independent review found no Important or Critical issues.
+- [ ] Obtain publication approval, verify CI on the exact release commit, review linked deployments and public metadata, enable/verify private reporting, and publish v0.1.0.
+
+**Acceptance:** clean-source local golden path and automated gates pass; exact
+publication content is reviewed; visibility and release changes remain explicit
+maintainer actions. School/pilot readiness is a separate milestone.
 
 ### Runtime and deployment reproducibility
 
